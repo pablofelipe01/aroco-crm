@@ -25,9 +25,38 @@ function LoginForm() {
   const [email, setEmail] = React.useState("");
   const [password, setPassword] = React.useState("");
   const [error, setError] = React.useState<string | null>(null);
+  const [notice, setNotice] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState(false);
+  const [resetting, setResetting] = React.useState(false);
 
   const configured = hasSupabaseEnv();
+
+  async function onReset() {
+    setError(null);
+    setNotice(null);
+    if (!email.trim()) {
+      setError("Ingresa tu correo arriba y vuelve a tocar el enlace.");
+      return;
+    }
+    setResetting(true);
+    try {
+      const supabase = createClient();
+      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+        redirectTo: `${window.location.origin}/auth/callback?next=/reset-password`,
+      });
+      if (error) {
+        setError(error.message);
+        return;
+      }
+      setNotice(
+        "Si el correo existe, te enviamos un enlace para restablecer tu contraseña.",
+      );
+    } catch {
+      setError("No se pudo enviar el correo. Intenta de nuevo.");
+    } finally {
+      setResetting(false);
+    }
+  }
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -106,6 +135,11 @@ function LoginForm() {
                 {error}
               </p>
             )}
+            {notice && (
+              <p className="text-sm text-success" role="status">
+                {notice}
+              </p>
+            )}
 
             <Button
               type="submit"
@@ -116,6 +150,15 @@ function LoginForm() {
               <LogIn className="h-4 w-4" />
               Entrar
             </Button>
+
+            <button
+              type="button"
+              onClick={onReset}
+              disabled={!configured || resetting}
+              className="w-full text-center text-xs text-fg-muted underline-offset-2 transition-colors hover:text-accent hover:underline disabled:opacity-50"
+            >
+              {resetting ? "Enviando…" : "¿Olvidaste tu contraseña?"}
+            </button>
           </form>
 
           <p className="text-center text-xs text-fg-subtle">

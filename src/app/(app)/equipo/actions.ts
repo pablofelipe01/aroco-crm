@@ -65,7 +65,16 @@ export async function inviteUser(
     redirectTo: origin ? `${origin}/auth/callback` : undefined,
   });
 
-  if (error) return { error: error.message };
+  if (error) {
+    const msg = error.message.toLowerCase();
+    if (msg.includes("already") || msg.includes("registered") || msg.includes("exists")) {
+      return {
+        error:
+          "Ese correo ya tiene una cuenta. Si la persona olvidó su contraseña, puede usar “¿Olvidaste tu contraseña?” en el login.",
+      };
+    }
+    return { error: error.message };
+  }
 
   revalidatePath("/equipo");
   return { success: `Invitación enviada a ${email}.` };
