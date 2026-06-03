@@ -108,7 +108,93 @@ export function CotizacionesClient({
           }
         />
       ) : (
-        <div className="overflow-x-auto rounded-[var(--radius-lg)] border border-border bg-surface">
+        <>
+        {/* Mobile: cards */}
+        <ul className="space-y-2 sm:hidden">
+          {initialQuotes.map((q) => (
+            <li
+              key={q.id}
+              className="rounded-[var(--radius-md)] border border-border bg-surface p-3 shadow-[var(--shadow-soft-sm)]"
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="font-mono text-xs font-medium text-fg">
+                    {q.quote_number ?? "—"}
+                  </p>
+                  <p className="truncate text-sm text-fg">
+                    {q.client_name ?? q.lead?.company ?? "—"}
+                  </p>
+                </div>
+                <Badge tone="neutral">{q.incoterm}</Badge>
+              </div>
+              <div className="mt-2 flex items-end justify-between gap-2">
+                <div>
+                  <p className="font-mono text-base font-semibold tnum text-fg">
+                    {q.precio_final_usd_tm != null ? formatUSD(q.precio_final_usd_tm) : "—"}
+                  </p>
+                  <p className="text-xs text-fg-subtle">
+                    Utilidad{" "}
+                    {q.utilidad_pct != null ? `${(q.utilidad_pct * 100).toFixed(2)}%` : "—"}
+                    {" · "}
+                    {formatDate(q.created_at)}
+                  </p>
+                </div>
+                {canWrite ? (
+                  <Select
+                    value={q.status}
+                    onChange={(e) => onStatus(q.id, e.target.value as QuoteStatus)}
+                    className="h-8 w-auto py-0 text-xs"
+                  >
+                    {STATUSES.map((st) => (
+                      <option key={st} value={st}>
+                        {QUOTE_STATUS_META[st].label}
+                      </option>
+                    ))}
+                  </Select>
+                ) : (
+                  <Badge tone={QUOTE_STATUS_META[q.status].tone}>
+                    {QUOTE_STATUS_META[q.status].label}
+                  </Badge>
+                )}
+              </div>
+              <div className="mt-2 flex items-center justify-end gap-1 border-t border-border pt-2">
+                <a
+                  href={`/print/cotizacion/${q.id}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="rounded p-1.5 text-fg-subtle hover:bg-bg-subtle hover:text-fg"
+                  title="Exportar PDF"
+                >
+                  <FileDown className="h-4 w-4" />
+                </a>
+                {canWrite && (
+                  <>
+                    <button
+                      onClick={() => {
+                        setEditing(q);
+                        setOpen(true);
+                      }}
+                      className="rounded p-1.5 text-fg-subtle hover:bg-bg-subtle hover:text-fg"
+                      title="Editar"
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={() => onDelete(q)}
+                      className="rounded p-1.5 text-fg-subtle hover:bg-danger-soft hover:text-danger"
+                      title="Eliminar"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </>
+                )}
+              </div>
+            </li>
+          ))}
+        </ul>
+
+        {/* Desktop: table */}
+        <div className="hidden overflow-x-auto rounded-[var(--radius-lg)] border border-border bg-surface sm:block">
           <table className="w-full min-w-[820px] text-sm">
             <thead>
               <tr className="border-b border-border text-xs uppercase tracking-wide text-fg-subtle">
@@ -201,6 +287,7 @@ export function CotizacionesClient({
             </tbody>
           </table>
         </div>
+        </>
       )}
 
       <QuoteCalculator

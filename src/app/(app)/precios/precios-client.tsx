@@ -174,7 +174,44 @@ export function PreciosClient({
           {byDate.length === 0 ? (
             <p className="px-5 py-8 text-center text-sm text-fg-subtle">Sin registros.</p>
           ) : (
-            <div className="overflow-x-auto">
+            <>
+            {/* Mobile: cards */}
+            <ul className="space-y-2 p-3 sm:hidden">
+              {byDate.slice(0, 30).map(([d, row]) => (
+                <li
+                  key={d}
+                  className="rounded-[var(--radius-md)] border border-border bg-surface p-3"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-mono text-xs font-medium text-fg-subtle">
+                      {formatDate(d)}
+                    </span>
+                    {canWrite && (
+                      <button
+                        onClick={() => onDeleteDate(d)}
+                        className="rounded p-1 text-fg-subtle hover:bg-danger-soft hover:text-danger"
+                        aria-label="Eliminar fecha"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </div>
+                  <dl className="mt-1.5 space-y-1">
+                    {companies.map((c) => (
+                      <div key={c} className="flex items-center justify-between gap-2 text-sm">
+                        <dt className="min-w-0 truncate text-fg-muted">{c}</dt>
+                        <dd className="shrink-0 font-mono tnum text-fg">
+                          {row[c] != null ? formatNumber(row[c]) : "—"}
+                        </dd>
+                      </div>
+                    ))}
+                  </dl>
+                </li>
+              ))}
+            </ul>
+
+            {/* Desktop: table */}
+            <div className="hidden overflow-x-auto sm:block">
               <table className="w-full min-w-[560px] text-sm">
                 <thead>
                   <tr className="border-b border-border text-xs uppercase tracking-wide text-fg-subtle">
@@ -214,6 +251,7 @@ export function PreciosClient({
                 </tbody>
               </table>
             </div>
+            </>
           )}
         </CardBody>
       </Card>

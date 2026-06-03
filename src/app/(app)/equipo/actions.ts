@@ -80,14 +80,42 @@ export async function inviteUser(
   return { success: `Invitación enviada a ${email}.` };
 }
 
-/** Toggle a profile's active flag (admin only). */
-export async function toggleProfileActive(profileId: string, active: boolean) {
-  await requireAdmin();
+export type ProfileActionResult = { ok: boolean; error?: string };
+
+/** Toggle a profile's active flag (admin only). Cannot deactivate yourself. */
+export async function toggleProfileActive(
+  profileId: string,
+  active: boolean,
+): Promise<ProfileActionResult> {
+  const session = await requireAdmin().catch(() => null);
+  if (!session) return { ok: false, error: "No autorizado." };
+  if (profileId === session.userId)
+    return { ok: false, error: "No puedes desactivar tu propia cuenta." };
   const supabase = await createClient();
   const { error } = await supabase
     .from("profiles")
     .update({ active })
     .eq("id", profileId);
-  if (error) throw new Error(error.message);
+  if (error) return { ok: false, error: error.message };
   revalidatePath("/equipo");
+  return { ok: true };
+}
+
+/** Change a profile's role (admin only). Cannot change your own role. */
+export async function setProfileRole(
+  profileId: string,
+  role: "admin" | "member",
+): Promise<ProfileActionResult> {
+  const session = await requireAdmin().catch(() => null);
+  if (!session) return { ok: false, error: "No autorizado." };
+  if (profileId === session.userId)
+    return { ok: false, error: "No puedes cambiar tu propio rol." };
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("profiles")
+    .update({ role })
+    .eq("id", profileId);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/equipo");
+  return { ok: true };
 }

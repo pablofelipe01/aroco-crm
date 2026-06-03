@@ -107,7 +107,45 @@ export function InventarioClient({
       {filtered.length === 0 ? (
         <EmptyState icon={<Boxes className="h-6 w-6" />} title="Sin lotes" />
       ) : (
-        <div className="overflow-x-auto rounded-[var(--radius-lg)] border border-border bg-surface">
+        <>
+        {/* Mobile: cards */}
+        <ul className="space-y-2 sm:hidden">
+          {filtered.map((l) => (
+            <li key={l.id}>
+              <button
+                onClick={() => setSelected(l)}
+                className="flex w-full flex-col gap-2 rounded-[var(--radius-md)] border border-border bg-surface p-3 text-left shadow-[var(--shadow-soft-sm)] active:scale-[0.99]"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <span className="min-w-0 flex-1 break-all font-mono text-xs text-fg">
+                    {l.code}
+                  </span>
+                  {l.needs_review && <Badge tone="warn">verificar</Badge>}
+                </div>
+                <div className="flex items-end justify-between gap-2">
+                  <div className="text-xs text-fg-subtle">
+                    {l.entry_date ? formatDate(l.entry_date) : "—"}
+                    {l.quality ? ` · ${l.quality}` : ""}
+                    <div className="mt-0.5 font-mono">
+                      In {formatNumber(l.qty_in_kg)} · Out {formatNumber(l.qty_out_kg)}
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="font-mono text-lg font-semibold tnum text-fg">
+                      {formatNumber(l.qty_available_kg)}
+                    </div>
+                    <div className="text-[10px] uppercase tracking-wide text-fg-subtle">
+                      disponible kg
+                    </div>
+                  </div>
+                </div>
+              </button>
+            </li>
+          ))}
+        </ul>
+
+        {/* Desktop: table */}
+        <div className="hidden overflow-x-auto rounded-[var(--radius-lg)] border border-border bg-surface sm:block">
           <table className="w-full min-w-[680px] text-sm">
             <thead>
               <tr className="border-b border-border text-xs uppercase tracking-wide text-fg-subtle">
@@ -152,6 +190,7 @@ export function InventarioClient({
             </tbody>
           </table>
         </div>
+        </>
       )}
 
       <LotDetail

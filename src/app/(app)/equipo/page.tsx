@@ -8,7 +8,9 @@ import { getSessionContext } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { hasSupabaseEnv } from "@/lib/env";
 import { initials } from "@/lib/utils";
+import type { Profile } from "@/lib/types/database";
 import { InviteForm } from "./invite-form";
+import { ProfileList } from "./profile-list";
 
 export default async function EquipoPage() {
   if (!hasSupabaseEnv()) {
@@ -73,38 +75,10 @@ export default async function EquipoPage() {
           <CardTitle>Usuarios con acceso ({profiles?.length ?? 0})</CardTitle>
         </CardHeader>
         <CardBody className="p-0">
-          {!profiles?.length ? (
-            <p className="px-5 py-8 text-center text-sm text-fg-subtle">
-              Aún no hay usuarios. Invita al primero arriba.
-            </p>
-          ) : (
-            <ul className="divide-y divide-border">
-              {profiles.map((p) => (
-                <li key={p.id} className="flex items-center gap-3 px-5 py-3">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-accent font-mono text-xs font-medium text-accent-fg">
-                    {initials(p.full_name)}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-fg">
-                      {p.full_name}
-                    </p>
-                    <p className="truncate text-xs text-fg-muted">{p.email}</p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {p.department && (
-                      <Badge tone="neutral">{p.department}</Badge>
-                    )}
-                    <Badge tone={p.role === "admin" ? "accent" : "neutral"}>
-                      {p.role === "admin" ? "Admin" : "Miembro"}
-                    </Badge>
-                    <Badge tone={p.active ? "success" : "danger"} dot>
-                      {p.active ? "Activo" : "Inactivo"}
-                    </Badge>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
+          <ProfileList
+            profiles={(profiles ?? []) as Profile[]}
+            currentUserId={session!.userId}
+          />
         </CardBody>
       </Card>
 
