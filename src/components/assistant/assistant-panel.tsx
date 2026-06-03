@@ -1,17 +1,21 @@
 "use client";
 
 import * as React from "react";
+import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { Sparkles, Send, Loader2, Wrench } from "lucide-react";
+import { Sparkles, Send, Loader2, Wrench, Check, X, GitBranch, StickyNote } from "lucide-react";
 import { Drawer } from "@/components/ui/drawer";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/input";
+import { useToast } from "@/components/ui/toast";
 import { cn } from "@/lib/utils";
+import { executeAgentAction, type AgentProposal } from "./actions";
 
 interface ChatMessage {
   role: "user" | "assistant";
   content: string;
   tools?: { name: string }[];
+  proposals?: AgentProposal[];
 }
 
 interface AssistantContextValue {
@@ -35,11 +39,29 @@ const SUGGESTIONS = [
 ];
 
 export function AssistantProvider({ children }: { children: React.ReactNode }) {
+  const router = useRouter();
+  const { toast } = useToast();
   const [isOpen, setIsOpen] = React.useState(false);
   const [messages, setMessages] = React.useState<ChatMessage[]>([]);
   const [input, setInput] = React.useState("");
   const [loading, setLoading] = React.useState(false);
+  // Resolved proposal cards, keyed "msgIndex:propIndex".
+  const [resolved, setResolved] = React.useState<Record<string, "done" | "dismissed">>({});
+  const [confirming, setConfirming] = React.useState<string | null>(null);
   const scrollRef = React.useRef<HTMLDivElement>(null);
+
+  async function onConfirm(key: string, proposal: AgentProposal) {
+    setConfirming(key);
+    const res = await executeAgentAction(proposal);
+    setConfirming(null);
+    if (!res.ok) {
+      toast({ tone: "error", title: "No se pudo aplicar", description: res.error });
+      return;
+    }
+    setResolved((r) => ({ ...r, [key]: "done" }));
+    toast({ tone: "success", title: "Acción aplicada", description: res.message });
+    router.refresh();
+  }
 
   const open = React.useCallback(() => setIsOpen(true), []);
   const close = React.useCallback(() => setIsOpen(false), []);
@@ -72,7 +94,12 @@ export function AssistantProvider({ children }: { children: React.ReactNode }) {
       } else {
         setMessages((m) => [
           ...m,
-          { role: "assistant", content: data.reply, tools: data.tools_used },
+          {
+            role: "assistant",
+            content: data.reply,
+            tools: data.tools_used,
+            proposals: Array.isArray(data.proposals) ? data.proposals : [],
+          },
         ]);
       }
     } catch {
@@ -151,25 +178,86 @@ export function AssistantProvider({ children }: { children: React.ReactNode }) {
           )}
 
           {messages.map((m, i) => (
-            <motion.div
-              key={i}
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              className={cn(
-                "max-w-[88%] rounded-[var(--radius-md)] px-3.5 py-2.5 text-sm",
-                m.role === "user"
-                  ? "self-end bg-accent text-accent-fg"
-                  : "self-start border border-border bg-surface text-fg",
-              )}
-            >
-              <p className="whitespace-pre-wrap leading-relaxed">{m.content}</p>
-              {m.tools && m.tools.length > 0 && (
-                <p className="mt-2 flex items-center gap-1 text-[10px] text-fg-subtle">
-                  <Wrench className="h-3 w-3" />
-                  {m.tools.map((t) => t.name).join(", ")}
-                </p>
-              )}
-            </motion.div>
+            <React.Fragment key={i}>
+              <motion.div
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                className={cn(
+                  "max-w-[88%] rounded-[var(--radius-md)] px-3.5 py-2.5 text-sm",
+                  m.role === "user"
+                    ? "self-end bg-accent text-accent-fg"
+                    : "self-start border border-border bg-surface text-fg",
+                )}
+              >
+                <p className="whitespace-pre-wrap leading-relaxed">{m.content}</p>
+                {m.tools && m.tools.length > 0 && (
+                  <p className="mt-2 flex items-center gap-1 text-[10px] text-fg-subtle">
+                    <Wrench className="h-3 w-3" />
+                    {m.tools.map((t) => t.name).join(", ")}
+                  </p>
+                )}
+              </motion.div>
+
+              {m.proposals?.map((p, j) => {
+                const key = `${i}:${j}`;
+                const state = resolved[key];
+                const Icon = p.kind === "lead_status" ? GitBranch : StickyNote;
+                return (
+                  <div
+                    key={key}
+                    className="max-w-[88%] self-start rounded-[var(--radius-md)] border border-accent/40 bg-accent-soft/30 p-3"
+                  >
+                    <div className="flex items-start gap-2">
+                      <Icon className="mt-0.5 h-4 w-4 shrink-0 text-accent" />
+                      <div className="min-w-0 text-sm">
+                        {p.kind === "lead_status" ? (
+                          <>
+                            <p className="font-medium text-fg">
+                              Cambiar estado · {p.company}
+                            </p>
+                            <p className="text-xs text-fg-muted">
+                              {p.from ?? "—"} → <span className="font-medium">{p.status}</span>
+                            </p>
+                          </>
+                        ) : (
+                          <>
+                            <p className="font-medium text-fg">Agregar nota · {p.company}</p>
+                            <p className="text-xs text-fg-muted">“{p.note}”</p>
+                          </>
+                        )}
+                      </div>
+                    </div>
+
+                    {state === "done" ? (
+                      <p className="mt-2 flex items-center gap-1 text-xs font-medium text-success">
+                        <Check className="h-3.5 w-3.5" /> Aplicado
+                      </p>
+                    ) : state === "dismissed" ? (
+                      <p className="mt-2 text-xs text-fg-subtle">Descartado</p>
+                    ) : (
+                      <div className="mt-2.5 flex items-center gap-2">
+                        <Button
+                          size="sm"
+                          loading={confirming === key}
+                          onClick={() => onConfirm(key, p)}
+                        >
+                          <Check className="h-3.5 w-3.5" />
+                          Confirmar
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setResolved((r) => ({ ...r, [key]: "dismissed" }))}
+                        >
+                          <X className="h-3.5 w-3.5" />
+                          Descartar
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </React.Fragment>
           ))}
 
           {loading && (

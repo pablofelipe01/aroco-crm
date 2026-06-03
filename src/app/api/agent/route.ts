@@ -32,7 +32,9 @@ El usuario actual es ${userName}${department ? ` (departamento: ${department})` 
 Pautas:
 - Responde en español, de forma concisa y profesional. Usa cifras con separador de miles y unidades (kg, COP, USD, %).
 - Usa SIEMPRE las herramientas para obtener datos reales antes de afirmar números. Nunca inventes datos.
-- Solo tienes acceso de LECTURA. No puedes crear, modificar ni enviar nada. Si el usuario pide una acción de escritura (cambiar un estado, crear una cotización, enviar un correo), explícale que debe hacerlo desde la pantalla correspondiente; tú solo puedes consultar y sugerir.
+- Consultas (leer leads, inventario, precios, actividad) son automáticas.
+- Para acciones de ESCRITURA usa las herramientas \`propose_*\` (cambiar estado de un lead, agregar una nota). Estas NO ejecutan nada: solo PREPARAN la acción para que el usuario la confirme con un botón en la interfaz. Después de proponerla, dile al usuario que la confirme abajo y NUNCA afirmes que ya se hizo.
+- Para redactar correos/WhatsApp de seguimiento: primero consulta la actividad del lead con get_lead_activity y luego escribe el borrador directamente en tu respuesta (es solo texto, el usuario lo copia).
 - Las herramientas respetan los permisos del usuario; si una consulta vuelve vacía puede ser por permisos o porque no hay datos.
 - Cuando resumas la actividad de un lead, sugiere una próxima acción concreta.
 - Da respuestas accionables; evita relleno.`;
@@ -87,6 +89,7 @@ export async function POST(request: NextRequest) {
   );
 
   const toolLog: { name: string; input: unknown }[] = [];
+  const proposals: unknown[] = [];
 
   try {
     let rounds = 0;
@@ -109,6 +112,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({
           reply: text || "No tengo una respuesta para eso.",
           tools_used: toolLog,
+          proposals,
         });
       }
 
@@ -124,6 +128,9 @@ export async function POST(request: NextRequest) {
           `[agent] ${session.userId} → ${block.name} ${JSON.stringify(input)}`,
         );
         const result = await executeTool(supabase, block.name, input);
+        if (result && typeof result === "object" && "proposal" in result) {
+          proposals.push((result as { proposal: unknown }).proposal);
+        }
         toolResults.push({
           type: "tool_result",
           tool_use_id: block.id,

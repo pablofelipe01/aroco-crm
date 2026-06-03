@@ -100,6 +100,44 @@ export const AI_TOOLS: Anthropic.Tool[] = [
       "Conteo de leads por etapa del pipeline y por mercado. Para '¿cómo va el pipeline?' o '¿cuántos leads activos hay?'.",
     input_schema: { type: "object", properties: {} },
   },
+  {
+    name: "propose_lead_status_change",
+    description:
+      "PREPARA (no ejecuta) un cambio de estado de un lead — el usuario debe confirmarlo en la interfaz. Úsalo cuando el usuario pida mover o cambiar el estado de un lead. Nunca afirmes que el cambio se hizo: solo queda propuesto hasta que el usuario confirme.",
+    input_schema: {
+      type: "object",
+      properties: {
+        company: { type: "string", description: "Nombre (o parte) de la empresa del lead." },
+        status: {
+          type: "string",
+          enum: [
+            "Nuevo",
+            "Cotización",
+            "Negociación",
+            "Enviado",
+            "En espera",
+            "Cerrado",
+            "Descartado",
+          ],
+          description: "Nuevo estado propuesto.",
+        },
+      },
+      required: ["company", "status"],
+    },
+  },
+  {
+    name: "propose_lead_note",
+    description:
+      "PREPARA (no ejecuta) registrar una nota/actividad en la bitácora de un lead — el usuario debe confirmarla. Úsalo cuando el usuario pida 'agrega una nota', 'registra que…', 'deja constancia de…'. Nunca afirmes que se guardó hasta que el usuario confirme.",
+    input_schema: {
+      type: "object",
+      properties: {
+        company: { type: "string", description: "Nombre (o parte) de la empresa del lead." },
+        note: { type: "string", description: "Texto de la nota a registrar." },
+      },
+      required: ["company", "note"],
+    },
+  },
 ];
 
 function regionFromCode(code: string): string {
@@ -226,6 +264,46 @@ export async function executeTool(
         if (l.market) byMarket[l.market] = (byMarket[l.market] ?? 0) + 1;
       }
       return { total: data?.length ?? 0, por_estado: byStatus, por_mercado: byMarket };
+    }
+
+    case "propose_lead_status_change": {
+      const company = String(input.company ?? "").trim();
+      const status = String(input.status ?? "").trim();
+      if (!company || !status) return { error: "Faltan datos." };
+      const { data } = await db
+        .from("leads")
+        .select("id, company, status")
+        .ilike("company", `%${company}%`)
+        .limit(1);
+      const lead = data?.[0];
+      if (!lead) return { error: `No encontré un lead que coincida con "${company}".` };
+      return {
+        proposal: {
+          kind: "lead_status",
+          lead_id: lead.id,
+          company: lead.company,
+          from: lead.status,
+          status,
+        },
+        note: "Cambio preparado. Indica al usuario que lo confirme en la tarjeta de abajo; aún NO se aplicó.",
+      };
+    }
+
+    case "propose_lead_note": {
+      const company = String(input.company ?? "").trim();
+      const note = String(input.note ?? "").trim();
+      if (!company || !note) return { error: "Faltan datos." };
+      const { data } = await db
+        .from("leads")
+        .select("id, company")
+        .ilike("company", `%${company}%`)
+        .limit(1);
+      const lead = data?.[0];
+      if (!lead) return { error: `No encontré un lead que coincida con "${company}".` };
+      return {
+        proposal: { kind: "lead_note", lead_id: lead.id, company: lead.company, note },
+        note: "Nota preparada. Indica al usuario que la confirme en la tarjeta de abajo; aún NO se guardó.",
+      };
     }
 
     default:
