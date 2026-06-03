@@ -175,7 +175,7 @@ export function PreciosClient({
             <p className="px-5 py-8 text-center text-sm text-fg-subtle">Sin registros.</p>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              <table className="w-full min-w-[560px] text-sm">
                 <thead>
                   <tr className="border-b border-border text-xs uppercase tracking-wide text-fg-subtle">
                     <th className="px-4 py-3 text-left font-medium">Fecha</th>

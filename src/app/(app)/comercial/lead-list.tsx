@@ -91,7 +91,7 @@ export function LeadList({
 
   return (
     <div className="overflow-x-auto rounded-[var(--radius-lg)] border border-border bg-surface">
-      <table className="w-full text-sm">
+      <table className="w-full min-w-[760px] text-sm">
         <thead>
           {table.getHeaderGroups().map((hg) => (
             <tr key={hg.id} className="border-b border-border">

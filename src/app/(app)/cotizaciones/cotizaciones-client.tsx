@@ -109,7 +109,7 @@ export function CotizacionesClient({
         />
       ) : (
         <div className="overflow-x-auto rounded-[var(--radius-lg)] border border-border bg-surface">
-          <table className="w-full text-sm">
+          <table className="w-full min-w-[820px] text-sm">
             <thead>
               <tr className="border-b border-border text-xs uppercase tracking-wide text-fg-subtle">
                 <th className="px-4 py-3 text-left font-medium">Número</th>

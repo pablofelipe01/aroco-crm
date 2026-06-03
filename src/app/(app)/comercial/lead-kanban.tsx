@@ -4,7 +4,8 @@ import * as React from "react";
 import {
   DndContext,
   DragOverlay,
-  PointerSensor,
+  MouseSensor,
+  TouchSensor,
   useSensor,
   useSensors,
   useDraggable,
@@ -109,8 +110,13 @@ export function LeadKanban({
   onStatusChange: (id: string, status: LeadStage) => void;
 }) {
   const [activeId, setActiveId] = React.useState<string | null>(null);
+  // Mouse: 5px threshold. Touch: press-and-hold 200ms so a normal swipe scrolls
+  // the board horizontally and only a deliberate long-press starts a drag.
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(MouseSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(TouchSensor, {
+      activationConstraint: { delay: 200, tolerance: 8 },
+    }),
   );
 
   const byStage = React.useMemo(() => {

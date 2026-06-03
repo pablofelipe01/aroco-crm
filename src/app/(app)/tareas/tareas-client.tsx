@@ -5,7 +5,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import {
   DndContext,
   DragOverlay,
-  PointerSensor,
+  MouseSensor,
+  TouchSensor,
   useSensor,
   useSensors,
   useDraggable,
@@ -232,8 +233,12 @@ export function TareasClient({
     router.replace("/tareas");
   }, [searchParams, router]);
 
+  // Mouse: 5px threshold. Touch: press-and-hold so swiping scrolls the board.
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(MouseSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(TouchSensor, {
+      activationConstraint: { delay: 200, tolerance: 8 },
+    }),
   );
 
   const filtered = React.useMemo(() => {
