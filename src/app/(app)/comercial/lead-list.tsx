@@ -12,9 +12,9 @@ import {
 import { ArrowUpDown, ChevronDown, ChevronUp } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Users } from "lucide-react";
+import { Users, MapPin } from "lucide-react";
 import { LEAD_STAGE_TONE, type LeadStage } from "@/lib/status";
-import { formatDate } from "@/lib/utils";
+import { formatDate, initials } from "@/lib/utils";
 import type { LeadWithOwner } from "./page";
 
 const col = createColumnHelper<LeadWithOwner>();
@@ -90,7 +90,60 @@ export function LeadList({
   }
 
   return (
-    <div className="overflow-x-auto rounded-[var(--radius-lg)] border border-border bg-surface">
+    <>
+      {/* Mobile: card list */}
+      <ul className="space-y-2 sm:hidden">
+        {table.getRowModel().rows.map((row) => {
+          const l = row.original;
+          return (
+            <li key={row.id}>
+              <button
+                onClick={() => onSelect(l)}
+                className="flex w-full flex-col gap-2 rounded-[var(--radius-md)] border border-border bg-surface p-3 text-left shadow-[var(--shadow-soft-sm)] active:scale-[0.99]"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <span className="min-w-0 flex-1 font-medium text-fg">
+                    {l.company}
+                  </span>
+                  <Badge tone={LEAD_STAGE_TONE[l.status as LeadStage]} dot>
+                    {l.status}
+                  </Badge>
+                </div>
+                {l.contact_name && (
+                  <span className="truncate text-xs text-fg-muted">
+                    {l.contact_name}
+                  </span>
+                )}
+                <div className="flex items-center justify-between gap-2 text-xs text-fg-subtle">
+                  <span className="flex items-center gap-1 truncate">
+                    {l.country && (
+                      <>
+                        <MapPin className="h-3 w-3 shrink-0" />
+                        {l.country}
+                      </>
+                    )}
+                  </span>
+                  <span className="flex items-center gap-2">
+                    {l.market && <Badge tone="neutral">{l.market}</Badge>}
+                    {l.owner && (
+                      <span
+                        title={l.owner.name}
+                        className="flex h-5 w-5 items-center justify-center rounded-full font-mono text-[9px] text-white"
+                        style={{ backgroundColor: l.owner.color ?? "var(--accent)" }}
+                      >
+                        {initials(l.owner.name)}
+                      </span>
+                    )}
+                  </span>
+                </div>
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+
+      {/* Desktop: sortable table */}
+      <div className="hidden overflow-x-auto rounded-[var(--radius-lg)] border border-border bg-surface sm:block">
       <table className="w-full min-w-[760px] text-sm">
         <thead>
           {table.getHeaderGroups().map((hg) => (
@@ -135,6 +188,7 @@ export function LeadList({
           ))}
         </tbody>
       </table>
-    </div>
+      </div>
+    </>
   );
 }

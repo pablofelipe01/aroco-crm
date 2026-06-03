@@ -133,7 +133,56 @@ export function DespachosClient({
       {filtered.length === 0 ? (
         <EmptyState icon={<Truck className="h-6 w-6" />} title="Sin despachos" />
       ) : (
-        <div className="overflow-x-auto rounded-[var(--radius-lg)] border border-border bg-surface">
+        <>
+        {/* Mobile: card list */}
+        <ul className="space-y-2 sm:hidden">
+          {filtered.map((d) => (
+            <li
+              key={d.id}
+              className="rounded-[var(--radius-md)] border border-border bg-surface p-3 shadow-[var(--shadow-soft-sm)]"
+            >
+              <div className="flex items-start justify-between gap-2">
+                <span className="min-w-0 flex-1 font-medium text-fg">
+                  {d.destination ?? "—"}
+                </span>
+                <span className="font-mono text-sm font-semibold tnum text-fg">
+                  {formatKg(d.qty_kg)}
+                </span>
+              </div>
+              <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-fg-subtle">
+                <span className="font-mono">{formatDate(d.dispatch_date)}</span>
+                {d.remision_salida && <span className="font-mono">Rem. {d.remision_salida}</span>}
+                {d.purchase_price_cop_kg != null && (
+                  <span className="font-mono">{formatCOP(d.purchase_price_cop_kg)}/kg</span>
+                )}
+              </div>
+              <div className="mt-2 flex items-center justify-between gap-2">
+                <span className="min-w-0 truncate text-xs text-fg-muted">
+                  {d.origin ?? "—"}
+                </span>
+                <div className="flex shrink-0 items-center gap-2">
+                  {d.lot && (
+                    <Badge tone="accent" className="font-mono">
+                      {d.lot.code}
+                    </Badge>
+                  )}
+                  {canWrite && (
+                    <button
+                      onClick={() => onDelete(d)}
+                      className="rounded p-1.5 text-fg-subtle hover:bg-danger-soft hover:text-danger"
+                      aria-label="Eliminar"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
+              </div>
+            </li>
+          ))}
+        </ul>
+
+        {/* Desktop: table */}
+        <div className="hidden overflow-x-auto rounded-[var(--radius-lg)] border border-border bg-surface sm:block">
           <table className="w-full min-w-[760px] text-sm">
             <thead>
               <tr className="border-b border-border text-xs uppercase tracking-wide text-fg-subtle">
@@ -186,6 +235,7 @@ export function DespachosClient({
             </tbody>
           </table>
         </div>
+        </>
       )}
 
       <Modal
