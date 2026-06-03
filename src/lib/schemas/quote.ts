@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { CotizadorInput, Incoterm } from "@/lib/calc/cotizador";
+import { cotizar, type CotizadorInput, type Incoterm } from "@/lib/calc/cotizador";
 
 const num = z.coerce.number();
 const optNum = z.coerce.number().optional().default(0);
@@ -65,5 +65,47 @@ export function toCotizadorInput(q: QuoteFormParsed): CotizadorInput {
     bonifCadmio: q.bonif_cadmio,
     bonifTrazabilidad: q.bonif_trazabilidad,
     bonifTransporte: q.bonif_transporte,
+  };
+}
+
+/**
+ * Build the persisted quotes row (inputs as ratios + computed snapshot) from
+ * validated form values. Shared by the Cotizaciones module and the AI assistant
+ * so both compute identically. quote_number / created_by are added by the caller.
+ */
+export function buildQuoteRow(q: QuoteFormParsed) {
+  const calc = cotizar(toCotizadorInput(q));
+  return {
+    incoterm: q.incoterm,
+    lead_id: q.lead_id ?? null,
+    client_name: q.client_name ?? null,
+    market: q.market ?? null,
+    port_origin: q.port_origin ?? null,
+    port_destination: q.port_destination ?? null,
+    validity_days: q.validity_days,
+    trm: q.trm,
+    cocoa_usd_t: q.cocoa_usd_t,
+    differential: q.differential_pct / 100,
+    purchase_price_cop_kg: q.purchase_price_cop_kg,
+    volume_tm: q.volume_tm,
+    transporte_bodega: q.transporte_bodega,
+    seleccion: q.seleccion,
+    fumigacion: q.fumigacion,
+    estibas: q.estibas,
+    costales: q.costales,
+    coberturas: q.coberturas,
+    costos_exportacion: q.costos_exportacion,
+    bonif_calidad: q.bonif_calidad,
+    bonif_cadmio: q.bonif_cadmio,
+    bonif_trazabilidad: q.bonif_trazabilidad,
+    bonif_transporte: q.bonif_transporte,
+    commission_pct: q.commission_pct / 100,
+    target_utility_pct: q.target_utility_pct / 100,
+    costo_total_usd_tm: calc.costoTotalUsdTm,
+    utilidad_pct: calc.utilidadPct,
+    precio_final_usd_tm: calc.precioFinalUsdTm,
+    precio_final_cop_tm: calc.precioFinalCopTm,
+    total_operacion_usd: calc.totalOperacionUsd,
+    total_operacion_cop: calc.totalOperacionCop,
   };
 }

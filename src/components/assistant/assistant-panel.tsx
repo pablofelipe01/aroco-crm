@@ -14,6 +14,8 @@ import {
   StickyNote,
   ListChecks,
   Boxes,
+  Users,
+  FileText,
 } from "lucide-react";
 import { Drawer } from "@/components/ui/drawer";
 import { Button } from "@/components/ui/button";
@@ -80,6 +82,22 @@ function describeProposal(p: AgentProposal): {
         Icon: Boxes,
         title: `${p.movement === "salida" ? "Salida" : "Entrada"} · ${p.code}`,
         detail: `${p.qty_kg} kg${p.available != null ? ` (disp. ${p.available})` : ""}`,
+      };
+    case "create_lead":
+      return {
+        Icon: Users,
+        title: "Crear lead",
+        detail: `${p.company}${p.owner_name ? ` · ${p.owner_name}` : ""}${
+          p.market ? ` · ${p.market}` : ""
+        }`,
+      };
+    case "create_quote":
+      return {
+        Icon: FileText,
+        title: "Crear cotización (borrador)",
+        detail: `${p.incoterm} · ${p.company}${
+          p.preview_usd_tm != null ? ` · ≈ $${p.preview_usd_tm}/TM` : ""
+        }`,
       };
   }
 }

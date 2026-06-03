@@ -2,6 +2,8 @@ import "server-only";
 import type Anthropic from "@anthropic-ai/sdk";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/types/database";
+import { cotizar } from "@/lib/calc/cotizador";
+import { quoteSchema, toCotizadorInput } from "@/lib/schemas/quote";
 
 type DB = SupabaseClient<Database>;
 
@@ -170,6 +172,52 @@ export const AI_TOOLS: Anthropic.Tool[] = [
         note: { type: "string", description: "Nota (opcional)." },
       },
       required: ["lot_code", "kind", "qty_kg"],
+    },
+  },
+  {
+    name: "propose_create_lead",
+    description:
+      "PREPARA (no ejecuta) la creación de un lead/prospecto — el usuario debe confirmarlo. Úsalo cuando pidan 'crea un lead', 'agrega el prospecto X'. Nunca afirmes que se creó hasta que el usuario confirme.",
+    input_schema: {
+      type: "object",
+      properties: {
+        company: { type: "string", description: "Nombre de la empresa o prospecto." },
+        contact_name: { type: "string", description: "Persona de contacto (opcional)." },
+        country: { type: "string", description: "País / ciudad (opcional)." },
+        market: {
+          type: "string",
+          enum: ["Nacional", "Internacional"],
+          description: "Mercado (opcional).",
+        },
+        type: {
+          type: "string",
+          enum: ["Comprador", "Proveedor potencial", "Comprador/Broker"],
+          description: "Tipo (opcional).",
+        },
+        product_interest: { type: "string", description: "Producto/interés (opcional)." },
+        owner: { type: "string", description: "Nombre del responsable comercial (opcional)." },
+      },
+      required: ["company"],
+    },
+  },
+  {
+    name: "propose_create_quote",
+    description:
+      "PREPARA (no ejecuta) una cotización en BORRADOR — el usuario debe confirmarla. Úsalo cuando pidan 'cotiza…' o 'haz una cotización'. Reúne incoterm, volumen, precio de compra (COP/kg), TRM y referencia; los modificadores que no menciones quedan en 0 y el usuario los ajusta en el módulo Cotizaciones. Nunca afirmes que se creó hasta que el usuario confirme.",
+    input_schema: {
+      type: "object",
+      properties: {
+        incoterm: { type: "string", enum: ["NACIONAL", "FOB", "CIF"] },
+        company: { type: "string", description: "Lead o cliente (opcional)." },
+        volume_tm: { type: "number", description: "Volumen en TM." },
+        purchase_price_cop_kg: { type: "number", description: "Precio de compra COP/kg." },
+        trm: { type: "number", description: "TRM USD/COP." },
+        cocoa_usd_t: { type: "number", description: "Precio cocoa USD/T (export)." },
+        differential_pct: { type: "number", description: "Diferencial % (export)." },
+        commission_pct: { type: "number", description: "Comisión %." },
+        target_utility_pct: { type: "number", description: "Utilidad objetivo % (NACIONAL)." },
+      },
+      required: ["incoterm", "purchase_price_cop_kg", "trm"],
     },
   },
 ];
@@ -400,6 +448,104 @@ export async function executeTool(
           note: String(input.note ?? "").trim() || null,
         },
         note: "Movimiento preparado. Indica al usuario que lo confirme; aún NO se registró.",
+      };
+    }
+
+    case "propose_create_lead": {
+      const company = String(input.company ?? "").trim();
+      if (!company) return { error: "Falta el nombre de la empresa." };
+      let owner_id: string | null = null;
+      let owner_name: string | null = null;
+      const owner = String(input.owner ?? "").trim();
+      if (owner) {
+        const { data } = await db
+          .from("team_members")
+          .select("id, name")
+          .ilike("name", `%${owner}%`)
+          .limit(1);
+        if (data?.[0]) {
+          owner_id = data[0].id;
+          owner_name = data[0].name;
+        }
+      }
+      return {
+        proposal: {
+          kind: "create_lead",
+          company,
+          contact_name: String(input.contact_name ?? "").trim() || null,
+          country: String(input.country ?? "").trim() || null,
+          market: (input.market as string) || null,
+          type: (input.type as string) || null,
+          status: (String(input.status ?? "").trim() || "Nuevo") as string,
+          product_interest: String(input.product_interest ?? "").trim() || null,
+          commercial_owner: owner_id,
+          owner_name,
+        },
+        note: "Lead preparado. Indica al usuario que lo confirme; aún NO se creó.",
+      };
+    }
+
+    case "propose_create_quote": {
+      const incoterm = String(input.incoterm ?? "");
+      if (!["NACIONAL", "FOB", "CIF"].includes(incoterm))
+        return { error: "Incoterm inválido." };
+      const company = String(input.company ?? "").trim();
+      let lead_id: string | null = null;
+      let client_name: string | null = null;
+      let market: string | null = null;
+      if (company) {
+        const { data } = await db
+          .from("leads")
+          .select("id, company, market")
+          .ilike("company", `%${company}%`)
+          .limit(1);
+        if (data?.[0]) {
+          lead_id = data[0].id;
+          client_name = data[0].company;
+          market = data[0].market;
+        }
+      }
+      const quote = {
+        incoterm,
+        lead_id,
+        client_name,
+        market,
+        trm: Number(input.trm) || 0,
+        cocoa_usd_t: Number(input.cocoa_usd_t) || 0,
+        differential_pct: Number(input.differential_pct) || 0,
+        purchase_price_cop_kg: Number(input.purchase_price_cop_kg) || 0,
+        volume_tm: Number(input.volume_tm) || 1,
+        commission_pct: Number(input.commission_pct) || 0,
+        target_utility_pct: Number(input.target_utility_pct) || 0,
+        transporte_bodega: 0,
+        seleccion: 0,
+        fumigacion: 0,
+        estibas: 0,
+        costales: 0,
+        coberturas: 0,
+        costos_exportacion: 0,
+        bonif_calidad: 0,
+        bonif_cadmio: 0,
+        bonif_trazabilidad: 0,
+        bonif_transporte: 0,
+        validity_days: 15,
+      };
+      let preview: number | null = null;
+      try {
+        const parsed = quoteSchema.parse(quote);
+        preview = Math.round(cotizar(toCotizadorInput(parsed)).precioFinalUsdTm * 100) / 100;
+      } catch {
+        /* preview optional */
+      }
+      return {
+        proposal: {
+          kind: "create_quote",
+          company: client_name ?? company ?? "—",
+          incoterm,
+          preview_usd_tm: preview,
+          quote,
+        },
+        note: "Cotización (borrador) preparada. Indica al usuario que la confirme; aún NO se creó.",
       };
     }
 

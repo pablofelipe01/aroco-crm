@@ -5,6 +5,7 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { getSessionContext } from "@/lib/auth";
 import { LEAD_STAGES } from "@/lib/status";
+import { quoteSchema, buildQuoteRow } from "@/lib/schemas/quote";
 
 export type ExecuteResult = { ok: boolean; message?: string; error?: string };
 
@@ -38,6 +39,28 @@ const proposalSchema = z.discriminatedUnion("kind", [
     qty_kg: z.number().positive(),
     available: z.number().optional(),
     note: z.string().nullable().optional(),
+  }),
+  z.object({
+    kind: z.literal("create_lead"),
+    company: z.string().min(1),
+    contact_name: z.string().nullable().optional(),
+    country: z.string().nullable().optional(),
+    market: z.enum(["Nacional", "Internacional"]).nullable().optional(),
+    type: z
+      .enum(["Comprador", "Proveedor potencial", "Comprador/Broker"])
+      .nullable()
+      .optional(),
+    status: z.enum(LEAD_STAGES),
+    product_interest: z.string().nullable().optional(),
+    commercial_owner: z.string().uuid().nullable().optional(),
+    owner_name: z.string().nullable().optional(),
+  }),
+  z.object({
+    kind: z.literal("create_quote"),
+    company: z.string(),
+    incoterm: z.string(),
+    preview_usd_tm: z.number().nullable().optional(),
+    quote: quoteSchema,
   }),
 ]);
 
@@ -109,18 +132,61 @@ export async function executeAgentAction(input: unknown): Promise<ExecuteResult>
     return { ok: true, message: `Tarea creada: ${p.name}.` };
   }
 
-  // inventory_movement
-  const { error } = await supabase.from("inventory_movements").insert({
-    lot_id: p.lot_id,
-    kind: p.movement,
-    qty_kg: p.qty_kg,
-    notes: p.note ?? "Registrado vía asistente",
-    created_by: session.userId,
-  });
+  if (p.kind === "inventory_movement") {
+    const { error } = await supabase.from("inventory_movements").insert({
+      lot_id: p.lot_id,
+      kind: p.movement,
+      qty_kg: p.qty_kg,
+      notes: p.note ?? "Registrado vía asistente",
+      created_by: session.userId,
+    });
+    if (error) return { ok: false, error: friendly(error.message) };
+    revalidatePath("/inventario");
+    return {
+      ok: true,
+      message: `${p.movement === "salida" ? "Salida" : "Entrada"} de ${p.qty_kg} kg en ${p.code}.`,
+    };
+  }
+
+  if (p.kind === "create_lead") {
+    const { data, error } = await supabase
+      .from("leads")
+      .insert({
+        company: p.company,
+        contact_name: p.contact_name ?? null,
+        country: p.country ?? null,
+        market: p.market ?? null,
+        type: p.type ?? null,
+        status: p.status,
+        product_interest: p.product_interest ?? null,
+        commercial_owner: p.commercial_owner ?? null,
+        source: "app",
+        created_by: session.userId,
+      })
+      .select("id")
+      .single();
+    if (error) return { ok: false, error: friendly(error.message) };
+    await supabase.from("lead_activities").insert({
+      lead_id: data.id,
+      type: "Nota",
+      description: "Lead creado (vía asistente).",
+      user_name: userName,
+      created_by: session.userId,
+    });
+    revalidatePath("/comercial");
+    return { ok: true, message: `Lead creado: ${p.company}.` };
+  }
+
+  // create_quote (borrador)
+  const { count } = await supabase
+    .from("quotes")
+    .select("id", { count: "exact", head: true });
+  const quote_number = `COT-${new Date().getFullYear()}-${String((count ?? 0) + 1).padStart(4, "0")}`;
+  const row = buildQuoteRow(p.quote);
+  const { error } = await supabase
+    .from("quotes")
+    .insert({ ...row, quote_number, status: "borrador", created_by: session.userId });
   if (error) return { ok: false, error: friendly(error.message) };
-  revalidatePath("/inventario");
-  return {
-    ok: true,
-    message: `${p.movement === "salida" ? "Salida" : "Entrada"} de ${p.qty_kg} kg en ${p.code}.`,
-  };
+  revalidatePath("/cotizaciones");
+  return { ok: true, message: `Cotización ${quote_number} creada en borrador.` };
 }

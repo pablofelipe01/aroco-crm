@@ -3,8 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getSessionContext } from "@/lib/auth";
-import { quoteSchema, toCotizadorInput } from "@/lib/schemas/quote";
-import { cotizar } from "@/lib/calc/cotizador";
+import { quoteSchema, buildQuoteRow } from "@/lib/schemas/quote";
 import type { QuoteStatus } from "@/lib/types/database";
 
 export type ActionResult = { ok: boolean; error?: string; id?: string };
@@ -21,43 +20,7 @@ function buildRow(input: unknown) {
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Datos inválidos." } as const;
   }
-  const q = parsed.data;
-  const calc = cotizar(toCotizadorInput(q));
-  return {
-    row: {
-      incoterm: q.incoterm,
-      lead_id: q.lead_id ?? null,
-      client_name: q.client_name ?? null,
-      market: q.market ?? null,
-      port_origin: q.port_origin ?? null,
-      port_destination: q.port_destination ?? null,
-      validity_days: q.validity_days,
-      trm: q.trm,
-      cocoa_usd_t: q.cocoa_usd_t,
-      differential: q.differential_pct / 100,
-      purchase_price_cop_kg: q.purchase_price_cop_kg,
-      volume_tm: q.volume_tm,
-      transporte_bodega: q.transporte_bodega,
-      seleccion: q.seleccion,
-      fumigacion: q.fumigacion,
-      estibas: q.estibas,
-      costales: q.costales,
-      coberturas: q.coberturas,
-      costos_exportacion: q.costos_exportacion,
-      bonif_calidad: q.bonif_calidad,
-      bonif_cadmio: q.bonif_cadmio,
-      bonif_trazabilidad: q.bonif_trazabilidad,
-      bonif_transporte: q.bonif_transporte,
-      commission_pct: q.commission_pct / 100,
-      target_utility_pct: q.target_utility_pct / 100,
-      costo_total_usd_tm: calc.costoTotalUsdTm,
-      utilidad_pct: calc.utilidadPct,
-      precio_final_usd_tm: calc.precioFinalUsdTm,
-      precio_final_cop_tm: calc.precioFinalCopTm,
-      total_operacion_usd: calc.totalOperacionUsd,
-      total_operacion_cop: calc.totalOperacionCop,
-    },
-  } as const;
+  return { row: buildQuoteRow(parsed.data) } as const;
 }
 
 async function nextQuoteNumber(
