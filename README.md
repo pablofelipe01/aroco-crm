@@ -1,36 +1,65 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# AROCO — Plataforma comercial (CRM + ERP)
 
-## Getting Started
+Plataforma interna de **AROCO S.A.S** (exportadora/comercializadora de cacao colombiano): CRM de leads, inventario de bodega, cotizaciones de exportación, despachos, comisiones, histórico de precios, tareas y un asistente de IA — todo en una sola app, multi-usuario y por departamentos.
 
-First, run the development server:
+## Stack
+
+- **Next.js 16** (App Router) · **React 19** · **TypeScript** (strict)
+- **Tailwind CSS v4** (tokens cacao en `src/app/globals.css`, claro/oscuro)
+- **Supabase** — Postgres + Auth + RLS + Edge Functions + pg_cron (clientes SSR con `@supabase/ssr`)
+- Framer Motion · Recharts · @dnd-kit · @tanstack/react-table · Zod · react-hook-form · lucide-react
+- **Anthropic** (`@anthropic-ai/sdk`) — asistente con *tool use*, solo en el servidor
+- Deploy: **Vercel** (app) + **Supabase** (datos)
+
+## Módulos
+
+Dashboard · Comercial (CRM de leads, Kanban) · Cotizaciones (cotizador NACIONAL/FOB/CIF + PDF) · Inventario · Despachos · Comisiones · Histórico de precios · Tareas · Equipo/Ajustes · Asistente IA (⌘K + panel).
+
+## Puesta en marcha
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
+pnpm install
+cp .env.example .env.local   # y completa las claves
 pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Variables de entorno: ver [`.env.example`](.env.example). Necesitas un proyecto Supabase (URL + anon + service_role) y, para el asistente, una `ANTHROPIC_API_KEY`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Base de datos
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Las migraciones SQL versionadas están en [`supabase/migrations`](supabase/migrations). Aplícalas con la CLI de Supabase (o el panel) en orden. Genera los tipos con:
 
-## Learn More
+```bash
+pnpm db:types       # supabase gen types typescript --linked
+```
 
-To learn more about Next.js, take a look at the following resources:
+Siembra de datos iniciales desde el libro maestro (archivo local, no versionado):
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+pnpm seed           # scripts/seed-from-xlsx.ts
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Primer admin (invite-only):
 
-## Deploy on Vercel
+```bash
+pnpm tsx scripts/bootstrap-admin.ts <email> <password> "Nombre"
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Scripts
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+| Comando | Descripción |
+|---|---|
+| `pnpm dev` / `build` / `start` | Desarrollo / build / producción |
+| `pnpm typecheck` · `lint` · `format` | Calidad de código |
+| `pnpm test` | Tests de la lógica financiera (`src/lib/calc`) |
+| `pnpm seed` | Carga inicial desde `AROCO_Libro_Maestro.xlsx` |
+
+## Seguridad
+
+- **RLS activo en todas las tablas**; el acceso se aplica en Postgres, no solo en el cliente.
+- La `service_role key` y la `ANTHROPIC_API_KEY` viven **solo en el servidor** (`.env.local`, fuera de git).
+- Registro de usuarios **solo por invitación de admin**.
+
+## Documentación
+
+La especificación maestra del producto está en [`docs/SPEC.md`](docs/SPEC.md); las convenciones para desarrollo en [`CLAUDE.md`](CLAUDE.md).

@@ -1,26 +1,218 @@
 @import "tailwindcss";
 
+/* Dark mode driven by a `.dark` class (next-themes), not the OS preference. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ------------------------------------------------------------------ *
+ *  AROCO design tokens — cacao / verde identity (light + dark)
+ *  Semantic CSS variables; the @theme block below maps them to
+ *  Tailwind utilities (bg-surface, text-fg-muted, border-border, ...).
+ * ------------------------------------------------------------------ */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Backgrounds — paper / sand */
+  --bg-base: #f5f3ee;
+  --bg-subtle: #edeae3;
+  --bg-muted: #e4e0d7;
+
+  /* Surfaces */
+  --surface: #ffffff;
+  --surface-raised: #ffffff;
+  --surface-sunken: #f2efe9;
+
+  /* Borders / dividers */
+  --border: #e0dccf;
+  --border-strong: #cfc9b9;
+
+  /* Text */
+  --fg: #1a1814;
+  --fg-muted: #6b6760;
+  --fg-subtle: #9b9790;
+
+  /* Accent — verde cacao */
+  --accent: #1b4332;
+  --accent-hover: #163728;
+  --accent-active: #102a1f;
+  --accent-mid: #2d6a4f;
+  --accent-soft: #d8f3dc;
+  --accent-soft-fg: #1b4332;
+  --accent-fg: #f5f3ee; /* text on accent surfaces */
+
+  /* Status — each with a soft companion */
+  --warn: #b45309;
+  --warn-soft: #fdecd3;
+  --danger: #991b1b;
+  --danger-soft: #fbe0e0;
+  --info: #1e40af;
+  --info-soft: #dde6fb;
+  --success: #2d6a4f;
+  --success-soft: #d8f3dc;
+
+  /* Ring / focus */
+  --ring: #2d6a4f;
+
+  /* Radii */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+
+  /* Layered soft shadows */
+  --shadow-sm: 0 1px 2px rgba(26, 24, 20, 0.05), 0 1px 1px rgba(26, 24, 20, 0.04);
+  --shadow-md: 0 2px 6px rgba(26, 24, 20, 0.06), 0 6px 16px rgba(26, 24, 20, 0.06);
+  --shadow-lg: 0 8px 24px rgba(26, 24, 20, 0.1), 0 2px 8px rgba(26, 24, 20, 0.06);
+}
+
+.dark {
+  /* Cacao nocturno — warm dark */
+  --bg-base: #15120e;
+  --bg-subtle: #1a1611;
+  --bg-muted: #221d16;
+
+  --surface: #1e1a15;
+  --surface-raised: #262019;
+  --surface-sunken: #17130f;
+
+  --border: #322b22;
+  --border-strong: #463d30;
+
+  --fg: #f0ebe2;
+  --fg-muted: #b0a99c;
+  --fg-subtle: #7e776b;
+
+  --accent: #40916c;
+  --accent-hover: #52b788;
+  --accent-active: #2d6a4f;
+  --accent-mid: #52b788;
+  --accent-soft: #1c3329;
+  --accent-soft-fg: #95d5b2;
+  --accent-fg: #0f1a14;
+
+  --warn: #e08a2b;
+  --warn-soft: #3a2a12;
+  --danger: #e06a6a;
+  --danger-soft: #3a1c1c;
+  --info: #7aa2f7;
+  --info-soft: #1a2440;
+  --success: #52b788;
+  --success-soft: #1c3329;
+
+  --ring: #52b788;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 2px 6px rgba(0, 0, 0, 0.35), 0 6px 16px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.45), 0 2px 8px rgba(0, 0, 0, 0.35);
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-bg-base: var(--bg-base);
+  --color-bg-subtle: var(--bg-subtle);
+  --color-bg-muted: var(--bg-muted);
+
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-surface-sunken: var(--surface-sunken);
+
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+
+  --color-fg: var(--fg);
+  --color-fg-muted: var(--fg-muted);
+  --color-fg-subtle: var(--fg-subtle);
+
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-active: var(--accent-active);
+  --color-accent-mid: var(--accent-mid);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-soft-fg: var(--accent-soft-fg);
+  --color-accent-fg: var(--accent-fg);
+
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+
+  --color-ring: var(--ring);
+
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+
+  --shadow-soft-sm: var(--shadow-sm);
+  --shadow-soft-md: var(--shadow-md);
+  --shadow-soft-lg: var(--shadow-lg);
+
+  --font-sans: var(--font-dm-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-dm-mono), ui-monospace, "SF Mono", monospace;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+* {
+  border-color: var(--border);
+}
+
+html {
+  height: 100%;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  min-height: 100%;
+  background-color: var(--bg-base);
+  color: var(--fg);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  /* Subtle artisanal grain */
+  background-image: radial-gradient(
+    rgba(26, 24, 20, 0.018) 1px,
+    transparent 1px
+  );
+  background-size: 3px 3px;
+}
+
+.dark body {
+  background-image: radial-gradient(
+    rgba(255, 255, 255, 0.012) 1px,
+    transparent 1px
+  );
+  background-size: 3px 3px;
+}
+
+/* Tabular numbers for the financial-instrument feel */
+.tnum {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+/* Custom scrollbars */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 9999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--fg-subtle);
+  background-clip: padding-box;
+}
+
+/* Respect reduced-motion globally */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
