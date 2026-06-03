@@ -18,10 +18,34 @@ const STAGE_COLOR: Record<LeadStage, string> = {
 
 const ACTIVE_STAGES = ["Cotización", "Negociación", "Enviado"];
 
-/** Map a lot code like "CO-ANT-URA-050525" → region segment "ANT". */
+/** Friendly names for the department code segment. */
+const DEPT_NAMES: Record<string, string> = {
+  ANT: "Antioquia",
+  MET: "Meta",
+  CUN: "Cundinamarca",
+  TOL: "Tolima",
+  CAU: "Cauca",
+  SAN: "Santander",
+  MAG: "Magdalena Medio",
+  ARA: "Arauca",
+  ARAU: "Arauca",
+  BOL: "Bolívar",
+  HUI: "Huila",
+  NDS: "N. de Santander",
+};
+
+/**
+ * Map a lot code to a readable procedencia.
+ *   "CO-ANT-URA-050525"           → "Antioquia"
+ *   "CAU-080526(Ruta Guachene)"   → "Cauca"
+ *   "...-080526(Ruta Guachene)"   → "Ruta Guachene"
+ */
 function regionFromCode(code: string): string {
-  const parts = code.split("-");
-  return parts[1]?.trim() || "Otro";
+  const seg = code.split("-")[1]?.trim() ?? "";
+  if (DEPT_NAMES[seg]) return DEPT_NAMES[seg];
+  const paren = code.match(/\(([^)]+)\)/);
+  if (paren) return paren[1].trim();
+  return seg || "Otro";
 }
 
 function shortDate(iso: string): string {
@@ -68,8 +92,8 @@ export default async function DashboardPage() {
     regionKg.set(region, (regionKg.get(region) ?? 0) + kg);
   }
   const sortedRegions = [...regionKg.entries()].sort((a, b) => b[1] - a[1]);
-  const topRegions = sortedRegions.slice(0, 8).map(([region, kg]) => ({ region, kg }));
-  const restKg = sortedRegions.slice(8).reduce((s, [, kg]) => s + kg, 0);
+  const topRegions = sortedRegions.slice(0, 6).map(([region, kg]) => ({ region, kg }));
+  const restKg = sortedRegions.slice(6).reduce((s, [, kg]) => s + kg, 0);
   if (restKg > 0) topRegions.push({ region: "Otros", kg: restKg });
 
   // Price series — pivot to one row per date (last 18 dates).
