@@ -1,12 +1,25 @@
 "use client";
 
+import Link from "next/link";
 import { motion } from "framer-motion";
-import { Users, Boxes, Truck, FileText, Sparkles } from "lucide-react";
+import {
+  Users,
+  Boxes,
+  Truck,
+  FileText,
+  Sparkles,
+  DollarSign,
+  Coins,
+  ListChecks,
+  Calendar,
+} from "lucide-react";
 import { StatCard } from "@/components/ui/stat-card";
 import { Card, CardHeader, CardTitle, CardBody } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
+import { TASK_STATUS_META, type TaskStatus } from "@/lib/status";
+import { formatNumber, formatDate, cn } from "@/lib/utils";
 import { staggerContainer } from "@/lib/motion";
 import {
   PipelineChart,
@@ -31,10 +44,32 @@ export interface DashboardData {
     dispatchCount: number;
     dispatchedKg: number;
   };
+  refs: {
+    trm: number | null;
+    cocoaUsdT: number | null;
+    cacao: { company: string; price: number | null }[];
+  };
+  upcomingTasks: {
+    id: string;
+    name: string;
+    person_name: string | null;
+    due_date: string | null;
+    status: string;
+    overdue: boolean;
+  }[];
+  tasksScopeLabel: string;
   pipeline: PipelineDatum[];
   inventory: InventoryDatum[];
   priceSeries: PriceSeriesPoint[];
   priceCompanies: string[];
+}
+
+function shortCompany(c: string): string {
+  const u = c.toUpperCase();
+  if (u.includes("LUKER")) return "Casa Luker";
+  if (u.includes("IBAGU")) return "Ibagué";
+  if (u.includes("BTA") || u.includes("BOGOT")) return "Nal. Bta";
+  return c;
 }
 
 export function DashboardView({ data }: { data: DashboardData }) {
@@ -85,6 +120,101 @@ export function DashboardView({ data }: { data: DashboardData }) {
         />
       </motion.div>
 
+      {/* Market references + upcoming tasks */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <Card>
+          <CardHeader>
+            <CardTitle>Referencias de mercado</CardTitle>
+            <DollarSign className="h-4 w-4 text-fg-subtle" />
+          </CardHeader>
+          <CardBody className="space-y-2.5">
+            <RefRow
+              icon={<DollarSign className="h-4 w-4" />}
+              label="TRM"
+              value={data.refs.trm != null ? `$${formatNumber(data.refs.trm, 2)}` : "—"}
+              hint="COP/USD"
+            />
+            <RefRow
+              icon={<Coins className="h-4 w-4" />}
+              label="Cacao int."
+              value={data.refs.cocoaUsdT != null ? `$${formatNumber(data.refs.cocoaUsdT)}` : "—"}
+              hint="USD/T"
+            />
+            <div className="border-t border-border pt-2.5">
+              <p className="mb-1.5 text-[11px] uppercase tracking-wide text-fg-subtle">
+                Cacao nacional (COP/kg)
+              </p>
+              {data.refs.cacao.length === 0 ? (
+                <p className="text-sm text-fg-subtle">Sin precios cargados.</p>
+              ) : (
+                data.refs.cacao.map((c) => (
+                  <div key={c.company} className="flex items-center justify-between py-0.5 text-sm">
+                    <span className="truncate text-fg-muted">{shortCompany(c.company)}</span>
+                    <span className="font-mono tnum text-fg">
+                      {c.price != null ? formatNumber(c.price) : "—"}
+                    </span>
+                  </div>
+                ))
+              )}
+            </div>
+            {data.refs.trm == null && (
+              <p className="text-[11px] text-fg-subtle">
+                TRM y cacao internacional se toman de la última cotización.
+              </p>
+            )}
+          </CardBody>
+        </Card>
+
+        <Card className="lg:col-span-2">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <ListChecks className="h-4 w-4 text-accent" />
+              Próximas tareas
+            </CardTitle>
+            <Badge tone="neutral">{data.tasksScopeLabel}</Badge>
+          </CardHeader>
+          <CardBody className="p-0">
+            {data.upcomingTasks.length === 0 ? (
+              <p className="px-5 py-8 text-center text-sm text-fg-subtle">
+                No hay tareas pendientes. 🎉
+              </p>
+            ) : (
+              <ul className="divide-y divide-border">
+                {data.upcomingTasks.map((t) => (
+                  <li key={t.id} className="flex items-center gap-3 px-5 py-2.5">
+                    <Badge tone={TASK_STATUS_META[t.status as TaskStatus]?.tone ?? "neutral"} dot>
+                      {TASK_STATUS_META[t.status as TaskStatus]?.label ?? t.status}
+                    </Badge>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium text-fg">{t.name}</p>
+                      {t.person_name && (
+                        <p className="truncate text-xs text-fg-muted">{t.person_name}</p>
+                      )}
+                    </div>
+                    {t.due_date && (
+                      <span
+                        className={cn(
+                          "flex shrink-0 items-center gap-1 font-mono text-xs",
+                          t.overdue ? "font-medium text-danger" : "text-fg-subtle",
+                        )}
+                      >
+                        <Calendar className="h-3 w-3" />
+                        {formatDate(t.due_date)}
+                      </span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+            <div className="border-t border-border px-5 py-2.5 text-right">
+              <Link href="/tareas" className="text-xs text-accent hover:underline">
+                Ver todas las tareas →
+              </Link>
+            </div>
+          </CardBody>
+        </Card>
+      </div>
+
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-2">
           <CardHeader>
@@ -126,6 +256,29 @@ export function DashboardView({ data }: { data: DashboardData }) {
           )}
         </CardBody>
       </Card>
+    </div>
+  );
+}
+
+function RefRow({
+  icon,
+  label,
+  value,
+  hint,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+  hint?: string;
+}) {
+  return (
+    <div className="flex items-center gap-2.5">
+      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[var(--radius-sm)] bg-accent-soft text-accent-soft-fg">
+        {icon}
+      </span>
+      <span className="text-sm text-fg-muted">{label}</span>
+      <span className="ml-auto font-mono text-sm font-semibold tnum text-fg">{value}</span>
+      {hint && <span className="text-[10px] uppercase tracking-wide text-fg-subtle">{hint}</span>}
     </div>
   );
 }

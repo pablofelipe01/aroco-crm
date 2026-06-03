@@ -5,7 +5,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { LayoutGrid, List, Plus, Search, X } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
-import { Input, Select } from "@/components/ui/input";
+import { Input } from "@/components/ui/input";
+import { MultiSelect } from "@/components/ui/multi-select";
 import { useToast } from "@/components/ui/toast";
 import { cn } from "@/lib/utils";
 import { LEAD_STAGES } from "@/lib/status";
@@ -45,9 +46,9 @@ export function ComercialClient({
 
   const [view, setView] = React.useState<View>("kanban");
   const [query, setQuery] = React.useState("");
-  const [fStatus, setFStatus] = React.useState("");
-  const [fMarket, setFMarket] = React.useState("");
-  const [fOwner, setFOwner] = React.useState("");
+  const [fStatus, setFStatus] = React.useState<string[]>([]);
+  const [fMarket, setFMarket] = React.useState<string[]>([]);
+  const [fOwner, setFOwner] = React.useState<string[]>([]);
 
   const [selected, setSelected] = React.useState<LeadWithOwner | null>(null);
   const [formOpen, setFormOpen] = React.useState(false);
@@ -73,9 +74,10 @@ export function ComercialClient({
   const filtered = React.useMemo(() => {
     const q = query.trim().toLowerCase();
     return leads.filter((l) => {
-      if (fStatus && l.status !== fStatus) return false;
-      if (fMarket && l.market !== fMarket) return false;
-      if (fOwner && l.commercial_owner !== fOwner) return false;
+      if (fStatus.length && !fStatus.includes(l.status)) return false;
+      if (fMarket.length && (!l.market || !fMarket.includes(l.market))) return false;
+      if (fOwner.length && (!l.commercial_owner || !fOwner.includes(l.commercial_owner)))
+        return false;
       if (q) {
         const hay = `${l.company} ${l.contact_name ?? ""} ${l.country ?? ""} ${
           l.product_interest ?? ""
@@ -86,12 +88,13 @@ export function ComercialClient({
     });
   }, [leads, query, fStatus, fMarket, fOwner]);
 
-  const hasFilters = query || fStatus || fMarket || fOwner;
+  const hasFilters =
+    !!query || fStatus.length > 0 || fMarket.length > 0 || fOwner.length > 0;
   const clearFilters = () => {
     setQuery("");
-    setFStatus("");
-    setFMarket("");
-    setFOwner("");
+    setFStatus([]);
+    setFMarket([]);
+    setFOwner([]);
   };
 
   async function onStatusChange(id: string, status: (typeof LEAD_STAGES)[number]) {
@@ -144,42 +147,24 @@ export function ComercialClient({
               className="pl-9"
             />
           </div>
-          <Select
-            value={fStatus}
-            onChange={(e) => setFStatus(e.target.value)}
-            className="w-auto"
-          >
-            <option value="">Todos los estados</option>
-            {LEAD_STAGES.map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </Select>
-          <Select
-            value={fMarket}
-            onChange={(e) => setFMarket(e.target.value)}
-            className="w-auto"
-          >
-            <option value="">Mercado</option>
-            {MARKETS.map((m) => (
-              <option key={m} value={m}>
-                {m}
-              </option>
-            ))}
-          </Select>
-          <Select
-            value={fOwner}
-            onChange={(e) => setFOwner(e.target.value)}
-            className="w-auto"
-          >
-            <option value="">Responsable</option>
-            {team.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name}
-              </option>
-            ))}
-          </Select>
+          <MultiSelect
+            label="Estado"
+            selected={fStatus}
+            onChange={setFStatus}
+            options={LEAD_STAGES.map((s) => ({ value: s, label: s }))}
+          />
+          <MultiSelect
+            label="Mercado"
+            selected={fMarket}
+            onChange={setFMarket}
+            options={MARKETS.map((m) => ({ value: m, label: m }))}
+          />
+          <MultiSelect
+            label="Responsable"
+            selected={fOwner}
+            onChange={setFOwner}
+            options={team.map((t) => ({ value: t.id, label: t.name }))}
+          />
           {hasFilters && (
             <Button variant="ghost" size="sm" onClick={clearFilters}>
               <X className="h-3.5 w-3.5" />

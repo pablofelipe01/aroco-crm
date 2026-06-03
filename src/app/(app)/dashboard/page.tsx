@@ -57,15 +57,39 @@ export default async function DashboardPage() {
   const supabase = await createClient();
   const session = await getSessionContext();
 
-  const [leadsRes, lotsRes, pricesRes, dispatchRes] = await Promise.all([
-    supabase.from("leads").select("status"),
-    supabase.from("inventory_lots").select("code, qty_available_kg"),
-    supabase
-      .from("price_history")
-      .select("company, date, price_cop_kg")
-      .order("date", { ascending: true }),
-    supabase.from("dispatches").select("qty_kg"),
-  ]);
+  const isAdmin = session?.profile?.role === "admin";
+  const dept = session?.profile?.department ?? null;
+
+  // Upcoming pending tasks (next 5 by due date). For admins, scoped to the
+  // people of their own department.
+  let tasksQuery = supabase
+    .from("tasks")
+    .select(
+      "id, name, status, due_date, person_name, person:team_members!tasks_person_id_fkey" +
+        (isAdmin && dept ? "!inner" : "") +
+        "(name, department)",
+    )
+    .neq("status", "done")
+    .order("due_date", { ascending: true, nullsFirst: false })
+    .limit(5);
+  if (isAdmin && dept) tasksQuery = tasksQuery.eq("person.department", dept);
+
+  const [leadsRes, lotsRes, pricesRes, dispatchRes, quoteRes, tasksRes] =
+    await Promise.all([
+      supabase.from("leads").select("status"),
+      supabase.from("inventory_lots").select("code, qty_available_kg"),
+      supabase
+        .from("price_history")
+        .select("company, date, price_cop_kg")
+        .order("date", { ascending: true }),
+      supabase.from("dispatches").select("qty_kg"),
+      supabase
+        .from("quotes")
+        .select("trm, cocoa_usd_t, created_at")
+        .order("created_at", { ascending: false })
+        .limit(1),
+      tasksQuery,
+    ]);
 
   const leads = leadsRes.data ?? [];
   const lots = lotsRes.data ?? [];
@@ -106,6 +130,32 @@ export default async function DashboardPage() {
   }
   const priceSeries = [...byDate.values()].slice(-18);
 
+  // Market references: latest cacao price per company (prices are asc, so the
+  // last seen is the latest) + TRM and international cocoa from the last quote.
+  const latestPrice = new Map<string, number>();
+  for (const p of prices) latestPrice.set(p.company, Number(p.price_cop_kg));
+  const cacao = companies.map((c) => ({ company: c, price: latestPrice.get(c) ?? null }));
+  const lastQuote = quoteRes.data?.[0];
+
+  // Upcoming tasks.
+  type TaskRow = {
+    id: string;
+    name: string;
+    status: string;
+    due_date: string | null;
+    person_name: string | null;
+    person: { name: string | null; department: string | null } | null;
+  };
+  const today = new Date().toISOString().slice(0, 10);
+  const upcomingTasks = ((tasksRes.data ?? []) as unknown as TaskRow[]).map((t) => ({
+    id: t.id,
+    name: t.name,
+    person_name: t.person?.name ?? t.person_name ?? null,
+    due_date: t.due_date,
+    status: t.status,
+    overdue: !!t.due_date && t.due_date < today,
+  }));
+
   const data: DashboardData = {
     name: session?.profile?.full_name ?? "",
     kpis: {
@@ -116,6 +166,13 @@ export default async function DashboardPage() {
       dispatchCount: dispatches.length,
       dispatchedKg: dispatches.reduce((s, d) => s + (Number(d.qty_kg) || 0), 0),
     },
+    refs: {
+      trm: lastQuote?.trm ?? null,
+      cocoaUsdT: lastQuote?.cocoa_usd_t ?? null,
+      cacao,
+    },
+    upcomingTasks,
+    tasksScopeLabel: isAdmin && dept ? `Departamento: ${dept}` : "Próximas",
     pipeline,
     inventory: topRegions,
     priceSeries,
