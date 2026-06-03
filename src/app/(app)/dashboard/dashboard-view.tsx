@@ -46,7 +46,10 @@ export interface DashboardData {
   };
   refs: {
     trm: number | null;
+    trmDate: string | null;
+    spot: number | null;
     cocoaUsdT: number | null;
+    cocoaContract: string | null;
     cacao: { company: string; price: number | null }[];
   };
   upcomingTasks: {
@@ -130,15 +133,28 @@ export function DashboardView({ data }: { data: DashboardData }) {
           <CardBody className="space-y-2.5">
             <RefRow
               icon={<DollarSign className="h-4 w-4" />}
-              label="TRM"
+              label="TRM oficial"
               value={data.refs.trm != null ? `$${formatNumber(data.refs.trm, 2)}` : "—"}
-              hint="COP/USD"
+              hint={data.refs.trmDate ? `Banrep · ${formatDate(data.refs.trmDate)}` : "Banrep"}
+            />
+            <RefRow
+              icon={<DollarSign className="h-4 w-4" />}
+              label="USD/COP spot"
+              value={data.refs.spot != null ? `$${formatNumber(data.refs.spot, 2)}` : "—"}
+              hint={
+                data.refs.spot != null && data.refs.trm != null
+                  ? `${data.refs.spot >= data.refs.trm ? "+" : ""}${formatNumber(
+                      data.refs.spot - data.refs.trm,
+                      0,
+                    )} vs TRM`
+                  : "Yahoo"
+              }
             />
             <RefRow
               icon={<Coins className="h-4 w-4" />}
-              label="Cacao int."
+              label="Cacao ICE"
               value={data.refs.cocoaUsdT != null ? `$${formatNumber(data.refs.cocoaUsdT)}` : "—"}
-              hint="USD/T"
+              hint={data.refs.cocoaContract ? `${data.refs.cocoaContract} · USD/T` : "USD/T"}
             />
             <div className="border-t border-border pt-2.5">
               <p className="mb-1.5 text-[11px] uppercase tracking-wide text-fg-subtle">
@@ -157,11 +173,9 @@ export function DashboardView({ data }: { data: DashboardData }) {
                 ))
               )}
             </div>
-            {data.refs.trm == null && (
-              <p className="text-[11px] text-fg-subtle">
-                TRM y cacao internacional se toman de la última cotización.
-              </p>
-            )}
+            <p className="text-[11px] text-fg-subtle">
+              TRM: Banco de la República · Spot y Cacao ICE: Yahoo Finance.
+            </p>
           </CardBody>
         </Card>
 

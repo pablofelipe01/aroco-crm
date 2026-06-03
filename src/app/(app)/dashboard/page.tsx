@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { getSessionContext } from "@/lib/auth";
 import { LEAD_STAGES, type LeadStage } from "@/lib/status";
+import { getMarketData } from "@/lib/market";
 import { DashboardView, type DashboardData } from "./dashboard-view";
 import type { PriceSeriesPoint } from "@/components/charts/price-chart";
 
@@ -74,7 +75,7 @@ export default async function DashboardPage() {
     .limit(5);
   if (isAdmin && dept) tasksQuery = tasksQuery.eq("person.department", dept);
 
-  const [leadsRes, lotsRes, pricesRes, dispatchRes, quoteRes, tasksRes] =
+  const [leadsRes, lotsRes, pricesRes, dispatchRes, market, tasksRes] =
     await Promise.all([
       supabase.from("leads").select("status"),
       supabase.from("inventory_lots").select("code, qty_available_kg"),
@@ -83,11 +84,7 @@ export default async function DashboardPage() {
         .select("company, date, price_cop_kg")
         .order("date", { ascending: true }),
       supabase.from("dispatches").select("qty_kg"),
-      supabase
-        .from("quotes")
-        .select("trm, cocoa_usd_t, created_at")
-        .order("created_at", { ascending: false })
-        .limit(1),
+      getMarketData(),
       tasksQuery,
     ]);
 
@@ -135,7 +132,6 @@ export default async function DashboardPage() {
   const latestPrice = new Map<string, number>();
   for (const p of prices) latestPrice.set(p.company, Number(p.price_cop_kg));
   const cacao = companies.map((c) => ({ company: c, price: latestPrice.get(c) ?? null }));
-  const lastQuote = quoteRes.data?.[0];
 
   // Upcoming tasks.
   type TaskRow = {
@@ -167,8 +163,11 @@ export default async function DashboardPage() {
       dispatchedKg: dispatches.reduce((s, d) => s + (Number(d.qty_kg) || 0), 0),
     },
     refs: {
-      trm: lastQuote?.trm ?? null,
-      cocoaUsdT: lastQuote?.cocoa_usd_t ?? null,
+      trm: market.trm,
+      trmDate: market.trmDate,
+      spot: market.spot,
+      cocoaUsdT: market.cocoaUsdT,
+      cocoaContract: market.cocoaContract,
       cacao,
     },
     upcomingTasks,
