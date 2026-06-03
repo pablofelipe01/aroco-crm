@@ -15,9 +15,9 @@ export default async function OnboardingPage() {
     <Card className="shadow-[var(--shadow-soft-lg)]">
       <CardBody className="space-y-5">
         <div>
-          <h1 className="text-lg font-semibold text-fg">Completa tu perfil</h1>
+          <h1 className="text-lg font-semibold text-fg">Crea tu cuenta</h1>
           <p className="mt-1 text-sm text-fg-muted">
-            Bienvenido a AROCO. Confirma tus datos para continuar.
+            Bienvenido a AROCO. Confirma tus datos y define tu contraseña.
           </p>
         </div>
         <OnboardingForm

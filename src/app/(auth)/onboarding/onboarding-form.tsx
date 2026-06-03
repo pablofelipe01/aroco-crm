@@ -35,6 +35,24 @@ export function OnboardingForm({ initialName }: { initialName: string }) {
           ))}
         </Select>
       </Field>
+      <Field label="Contraseña" hint="Mínimo 8 caracteres.">
+        <Input
+          name="password"
+          type="password"
+          autoComplete="new-password"
+          placeholder="••••••••"
+          required
+        />
+      </Field>
+      <Field label="Confirmar contraseña">
+        <Input
+          name="password_confirm"
+          type="password"
+          autoComplete="new-password"
+          placeholder="••••••••"
+          required
+        />
+      </Field>
 
       {state.error && (
         <p className="text-sm text-danger" role="alert">

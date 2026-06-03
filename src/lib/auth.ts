@@ -32,7 +32,7 @@ export async function getSessionContext(): Promise<SessionContext | null> {
   };
 }
 
-/** A profile is considered onboarded once it has a department assigned. */
+/** Onboarded once name + department + password are set (the `onboarded` flag). */
 export function isOnboarded(profile: Profile | null): boolean {
-  return Boolean(profile && profile.department);
+  return Boolean(profile && profile.onboarded);
 }

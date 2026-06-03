@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getSessionContext } from "@/lib/auth";
@@ -46,7 +47,14 @@ export async function inviteUser(
     return { error: "Departamento inválido." };
   }
 
-  const origin = process.env.NEXT_PUBLIC_SITE_URL ?? "";
+  // Use the real origin the admin is on (so the invite link points to the
+  // deployed app, not a fixed env var). Falls back to NEXT_PUBLIC_SITE_URL.
+  const h = await headers();
+  const host = h.get("x-forwarded-host") ?? h.get("host");
+  const proto = h.get("x-forwarded-proto") ?? "https";
+  const origin =
+    (host ? `${proto}://${host}` : "") || process.env.NEXT_PUBLIC_SITE_URL || "";
+
   const admin = createAdminClient();
   const { error } = await admin.auth.admin.inviteUserByEmail(email, {
     data: {
