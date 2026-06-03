@@ -3,7 +3,18 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { Sparkles, Send, Loader2, Wrench, Check, X, GitBranch, StickyNote } from "lucide-react";
+import {
+  Sparkles,
+  Send,
+  Loader2,
+  Wrench,
+  Check,
+  X,
+  GitBranch,
+  StickyNote,
+  ListChecks,
+  Boxes,
+} from "lucide-react";
 import { Drawer } from "@/components/ui/drawer";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/input";
@@ -37,6 +48,41 @@ const SUGGESTIONS = [
   "¿Cuál es el precio actual de Casa Luker?",
   "¿Cómo va el pipeline comercial?",
 ];
+
+function describeProposal(p: AgentProposal): {
+  Icon: React.ElementType;
+  title: string;
+  detail: string;
+} {
+  switch (p.kind) {
+    case "lead_status":
+      return {
+        Icon: GitBranch,
+        title: `Cambiar estado · ${p.company}`,
+        detail: `${p.from ?? "—"} → ${p.status}`,
+      };
+    case "lead_note":
+      return {
+        Icon: StickyNote,
+        title: `Agregar nota · ${p.company}`,
+        detail: `“${p.note}”`,
+      };
+    case "create_task":
+      return {
+        Icon: ListChecks,
+        title: "Crear tarea",
+        detail: `${p.name}${p.person_name ? ` · ${p.person_name}` : ""}${
+          p.due_date ? ` · vence ${p.due_date}` : ""
+        }`,
+      };
+    case "inventory_movement":
+      return {
+        Icon: Boxes,
+        title: `${p.movement === "salida" ? "Salida" : "Entrada"} · ${p.code}`,
+        detail: `${p.qty_kg} kg${p.available != null ? ` (disp. ${p.available})` : ""}`,
+      };
+  }
+}
 
 export function AssistantProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -201,7 +247,7 @@ export function AssistantProvider({ children }: { children: React.ReactNode }) {
               {m.proposals?.map((p, j) => {
                 const key = `${i}:${j}`;
                 const state = resolved[key];
-                const Icon = p.kind === "lead_status" ? GitBranch : StickyNote;
+                const { Icon, title, detail } = describeProposal(p);
                 return (
                   <div
                     key={key}
@@ -210,21 +256,8 @@ export function AssistantProvider({ children }: { children: React.ReactNode }) {
                     <div className="flex items-start gap-2">
                       <Icon className="mt-0.5 h-4 w-4 shrink-0 text-accent" />
                       <div className="min-w-0 text-sm">
-                        {p.kind === "lead_status" ? (
-                          <>
-                            <p className="font-medium text-fg">
-                              Cambiar estado · {p.company}
-                            </p>
-                            <p className="text-xs text-fg-muted">
-                              {p.from ?? "—"} → <span className="font-medium">{p.status}</span>
-                            </p>
-                          </>
-                        ) : (
-                          <>
-                            <p className="font-medium text-fg">Agregar nota · {p.company}</p>
-                            <p className="text-xs text-fg-muted">“{p.note}”</p>
-                          </>
-                        )}
+                        <p className="font-medium text-fg">{title}</p>
+                        <p className="text-xs text-fg-muted">{detail}</p>
                       </div>
                     </div>
 

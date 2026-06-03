@@ -138,6 +138,40 @@ export const AI_TOOLS: Anthropic.Tool[] = [
       required: ["company", "note"],
     },
   },
+  {
+    name: "propose_create_task",
+    description:
+      "PREPARA (no ejecuta) la creación de una tarea — el usuario debe confirmarla. Úsalo cuando pidan 'crea una tarea', 'recuérdame…', 'asígnale a X que…'. Nunca afirmes que se creó hasta que el usuario confirme.",
+    input_schema: {
+      type: "object",
+      properties: {
+        name: { type: "string", description: "Qué hay que hacer (título de la tarea)." },
+        person: { type: "string", description: "Nombre del responsable (opcional)." },
+        due_date: { type: "string", description: "Fecha de vencimiento YYYY-MM-DD (opcional)." },
+        description: { type: "string", description: "Detalle adicional (opcional)." },
+      },
+      required: ["name"],
+    },
+  },
+  {
+    name: "propose_inventory_movement",
+    description:
+      "PREPARA (no ejecuta) un movimiento de inventario (entrada o salida) sobre un lote — el usuario debe confirmarlo. Úsalo cuando pidan 'registra una salida de N kg del lote X', 'ingresa N kg'. Nunca afirmes que se registró hasta que el usuario confirme.",
+    input_schema: {
+      type: "object",
+      properties: {
+        lot_code: { type: "string", description: "Código (o parte) del lote." },
+        kind: {
+          type: "string",
+          enum: ["entrada", "salida"],
+          description: "Tipo de movimiento.",
+        },
+        qty_kg: { type: "number", description: "Cantidad en kg (positiva)." },
+        note: { type: "string", description: "Nota (opcional)." },
+      },
+      required: ["lot_code", "kind", "qty_kg"],
+    },
+  },
 ];
 
 function regionFromCode(code: string): string {
@@ -303,6 +337,69 @@ export async function executeTool(
       return {
         proposal: { kind: "lead_note", lead_id: lead.id, company: lead.company, note },
         note: "Nota preparada. Indica al usuario que la confirme en la tarjeta de abajo; aún NO se guardó.",
+      };
+    }
+
+    case "propose_create_task": {
+      const name = String(input.name ?? "").trim();
+      if (!name) return { error: "Falta el nombre de la tarea." };
+      let person_id: string | null = null;
+      let person_name: string | null = null;
+      const person = String(input.person ?? "").trim();
+      if (person) {
+        const { data } = await db
+          .from("team_members")
+          .select("id, name")
+          .ilike("name", `%${person}%`)
+          .limit(1);
+        if (data?.[0]) {
+          person_id = data[0].id;
+          person_name = data[0].name;
+        }
+      }
+      return {
+        proposal: {
+          kind: "create_task",
+          name,
+          person_id,
+          person_name,
+          due_date: String(input.due_date ?? "").trim() || null,
+          description: String(input.description ?? "").trim() || null,
+        },
+        note: "Tarea preparada. Indica al usuario que la confirme; aún NO se creó.",
+      };
+    }
+
+    case "propose_inventory_movement": {
+      const lotCode = String(input.lot_code ?? "").trim();
+      const movement = String(input.kind ?? "");
+      const qty = Number(input.qty_kg);
+      if (
+        !lotCode ||
+        (movement !== "entrada" && movement !== "salida") ||
+        !Number.isFinite(qty) ||
+        qty <= 0
+      ) {
+        return { error: "Datos de movimiento inválidos (lote, tipo y cantidad > 0)." };
+      }
+      const { data } = await db
+        .from("inventory_lots")
+        .select("id, code, qty_available_kg")
+        .ilike("code", `%${lotCode}%`)
+        .limit(1);
+      const lot = data?.[0];
+      if (!lot) return { error: `No encontré un lote que coincida con "${lotCode}".` };
+      return {
+        proposal: {
+          kind: "inventory_movement",
+          lot_id: lot.id,
+          code: lot.code,
+          movement,
+          qty_kg: qty,
+          available: lot.qty_available_kg,
+          note: String(input.note ?? "").trim() || null,
+        },
+        note: "Movimiento preparado. Indica al usuario que lo confirme; aún NO se registró.",
       };
     }
 
