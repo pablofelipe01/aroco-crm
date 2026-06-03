@@ -18,6 +18,15 @@ export interface PriceSeriesPoint {
 
 const SERIES_COLORS = ["#1B4332", "#B45309", "#1E40AF"];
 
+/** Shorten the long company labels for the legend/tooltip. */
+function shortName(company: string): string {
+  const c = company.toUpperCase();
+  if (c.includes("LUKER")) return "Casa Luker";
+  if (c.includes("IBAGU")) return "Nal. Chocolate Ibagué";
+  if (c.includes("BTA") || c.includes("BOGOT")) return "Nal. Chocolate Bta";
+  return company;
+}
+
 export function PriceChart({
   data,
   companies,
@@ -26,8 +35,8 @@ export function PriceChart({
   companies: string[];
 }) {
   return (
-    <ResponsiveContainer width="100%" height={260}>
-      <LineChart data={data} margin={{ top: 8, right: 12, left: -8, bottom: 0 }}>
+    <ResponsiveContainer width="100%" height={280}>
+      <LineChart data={data} margin={{ top: 8, right: 16, left: 4, bottom: 0 }}>
         <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
         <XAxis
           dataKey="date"
@@ -40,9 +49,9 @@ export function PriceChart({
           tick={{ fontSize: 11, fill: "var(--fg-subtle)" }}
           axisLine={false}
           tickLine={false}
-          width={56}
-          domain={["auto", "auto"]}
-          tickFormatter={(v: number) => `${(v / 1000).toFixed(0)}k`}
+          width={48}
+          domain={["dataMin - 200", "dataMax + 200"]}
+          tickFormatter={(v: number) => `${(v / 1000).toFixed(1)}k`}
         />
         <Tooltip
           contentStyle={{
@@ -52,11 +61,18 @@ export function PriceChart({
             fontSize: 12,
             color: "var(--fg)",
           }}
-          formatter={(value) =>
-            new Intl.NumberFormat("es-CO").format(Number(value)) + " COP/kg"
-          }
+          formatter={(value: unknown, name: unknown) => [
+            `${new Intl.NumberFormat("es-CO").format(Number(value))} COP/kg`,
+            shortName(String(name)),
+          ]}
         />
-        <Legend wrapperStyle={{ fontSize: 11, color: "var(--fg-muted)" }} iconType="plainline" />
+        <Legend
+          wrapperStyle={{ fontSize: 11, color: "var(--fg-muted)", paddingTop: 8 }}
+          iconType="plainline"
+          formatter={(value: unknown) => (
+            <span style={{ color: "var(--fg-muted)" }}>{shortName(String(value))}</span>
+          )}
+        />
         {companies.map((c, i) => (
           <Line
             key={c}
@@ -65,6 +81,7 @@ export function PriceChart({
             stroke={SERIES_COLORS[i % SERIES_COLORS.length]}
             strokeWidth={2}
             dot={false}
+            activeDot={{ r: 4 }}
             connectNulls
           />
         ))}

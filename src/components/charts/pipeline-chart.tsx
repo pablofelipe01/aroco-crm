@@ -8,6 +8,7 @@ import {
   Tooltip,
   ResponsiveContainer,
   Cell,
+  LabelList,
 } from "recharts";
 
 export interface PipelineDatum {
@@ -18,23 +19,21 @@ export interface PipelineDatum {
 
 export function PipelineChart({ data }: { data: PipelineDatum[] }) {
   return (
-    <ResponsiveContainer width="100%" height={240}>
-      <BarChart data={data} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
-        <XAxis
-          dataKey="stage"
-          tick={{ fontSize: 11, fill: "var(--fg-subtle)" }}
-          axisLine={{ stroke: "var(--border)" }}
-          tickLine={false}
-          interval={0}
-          angle={-20}
-          textAnchor="end"
-          height={50}
-        />
+    <ResponsiveContainer width="100%" height={260}>
+      <BarChart
+        layout="vertical"
+        data={data}
+        margin={{ top: 4, right: 28, left: 8, bottom: 4 }}
+        barCategoryGap={8}
+      >
+        <XAxis type="number" hide domain={[0, "dataMax"]} allowDecimals={false} />
         <YAxis
-          tick={{ fontSize: 11, fill: "var(--fg-subtle)" }}
+          type="category"
+          dataKey="stage"
+          width={92}
+          tick={{ fontSize: 12, fill: "var(--fg-muted)" }}
           axisLine={false}
           tickLine={false}
-          allowDecimals={false}
         />
         <Tooltip
           cursor={{ fill: "var(--bg-muted)", opacity: 0.4 }}
@@ -45,11 +44,17 @@ export function PipelineChart({ data }: { data: PipelineDatum[] }) {
             fontSize: 12,
             color: "var(--fg)",
           }}
+          formatter={(value: unknown) => [`${Number(value)} leads`, "Cantidad"]}
         />
-        <Bar dataKey="count" radius={[6, 6, 0, 0]}>
+        <Bar dataKey="count" radius={[0, 6, 6, 0]} barSize={20}>
           {data.map((d) => (
             <Cell key={d.stage} fill={d.color} />
           ))}
+          <LabelList
+            dataKey="count"
+            position="right"
+            style={{ fill: "var(--fg)", fontSize: 12, fontWeight: 600 }}
+          />
         </Bar>
       </BarChart>
     </ResponsiveContainer>
