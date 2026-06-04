@@ -58,7 +58,7 @@ export function Modal({
             aria-modal="true"
             aria-label={title}
             className={cn(
-              "relative w-full overflow-hidden rounded-[var(--radius-lg)] border border-border bg-surface shadow-[var(--shadow-soft-lg)]",
+              "relative flex max-h-[90dvh] w-full flex-col overflow-hidden rounded-[var(--radius-lg)] border border-border bg-surface shadow-[var(--shadow-soft-lg)]",
               maxW,
             )}
             initial={{ opacity: 0, scale: 0.97, y: 8 }}
@@ -67,7 +67,7 @@ export function Modal({
             transition={{ type: "spring", stiffness: 460, damping: 34 }}
           >
             {(title || description) && (
-              <div className="flex items-start justify-between gap-4 border-b border-border px-5 py-4">
+              <div className="flex shrink-0 items-start justify-between gap-4 border-b border-border px-5 py-4">
                 <div>
                   {title && (
                     <h2 className="text-base font-semibold text-fg">{title}</h2>
@@ -85,9 +85,9 @@ export function Modal({
                 </button>
               </div>
             )}
-            <div className="px-5 py-4">{children}</div>
+            <div className="flex-1 overflow-y-auto px-5 py-4">{children}</div>
             {footer && (
-              <div className="flex items-center justify-end gap-2 border-t border-border bg-bg-subtle/50 px-5 py-3">
+              <div className="flex shrink-0 items-center justify-end gap-2 border-t border-border bg-bg-subtle/50 px-5 py-3">
                 {footer}
               </div>
             )}
