@@ -17,10 +17,16 @@ export interface PriceSeriesPoint {
 }
 
 const SERIES_COLORS = ["#1B4332", "#B45309", "#1E40AF"];
+const INTL_COLOR = "#7C3AED";
+
+function isIntl(company: string): boolean {
+  return company.toUpperCase().includes("INTERNACIONAL");
+}
 
 /** Shorten the long company labels for the legend/tooltip. */
 function shortName(company: string): string {
   const c = company.toUpperCase();
+  if (c.includes("INTERNACIONAL")) return "Internacional (ICE)";
   if (c.includes("LUKER")) return "Casa Luker";
   if (c.includes("IBAGU")) return "Nal. Chocolate Ibagué";
   if (c.includes("BTA") || c.includes("BOGOT")) return "Nal. Chocolate Bta";
@@ -78,8 +84,9 @@ export function PriceChart({
             key={c}
             type="monotone"
             dataKey={c}
-            stroke={SERIES_COLORS[i % SERIES_COLORS.length]}
+            stroke={isIntl(c) ? INTL_COLOR : SERIES_COLORS[i % SERIES_COLORS.length]}
             strokeWidth={2}
+            strokeDasharray={isIntl(c) ? "5 4" : undefined}
             dot={false}
             activeDot={{ r: 4 }}
             connectNulls

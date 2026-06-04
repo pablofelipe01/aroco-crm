@@ -2,7 +2,15 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Trash2, TrendingUp, TrendingDown } from "lucide-react";
+import {
+  Plus,
+  Trash2,
+  TrendingUp,
+  TrendingDown,
+  Globe,
+  Sparkles,
+  Loader2,
+} from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardHeader, CardTitle, CardBody } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -21,6 +29,8 @@ const PREFERRED_ORDER = [
   "NAC. CHOCOLATE IBAGUÉ",
 ];
 
+const INTL = "Internacional (ICE)";
+
 function shortDate(iso: string) {
   return new Intl.DateTimeFormat("es-CO", { day: "2-digit", month: "short" }).format(
     new Date(iso),
@@ -29,9 +39,11 @@ function shortDate(iso: string) {
 
 export function PreciosClient({
   prices,
+  international,
   canWrite,
 }: {
   prices: PriceHistory[];
+  international: Record<string, number>;
   canWrite: boolean;
 }) {
   const router = useRouter();
@@ -40,6 +52,8 @@ export function PreciosClient({
   const [date, setDate] = React.useState(new Date().toISOString().slice(0, 10));
   const [vals, setVals] = React.useState<Record<string, string>>({});
   const [saving, setSaving] = React.useState(false);
+  const [analysis, setAnalysis] = React.useState<string | null>(null);
+  const [analyzing, setAnalyzing] = React.useState(false);
 
   const companies = React.useMemo(() => {
     const set = new Set(prices.map((p) => p.company));
@@ -62,8 +76,11 @@ export function PreciosClient({
 
   const series: PriceSeriesPoint[] = React.useMemo(() => {
     const asc = [...byDate].reverse().slice(-24);
-    return asc.map(([d, row]) => ({ date: shortDate(d), ...row }));
-  }, [byDate]);
+    return asc.map(([d, row]) => {
+      const intl = international[d];
+      return { date: shortDate(d), ...row, ...(intl != null ? { [INTL]: intl } : {}) };
+    });
+  }, [byDate, international]);
 
   // Latest + delta per company.
   const latest = React.useMemo(() => {
@@ -77,6 +94,55 @@ export function PreciosClient({
       return { company: c, cur, delta };
     });
   }, [companies, prices]);
+
+  const hasIntl = Object.keys(international).length > 0;
+  const chartCompanies = hasIntl ? [...companies, INTL] : companies;
+
+  // Latest international (COP/kg) and gap vs the national average.
+  const gap = React.useMemo(() => {
+    const sortedDates = [...new Set(prices.map((p) => p.date))].sort((a, b) =>
+      a < b ? 1 : -1,
+    );
+    const latestDate = sortedDates[0];
+    if (!latestDate) return null;
+    const intl = international[latestDate];
+    const nat = prices.filter((p) => p.date === latestDate).map((p) => p.price_cop_kg);
+    if (intl == null || nat.length === 0) return null;
+    const natAvg = nat.reduce((s, v) => s + v, 0) / nat.length;
+    return {
+      intl,
+      natAvg,
+      diff: intl - natAvg,
+      pct: natAvg !== 0 ? ((intl - natAvg) / natAvg) * 100 : 0,
+    };
+  }, [prices, international]);
+
+  async function onAnalyze() {
+    setAnalyzing(true);
+    setAnalysis(null);
+    try {
+      const res = await fetch("/api/precios/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          latest: latest.map((l) => ({ company: l.company, price: l.cur })),
+          internationalCopKg: gap?.intl ?? null,
+          gapPct: gap?.pct ?? null,
+          series: series.slice(-12),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast({ tone: "error", title: "No se pudo analizar", description: data.error });
+        return;
+      }
+      setAnalysis(data.analysis);
+    } catch {
+      toast({ tone: "error", title: "Error de conexión" });
+    } finally {
+      setAnalyzing(false);
+    }
+  }
 
   async function onSubmit() {
     setSaving(true);
@@ -124,7 +190,7 @@ export function PreciosClient({
         }
       />
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {latest.map((l) => (
           <Card key={l.company}>
             <CardBody>
@@ -151,17 +217,68 @@ export function PreciosClient({
             </CardBody>
           </Card>
         ))}
+        {gap && (
+          <Card className="border-accent/40 bg-accent-soft/20">
+            <CardBody>
+              <p className="flex items-center gap-1.5 text-xs font-medium text-fg-muted">
+                <Globe className="h-3.5 w-3.5" />
+                Internacional (ICE → COP/kg)
+              </p>
+              <p className="mt-1 font-mono text-2xl font-bold text-fg tnum">
+                {formatNumber(gap.intl)}
+                <span className="text-sm font-normal text-fg-subtle"> COP/kg</span>
+              </p>
+              <span
+                className={cn(
+                  "mt-1 inline-flex items-center gap-1 text-xs font-medium",
+                  gap.diff >= 0 ? "text-success" : "text-danger",
+                )}
+              >
+                {gap.diff >= 0 ? "+" : ""}
+                {formatNumber(gap.diff)} ({gap.pct >= 0 ? "+" : ""}
+                {gap.pct.toFixed(1)}%) vs. nacional
+              </span>
+            </CardBody>
+          </Card>
+        )}
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Tendencia</CardTitle>
+          <CardTitle>Tendencia · nacional vs internacional</CardTitle>
+          <Button size="sm" variant="secondary" onClick={onAnalyze} loading={analyzing}>
+            <Sparkles className="h-4 w-4 text-accent" />
+            Analizar con IA
+          </Button>
         </CardHeader>
         <CardBody>
           {series.length > 0 ? (
-            <PriceChart data={series} companies={companies} />
+            <PriceChart data={series} companies={chartCompanies} />
           ) : (
             <EmptyState title="Sin datos de precios" />
+          )}
+          {!hasIntl && series.length > 0 && (
+            <p className="mt-2 text-xs text-fg-subtle">
+              No se pudo cargar el precio internacional en este momento.
+            </p>
+          )}
+          {(analyzing || analysis) && (
+            <div className="mt-4 rounded-[var(--radius-md)] border border-accent/40 bg-accent-soft/20 p-4">
+              <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-accent-soft-fg">
+                <Sparkles className="h-3.5 w-3.5" />
+                Análisis IA
+              </p>
+              {analyzing ? (
+                <p className="flex items-center gap-2 text-sm text-fg-muted">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Analizando precios…
+                </p>
+              ) : (
+                <p className="whitespace-pre-wrap text-sm leading-relaxed text-fg">
+                  {analysis}
+                </p>
+              )}
+            </div>
           )}
         </CardBody>
       </Card>

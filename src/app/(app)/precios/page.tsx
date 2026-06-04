@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { getSessionContext } from "@/lib/auth";
+import { getInternationalSeries } from "@/lib/market";
 import { PreciosClient } from "./precios-client";
 import type { PriceHistory } from "@/lib/types/database";
 
@@ -21,9 +22,14 @@ export default async function PreciosPage() {
     .select("*")
     .order("date", { ascending: true });
 
+  // International cocoa converted to COP/kg for the same dates we have nationally.
+  const dates = [...new Set((prices ?? []).map((p) => p.date))];
+  const international = await getInternationalSeries(dates);
+
   return (
     <PreciosClient
       prices={(prices ?? []) as PriceHistory[]}
+      international={international}
       canWrite={canWrite}
     />
   );

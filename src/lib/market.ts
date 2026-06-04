@@ -85,6 +85,96 @@ async function getTRM(): Promise<{ value: number | null; date: string | null }> 
   }
 }
 
+/** Parse a FRED fredgraph CSV (observation_date,SERIES) → Map<YYYY-MM-DD, value>. */
+function parseFredCsv(csv: string): Map<string, number> {
+  const map = new Map<string, number>();
+  const lines = csv.trim().split("\n");
+  for (let i = 1; i < lines.length; i++) {
+    const c = lines[i].split(",");
+    const date = c[0];
+    const value = Number(c[1]);
+    if (date && /^\d{4}-\d{2}-\d{2}$/.test(date) && Number.isFinite(value)) {
+      map.set(date, value);
+    }
+  }
+  return map;
+}
+
+/** Value of the latest entry with date ≤ target (nearest prior trading day). */
+function valueAtOrBefore(sorted: [string, number][], target: string): number | null {
+  let v: number | null = null;
+  for (const [d, val] of sorted) {
+    if (d <= target) v = val;
+    else break;
+  }
+  return v;
+}
+
+/**
+ * International cocoa converted to COP/kg for each requested date:
+ *   COP/kg = cocoa(USD/T) × TRM(COP/USD) ÷ 1000
+ *
+ * Cocoa history comes from FRED (IMF global cocoa price, PCOCOUSDM — monthly,
+ * USD/T, reliable from datacenter IPs; Stooq blocks daily CSV downloads and
+ * Yahoo 429s). The IMF series lags ~1-2 months, so dates beyond its last
+ * observation are anchored to the live ICE quote. TRM comes from Banrep
+ * (datos.gov.co) per day. Each date aligns to the nearest prior value.
+ */
+export async function getInternationalSeries(
+  dates: string[],
+): Promise<Record<string, number>> {
+  if (dates.length === 0) return {};
+  const from = dates.reduce((a, b) => (a < b ? a : b));
+  const cosd = `${from.slice(0, 4)}-01-01`;
+
+  const [cocoaCsv, trmTxt, live] = await Promise.all([
+    fetchText(
+      `https://fred.stlouisfed.org/graph/fredgraph.csv?id=PCOCOUSDM&cosd=${cosd}`,
+      86400,
+      { "User-Agent": "Mozilla/5.0" },
+    ),
+    fetchText(
+      `https://www.datos.gov.co/resource/32sa-8pi3.json?$select=valor,vigenciadesde&$where=vigenciadesde%20%3E=%20'${from}'&$order=vigenciadesde&$limit=2000`,
+      3600,
+      { Accept: "application/json" },
+    ),
+    stooqClose("cc.f", 900),
+  ]);
+
+  const cocoa = cocoaCsv ? parseFredCsv(cocoaCsv) : new Map<string, number>();
+  const trm = new Map<string, number>();
+  if (trmTxt) {
+    try {
+      for (const r of JSON.parse(trmTxt) as { valor?: string; vigenciadesde?: string }[]) {
+        const d = r.vigenciadesde?.slice(0, 10);
+        const v = Number(r.valor);
+        if (d && Number.isFinite(v)) trm.set(d, v);
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+
+  if (cocoa.size === 0 || trm.size === 0) return {};
+  const cocoaSorted = [...cocoa.entries()].sort((a, b) => (a[0] < b[0] ? -1 : 1));
+  const trmSorted = [...trm.entries()].sort((a, b) => (a[0] < b[0] ? -1 : 1));
+  const lastFredMonth = cocoaSorted[cocoaSorted.length - 1][0].slice(0, 7);
+
+  const out: Record<string, number> = {};
+  for (const d of dates) {
+    const fx = valueAtOrBefore(trmSorted, d);
+    if (fx == null) continue;
+    // Beyond FRED's last published month, use the live ICE quote so recent
+    // dates reflect the current market rather than a stale monthly average.
+    const usdT =
+      d.slice(0, 7) > lastFredMonth && live ? live.close : valueAtOrBefore(cocoaSorted, d);
+    if (usdT != null) {
+      out[d] = Math.round(((usdT * fx) / 1000) * 100) / 100;
+    }
+  }
+  return out;
+}
+
 export async function getMarketData(): Promise<MarketData> {
   const [cocoa, trm, spot] = await Promise.all([
     stooqClose("cc.f", 900),
