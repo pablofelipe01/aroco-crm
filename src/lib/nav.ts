@@ -7,6 +7,7 @@ import {
   Percent,
   LineChart,
   ListChecks,
+  ClipboardList,
   Settings,
   type LucideIcon,
 } from "lucide-react";
@@ -78,6 +79,12 @@ export const NAV_ITEMS: NavItem[] = [
     href: "/tareas",
     label: "Tareas",
     icon: ListChecks,
+    departments: "all",
+  },
+  {
+    href: "/actas",
+    label: "Actas",
+    icon: ClipboardList,
     departments: "all",
   },
   {

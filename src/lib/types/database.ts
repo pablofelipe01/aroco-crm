@@ -563,6 +563,42 @@ export type Database = {
         };
         Relationships: [];
       };
+      meetings: {
+        Row: {
+          id: string;
+          title: string;
+          meeting_date: string | null;
+          file_path: string | null;
+          file_name: string | null;
+          notes: string | null;
+          created_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          title: string;
+          meeting_date?: string | null;
+          file_path?: string | null;
+          file_name?: string | null;
+          notes?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          title?: string;
+          meeting_date?: string | null;
+          file_path?: string | null;
+          file_name?: string | null;
+          notes?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       tasks: {
         Row: {
           created_at: string;
@@ -570,6 +606,7 @@ export type Database = {
           description: string | null;
           due_date: string | null;
           id: string;
+          meeting_id: string | null;
           name: string;
           notes: string | null;
           person_id: string | null;
@@ -585,6 +622,7 @@ export type Database = {
           description?: string | null;
           due_date?: string | null;
           id?: string;
+          meeting_id?: string | null;
           name: string;
           notes?: string | null;
           person_id?: string | null;
@@ -600,6 +638,7 @@ export type Database = {
           description?: string | null;
           due_date?: string | null;
           id?: string;
+          meeting_id?: string | null;
           name?: string;
           notes?: string | null;
           person_id?: string | null;
@@ -723,6 +762,7 @@ export type Notification = Tables<"notifications">;
 export type CommissionRule = Tables<"commission_rules">;
 export type CommissionCalc = Tables<"commission_calcs">;
 export type Task = Tables<"tasks">;
+export type Meeting = Tables<"meetings">;
 
 export type Department = Enums<"department">;
 export type UserRole = Enums<"user_role">;
