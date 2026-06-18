@@ -4,7 +4,9 @@ import type { Database } from "@/lib/types/database";
 import { hasSupabaseEnv } from "@/lib/env";
 
 /** Routes reachable without a session. */
-const PUBLIC_PREFIXES = ["/login", "/auth", "/onboarding"];
+// /api/cron has its own Bearer-token auth (CRON_SECRET); it's hit by Vercel Cron
+// without a user session, so it must bypass the login redirect.
+const PUBLIC_PREFIXES = ["/login", "/auth", "/onboarding", "/api/cron"];
 
 function isPublic(pathname: string) {
   return PUBLIC_PREFIXES.some(
