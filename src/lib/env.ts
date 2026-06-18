@@ -66,4 +66,14 @@ export const serverEnv = {
       "https://docs.google.com/spreadsheets/d/1ozHRoAKiNNwMHOMCY-lwYaoJYxba71lo6sr1ltsg094/export?format=csv&gid=826514579"
     );
   },
+  /**
+   * Published CSV export of the daily prices Google Sheet (company × date
+   * matrix). Override per-environment if it ever moves.
+   */
+  get PRICES_SHEET_CSV_URL() {
+    return (
+      process.env.PRICES_SHEET_CSV_URL ??
+      "https://docs.google.com/spreadsheets/d/1aNoSXKt7kgfEFTu3EoSgil5yr4DICpiDjDu6eacjmro/export?format=csv&gid=1305299793"
+    );
+  },
 };

@@ -57,18 +57,20 @@ const ES_MONTHS: Record<string, string> = {
 };
 
 /**
- * Parse a Spanish abbreviated date like "5-may-2025" → ISO "2025-05-05".
+ * Parse a Spanish abbreviated date like "5-may-2025" or "18-jun-26" → ISO
+ * ("2025-05-05" / "2026-06-18"). A 2-digit year is assumed to be 20YY.
  * Returns null when the value is empty or unrecognized.
  */
 export function parseEsDate(value: string | undefined): string | null {
   const raw = (value ?? "").trim().toLowerCase();
   if (!raw) return null;
-  const m = raw.match(/^(\d{1,2})[-/ ]([a-záéíóú]{3,})\.?[-/ ](\d{4})$/);
+  const m = raw.match(/^(\d{1,2})[-/ ]([a-záéíóú]{3,})\.?[-/ ](\d{2}|\d{4})$/);
   if (!m) return null;
   const day = m[1].padStart(2, "0");
   const month = ES_MONTHS[m[2].slice(0, 3)];
   if (!month) return null;
-  return `${m[3]}-${month}-${day}`;
+  const year = m[3].length === 2 ? `20${m[3]}` : m[3];
+  return `${year}-${month}-${day}`;
 }
 
 /**
