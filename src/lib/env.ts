@@ -52,4 +52,18 @@ export const serverEnv = {
   get ANTHROPIC_MODEL() {
     return process.env.ANTHROPIC_MODEL ?? "";
   },
+  /** Shared secret protecting the Vercel Cron endpoint(s). */
+  get CRON_SECRET() {
+    return required("CRON_SECRET", process.env.CRON_SECRET);
+  },
+  /**
+   * Published CSV export of the inventory Google Sheet. Defaults to the AROCO
+   * sheet's `gid=826514579` tab; override per-environment if it ever moves.
+   */
+  get INVENTORY_SHEET_CSV_URL() {
+    return (
+      process.env.INVENTORY_SHEET_CSV_URL ??
+      "https://docs.google.com/spreadsheets/d/1ozHRoAKiNNwMHOMCY-lwYaoJYxba71lo6sr1ltsg094/export?format=csv&gid=826514579"
+    );
+  },
 };

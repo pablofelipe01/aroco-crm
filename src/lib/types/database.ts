@@ -114,6 +114,8 @@ export type Database = {
           qty_kg: number;
           remision_entrada: string | null;
           remision_salida: string | null;
+          source: string | null;
+          source_key: string | null;
           total_salida_kg: number | null;
           updated_at: string;
         };
@@ -132,6 +134,8 @@ export type Database = {
           qty_kg: number;
           remision_entrada?: string | null;
           remision_salida?: string | null;
+          source?: string | null;
+          source_key?: string | null;
           total_salida_kg?: number | null;
           updated_at?: string;
         };
@@ -150,6 +154,8 @@ export type Database = {
           qty_kg?: number;
           remision_entrada?: string | null;
           remision_salida?: string | null;
+          source?: string | null;
+          source_key?: string | null;
           total_salida_kg?: number | null;
           updated_at?: string;
         };
@@ -245,6 +251,42 @@ export type Database = {
           notes?: string | null;
           qty_kg?: number;
           remision?: string | null;
+        };
+        Relationships: [];
+      };
+      inventory_sync_runs: {
+        Row: {
+          dispatches_upserted: number;
+          duration_ms: number | null;
+          error: string | null;
+          id: string;
+          lots_upserted: number;
+          ran_at: string;
+          rows_read: number;
+          source: string;
+          status: string;
+        };
+        Insert: {
+          dispatches_upserted?: number;
+          duration_ms?: number | null;
+          error?: string | null;
+          id?: string;
+          lots_upserted?: number;
+          ran_at?: string;
+          rows_read?: number;
+          source?: string;
+          status: string;
+        };
+        Update: {
+          dispatches_upserted?: number;
+          duration_ms?: number | null;
+          error?: string | null;
+          id?: string;
+          lots_upserted?: number;
+          ran_at?: string;
+          rows_read?: number;
+          source?: string;
+          status?: string;
         };
         Relationships: [];
       };
@@ -694,6 +736,10 @@ export type Database = {
       can_write: {
         Args: { depts: Database["public"]["Enums"]["department"][] };
         Returns: boolean;
+      };
+      import_inventory_sheet: {
+        Args: { p_lots: Json; p_dispatches: Json };
+        Returns: Json;
       };
       is_active_member: { Args: Record<string, never>; Returns: boolean };
       is_admin: { Args: Record<string, never>; Returns: boolean };

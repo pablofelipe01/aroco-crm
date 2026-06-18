@@ -9,7 +9,7 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "format": "prettier --write .",
-    "test": "node --import tsx --test src/lib/calc/*.test.ts",
+    "test": "node --import tsx --test \"src/lib/**/*.test.ts\"",
     "seed": "tsx scripts/seed-from-xlsx.ts",
     "db:types": "supabase gen types typescript --linked > src/lib/types/database.ts"
   },
