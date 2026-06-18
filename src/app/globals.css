@@ -37,6 +37,11 @@
   --accent-soft-fg: #1b4332;
   --accent-fg: #f5f3ee; /* text on accent surfaces */
 
+  /* Brand — official AROCO logo palette (arena / cacao), theme-independent */
+  --brand-tan: #f4c575;
+  --brand-cocoa: #241002;
+  --brand-cream: #f3ead9;
+
   /* Status — each with a soft companion */
   --warn: #b45309;
   --warn-soft: #fdecd3;

@@ -1,47 +1,44 @@
+import Image from "next/image";
 import { cn } from "@/lib/utils";
 
-/** AROCO cacao-pod mark — a simple, scalable inline SVG. */
+/**
+ * Square AROCO monogram — a serif "a" + accent dot on a cacao tile, echoing the
+ * official wordmark. Used in compact spots (collapsed sidebar, etc.). Colours
+ * come from the brand tokens so it stays consistent across themes.
+ */
 export function Logo({ className }: { className?: string }) {
   return (
-    <svg
-      viewBox="0 0 32 32"
-      className={cn("h-7 w-7", className)}
-      aria-hidden
-      fill="none"
-    >
-      <defs>
-        <linearGradient id="aroco-pod" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stopColor="var(--accent-mid)" />
-          <stop offset="100%" stopColor="var(--accent)" />
-        </linearGradient>
-      </defs>
-      <path
-        d="M16 2c5 3 8 8 8 14s-3 11-8 14c-5-3-8-8-8-14S11 5 16 2Z"
-        fill="url(#aroco-pod)"
-      />
-      <path
-        d="M16 5v22M12 9c2 1.5 2 13 0 14M20 9c-2 1.5-2 13 0 14"
-        stroke="var(--accent-fg)"
-        strokeWidth="1.1"
-        strokeLinecap="round"
-        opacity="0.7"
-      />
+    <svg viewBox="0 0 32 32" className={cn("h-7 w-7", className)} aria-hidden>
+      <rect width="32" height="32" rx="7" fill="var(--brand-cocoa)" />
+      <text
+        x="15.5"
+        y="24.5"
+        textAnchor="middle"
+        fontFamily="Georgia, 'Times New Roman', serif"
+        fontWeight="700"
+        fontSize="24"
+        fill="var(--brand-tan)"
+      >
+        a
+      </text>
+      <circle cx="25" cy="8.5" r="2.4" fill="var(--brand-tan)" />
     </svg>
   );
 }
 
+/**
+ * Official AROCO wordmark (transparent PNG). Rendered with a fixed height and
+ * automatic width so it never stretches or distorts, regardless of container.
+ */
 export function Wordmark({ className }: { className?: string }) {
   return (
-    <div className={cn("flex items-center gap-2", className)}>
-      <Logo />
-      <div className="leading-none">
-        <span className="text-base font-bold tracking-tight text-fg">
-          AROCO
-        </span>
-        <span className="ml-1 font-mono text-[10px] uppercase tracking-widest text-fg-subtle">
-          cacao
-        </span>
-      </div>
-    </div>
+    <Image
+      src="/brand/aroco-logo.png"
+      alt="AROCO — aroma colombiano"
+      width={408}
+      height={134}
+      priority
+      className={cn("h-9 w-auto", className)}
+    />
   );
 }
