@@ -92,15 +92,25 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // Normalize for matching: lowercase + strip diacritics so "Alarcon" matches
+  // "Alarcón".
+  const norm = (s: string) =>
+    s
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[̀-ͯ]/g, "")
+      .trim();
+
   // Resolve assignee names → team member ids.
   const proposals = extracted.map((t) => {
     let person_id: string | null = null;
     let person_name: string | null = t.assignee;
     if (t.assignee) {
-      const a = t.assignee.toLowerCase();
-      const m = members.find(
-        (x) => x.name.toLowerCase() === a || x.name.toLowerCase().includes(a) || a.includes(x.name.toLowerCase()),
-      );
+      const a = norm(t.assignee);
+      const m = members.find((x) => {
+        const n = norm(x.name);
+        return n === a || n.includes(a) || a.includes(n);
+      });
       if (m) {
         person_id = m.id;
         person_name = m.name;

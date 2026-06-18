@@ -64,14 +64,22 @@ export async function extractActaTasks(
 ): Promise<ExtractedTask[]> {
   const anthropic = new Anthropic({ apiKey: serverEnv.ANTHROPIC_API_KEY });
 
-  const instruction = `Analiza esta acta de reunión de AROCO (exportadora de cacao) e identifica TODOS los compromisos y tareas accionables (cosas que alguien debe hacer).
+  const instruction = `Analiza esta acta de reunión de AROCO (exportadora de cacao) y extrae TODOS los compromisos y tareas accionables (cosas que alguien debe hacer). Pueden ser muchas (20 o más); no omitas ninguna ni las agrupes.
 
-Para cada tarea: redacta la acción de forma concreta y breve, identifica al responsable, y la fecha límite si se menciona.
+Presta especial atención a secciones como "Próximos pasos", "Compromisos", "Tareas", "Action items" o "Pendientes". Es común que cada tarea venga en el formato:
+  [Responsable] Título de la tarea: descripción detallada.
+En ese caso, CADA renglón/viñeta es una tarea independiente: el texto entre corchetes es el responsable, el título es la acción, y el resto es la descripción. Extrae absolutamente todas, una por una, en el mismo orden del acta.
 
-Equipo (asigna el responsable a uno de estos nombres cuando sea posible, coincidencia exacta):
+Para cada tarea:
+- "name": la acción concreta y breve (imperativo).
+- "assignee": el responsable. Asígnalo a uno de los nombres del equipo de abajo usando su ortografía EXACTA (incluyendo tildes), aunque en el acta aparezca sin tildes, mal escrito o solo con el nombre de pila. Si el responsable es "El grupo", "El equipo", "Todos" o similar (tarea colectiva sin dueño único), deja assignee en null. Si no hay responsable identificable, también null.
+- "due_date": fecha límite en YYYY-MM-DD si se menciona (interpreta relativas como "mañana", "el próximo martes", "en dos semanas"); null si no.
+- "description": el detalle/contexto de la tarea.
+
+Equipo (usa estos nombres EXACTOS para assignee):
 ${teamNames.map((n) => `- ${n}`).join("\n")}
 
-Si una tarea no tiene responsable claro, deja assignee en null. No inventes tareas que no estén en el acta. Hoy es ${new Date().toISOString().slice(0, 10)} (úsalo para interpretar fechas relativas como "el próximo viernes").`;
+No inventes tareas que no estén en el acta, pero tampoco descartes ninguna que sí esté. Hoy es ${new Date().toISOString().slice(0, 10)}.`;
 
   const userContent: Anthropic.ContentBlockParam[] =
     content.kind === "pdf"
@@ -86,7 +94,7 @@ Si una tarea no tiene responsable claro, deja assignee en null. No inventes tare
 
   const response = await anthropic.messages.create({
     model: MODEL,
-    max_tokens: 2500,
+    max_tokens: 8000,
     tools: [EXTRACT_TOOL],
     tool_choice: { type: "tool", name: "extract_tasks" },
     messages: [{ role: "user", content: userContent }],
