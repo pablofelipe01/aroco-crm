@@ -21,6 +21,7 @@ import {
   Search,
   X,
   Calendar,
+  CalendarPlus,
   Trash2,
   Pencil,
 } from "lucide-react";
@@ -40,6 +41,7 @@ import {
 import type { TeamMember } from "@/lib/types/database";
 import type { TaskWithPerson } from "./page";
 import { TaskForm } from "./task-form";
+import { CalendarExport } from "./calendar-export";
 import { updateTaskStatus, deleteTask } from "./actions";
 
 const TODAY = new Date().toISOString().slice(0, 10);
@@ -50,11 +52,13 @@ function TaskCard({
   task,
   onEdit,
   onDelete,
+  onCalendar,
   dragging,
 }: {
   task: TaskWithPerson;
   onEdit?: () => void;
   onDelete?: () => void;
+  onCalendar?: () => void;
   dragging?: boolean;
 }) {
   const overdue = isOverdue(task);
@@ -96,8 +100,17 @@ function TaskCard({
         ) : (
           <span />
         )}
-        {(onEdit || onDelete) && (
+        {(onEdit || onDelete || onCalendar) && (
           <span className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+            {onCalendar && (
+              <button
+                onClick={onCalendar}
+                className="rounded p-1 text-fg-subtle hover:bg-bg-subtle hover:text-fg"
+                aria-label="Agregar al calendario"
+              >
+                <CalendarPlus className="h-3.5 w-3.5" />
+              </button>
+            )}
             {onEdit && (
               <button
                 onClick={onEdit}
@@ -127,10 +140,12 @@ function DraggableTask({
   task,
   onEdit,
   onDelete,
+  onCalendar,
 }: {
   task: TaskWithPerson;
   onEdit: () => void;
   onDelete: () => void;
+  onCalendar: () => void;
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: task.id,
@@ -142,7 +157,7 @@ function DraggableTask({
       style={{ opacity: isDragging ? 0.4 : 1, touchAction: "none" }}
     >
       <div {...listeners} {...attributes}>
-        <TaskCard task={task} onEdit={onEdit} onDelete={onDelete} />
+        <TaskCard task={task} onEdit={onEdit} onDelete={onDelete} onCalendar={onCalendar} />
       </div>
     </motion.div>
   );
@@ -153,11 +168,13 @@ function Column({
   tasks,
   onEdit,
   onDelete,
+  onCalendar,
 }: {
   status: TaskStatus;
   tasks: TaskWithPerson[];
   onEdit: (t: TaskWithPerson) => void;
   onDelete: (t: TaskWithPerson) => void;
+  onCalendar: (t: TaskWithPerson) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: status });
   const meta = TASK_STATUS_META[status];
@@ -187,6 +204,7 @@ function Column({
             task={t}
             onEdit={() => onEdit(t)}
             onDelete={() => onDelete(t)}
+            onCalendar={() => onCalendar(t)}
           />
         ))}
         {tasks.length === 0 && (
@@ -221,6 +239,7 @@ export function TareasClient({
   const [fPerson, setFPerson] = React.useState("");
   const [formOpen, setFormOpen] = React.useState(false);
   const [editing, setEditing] = React.useState<TaskWithPerson | null>(null);
+  const [calTask, setCalTask] = React.useState<TaskWithPerson | null>(null);
   const [activeId, setActiveId] = React.useState<string | null>(null);
 
   // Deep link from the command palette (?new=1).
@@ -392,6 +411,7 @@ export function TareasClient({
                   setFormOpen(true);
                 }}
                 onDelete={onDelete}
+                onCalendar={setCalTask}
               />
             ))}
           </div>
@@ -440,6 +460,13 @@ export function TareasClient({
                 )}
                 <div className="flex shrink-0 items-center gap-1">
                   <button
+                    onClick={() => setCalTask(t)}
+                    className="rounded p-1.5 text-fg-subtle hover:bg-bg-subtle hover:text-fg"
+                    aria-label="Agregar al calendario"
+                  >
+                    <CalendarPlus className="h-4 w-4" />
+                  </button>
+                  <button
                     onClick={() => {
                       setEditing(t);
                       setFormOpen(true);
@@ -472,6 +499,12 @@ export function TareasClient({
           setFormOpen(false);
           router.refresh();
         }}
+      />
+
+      <CalendarExport
+        task={calTask}
+        open={calTask !== null}
+        onClose={() => setCalTask(null)}
       />
     </div>
   );
