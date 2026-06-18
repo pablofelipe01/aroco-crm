@@ -23,6 +23,7 @@ interface FormValues {
   commercial_owner: string;
   product_interest: string;
   volume: string;
+  potential_value_cop: string;
   next_action: string;
   next_action_date: string;
   notes: string;
@@ -40,6 +41,8 @@ function toValues(lead: LeadWithOwner | null): FormValues {
     commercial_owner: lead?.commercial_owner ?? "",
     product_interest: lead?.product_interest ?? "",
     volume: lead?.volume ?? "",
+    potential_value_cop:
+      lead?.potential_value_cop != null ? String(lead.potential_value_cop) : "",
     next_action: lead?.next_action ?? "",
     next_action_date: lead?.next_action_date ?? "",
     notes: lead?.notes ?? "",
@@ -168,6 +171,16 @@ export function LeadForm({
         </Field>
         <Field label="Volumen">
           <Input {...register("volume")} placeholder="p. ej. 25 MT/mes" />
+        </Field>
+        <Field label="Valor potencial (COP)">
+          <Input
+            type="number"
+            step="any"
+            min="0"
+            {...register("potential_value_cop")}
+            placeholder="p. ej. 120000000"
+            className="font-mono tnum"
+          />
         </Field>
         <Field label="Producto / Interés" className="sm:col-span-2">
           <Input {...register("product_interest")} />

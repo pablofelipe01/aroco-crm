@@ -19,7 +19,7 @@ import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
 import { TASK_STATUS_META, type TaskStatus } from "@/lib/status";
-import { formatNumber, formatDate, cn } from "@/lib/utils";
+import { formatNumber, formatDate, formatCOP, cn } from "@/lib/utils";
 import { staggerContainer } from "@/lib/motion";
 import {
   PipelineChart,
@@ -62,6 +62,7 @@ export interface DashboardData {
   }[];
   tasksScopeLabel: string;
   pipeline: PipelineDatum[];
+  pipelineValue: { weighted: number; total: number };
   inventory: InventoryDatum[];
   priceSeries: PriceSeriesPoint[];
   priceCompanies: string[];
@@ -237,6 +238,23 @@ export function DashboardView({ data }: { data: DashboardData }) {
             <Badge tone="neutral">{kpis.totalLeads} leads</Badge>
           </CardHeader>
           <CardBody>
+            {data.pipelineValue.weighted > 0 && (
+              <div className="mb-4 flex flex-wrap items-end justify-between gap-x-3 gap-y-1">
+                <div>
+                  <p className="text-[11px] uppercase tracking-wide text-fg-subtle">
+                    Valor ponderado del pipeline
+                  </p>
+                  <p className="mt-0.5 font-mono text-2xl font-bold tnum text-fg">
+                    {formatCOP(data.pipelineValue.weighted)}
+                  </p>
+                </div>
+                {data.pipelineValue.total > 0 && (
+                  <p className="text-xs text-fg-subtle">
+                    de {formatCOP(data.pipelineValue.total)} potencial
+                  </p>
+                )}
+              </div>
+            )}
             {data.pipeline.some((p) => p.count > 0) ? (
               <PipelineChart data={data.pipeline} />
             ) : (

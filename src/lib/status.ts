@@ -13,6 +13,21 @@ export const LEAD_STAGES = [
 
 export type LeadStage = (typeof LEAD_STAGES)[number];
 
+/**
+ * Probability weight per stage for pipeline value estimation: from 10% at
+ * "Nuevo" up to 100% at "Cerrado" (0% if "Descartado"). Multiply a lead's
+ * potential value by its stage weight to get its expected (weighted) value.
+ */
+export const LEAD_STAGE_WEIGHT: Record<LeadStage, number> = {
+  Nuevo: 0.1,
+  Cotización: 0.3,
+  Negociación: 0.5,
+  Enviado: 0.7,
+  "En espera": 0.4,
+  Cerrado: 1,
+  Descartado: 0,
+};
+
 export const LEAD_STAGE_TONE: Record<LeadStage, BadgeTone> = {
   Nuevo: "info",
   Cotización: "accent",

@@ -22,7 +22,7 @@ import { useToast } from "@/components/ui/toast";
 import { createClient } from "@/lib/supabase/client";
 import { LEAD_STAGE_TONE, type LeadStage } from "@/lib/status";
 import { ACTIVITY_TYPES } from "@/lib/schemas/lead";
-import { formatDate, initials } from "@/lib/utils";
+import { formatDate, formatCOP, initials } from "@/lib/utils";
 import type { TeamMember, LeadActivity, ActivityType } from "@/lib/types/database";
 import type { LeadWithOwner } from "./page";
 import { addActivity, deleteLead } from "./actions";
@@ -122,6 +122,10 @@ export function LeadDetail({
     ["Tipo", lead.type],
     ["Interés", lead.product_interest],
     ["Volumen", lead.volume],
+    [
+      "Valor potencial",
+      lead.potential_value_cop != null ? formatCOP(lead.potential_value_cop) : null,
+    ],
     ["Próxima acción", lead.next_action],
     ["Fecha próxima acción", lead.next_action_date ? formatDate(lead.next_action_date) : null],
   ];

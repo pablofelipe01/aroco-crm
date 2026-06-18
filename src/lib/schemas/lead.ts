@@ -23,6 +23,17 @@ const optionalText = z
   .transform((v) => (v === "" ? null : v))
   .nullable();
 
+/** Form value (string/number/empty) → positive number or null. */
+const optionalAmount = z
+  .union([z.string(), z.number(), z.null()])
+  .transform((v) => {
+    if (v === null) return null;
+    const n = typeof v === "number" ? v : Number(String(v).replace(/[^0-9.-]/g, ""));
+    return Number.isFinite(n) && n > 0 ? n : null;
+  })
+  .nullable()
+  .optional();
+
 export const leadSchema = z.object({
   company: z.string().trim().min(1, "La empresa es obligatoria."),
   contact_name: optionalText,
@@ -33,6 +44,7 @@ export const leadSchema = z.object({
   status: z.enum(LEAD_STAGES),
   product_interest: optionalText,
   volume: optionalText,
+  potential_value_cop: optionalAmount,
   next_action: optionalText,
   next_action_date: optionalText,
   commercial_owner: z.string().uuid().nullable().optional(),

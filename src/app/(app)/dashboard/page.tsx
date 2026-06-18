@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { getSessionContext } from "@/lib/auth";
-import { LEAD_STAGES, type LeadStage } from "@/lib/status";
+import { LEAD_STAGES, LEAD_STAGE_WEIGHT, type LeadStage } from "@/lib/status";
 import { getMarketData, getInternationalSeries } from "@/lib/market";
 import { DashboardView, type DashboardData } from "./dashboard-view";
 import type { PriceSeriesPoint } from "@/components/charts/price-chart";
@@ -80,7 +80,7 @@ export default async function DashboardPage() {
 
   const [leadsRes, lotsRes, pricesRes, dispatchRes, market, tasksRes] =
     await Promise.all([
-      supabase.from("leads").select("status"),
+      supabase.from("leads").select("status, potential_value_cop"),
       supabase.from("inventory_lots").select("code, qty_available_kg"),
       supabase
         .from("price_history")
@@ -104,6 +104,17 @@ export default async function DashboardPage() {
     count: stageCount.get(stage) ?? 0,
     color: STAGE_COLOR[stage],
   }));
+
+  // Weighted pipeline value: each lead's potential value × its stage
+  // probability (10% Nuevo … 100% Cerrado). `total` excludes discarded leads.
+  let pipelineWeighted = 0;
+  let pipelineTotal = 0;
+  for (const l of leads) {
+    const v = Number(l.potential_value_cop) || 0;
+    if (v <= 0) continue;
+    pipelineWeighted += v * (LEAD_STAGE_WEIGHT[l.status as LeadStage] ?? 0);
+    if (l.status !== "Descartado") pipelineTotal += v;
+  }
 
   // Inventory by region (top 8 + Otros).
   const regionKg = new Map<string, number>();
@@ -186,6 +197,7 @@ export default async function DashboardPage() {
     upcomingTasks,
     tasksScopeLabel: isAdmin && dept ? `Departamento: ${dept}` : "Próximas",
     pipeline,
+    pipelineValue: { weighted: pipelineWeighted, total: pipelineTotal },
     inventory: topRegions,
     priceSeries,
     priceCompanies,

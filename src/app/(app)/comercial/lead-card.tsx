@@ -2,7 +2,7 @@
 
 import { MapPin, Package } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { cn, initials } from "@/lib/utils";
+import { cn, initials, formatCOP } from "@/lib/utils";
 import type { LeadWithOwner } from "./page";
 
 export function LeadCard({
@@ -47,6 +47,13 @@ export function LeadCard({
         <p className="mt-2 flex items-start gap-1.5 text-xs text-fg-subtle">
           <Package className="mt-0.5 h-3 w-3 shrink-0" />
           <span className="line-clamp-2">{lead.product_interest}</span>
+        </p>
+      )}
+
+      {lead.potential_value_cop != null && (
+        <p className="mt-2 font-mono text-xs font-semibold tnum text-fg">
+          {formatCOP(lead.potential_value_cop)}
+          <span className="ml-1 font-sans font-normal text-fg-subtle">potencial</span>
         </p>
       )}
 

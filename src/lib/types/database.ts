@@ -334,6 +334,7 @@ export type Database = {
           next_action: string | null;
           next_action_date: string | null;
           notes: string | null;
+          potential_value_cop: number | null;
           product_interest: string | null;
           source: string | null;
           status: Database["public"]["Enums"]["lead_status"];
@@ -354,6 +355,7 @@ export type Database = {
           next_action?: string | null;
           next_action_date?: string | null;
           notes?: string | null;
+          potential_value_cop?: number | null;
           product_interest?: string | null;
           source?: string | null;
           status?: Database["public"]["Enums"]["lead_status"];
@@ -374,6 +376,7 @@ export type Database = {
           next_action?: string | null;
           next_action_date?: string | null;
           notes?: string | null;
+          potential_value_cop?: number | null;
           product_interest?: string | null;
           source?: string | null;
           status?: Database["public"]["Enums"]["lead_status"];
