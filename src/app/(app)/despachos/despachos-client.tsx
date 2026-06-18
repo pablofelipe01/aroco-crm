@@ -13,6 +13,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { useToast } from "@/components/ui/toast";
 import { formatKg, formatDate, formatCOP } from "@/lib/utils";
 import type { DispatchWithLinks } from "./page";
+import { DispatchTrace } from "./dispatch-trace";
 import { createDispatch, deleteDispatch } from "./actions";
 
 interface FormValues {
@@ -55,6 +56,7 @@ export function DespachosClient({
   const router = useRouter();
   const { toast } = useToast();
   const [open, setOpen] = React.useState(false);
+  const [trace, setTrace] = React.useState<DispatchWithLinks | null>(null);
   const [query, setQuery] = React.useState("");
   const { register, handleSubmit, reset, formState } = useForm<FormValues>({
     defaultValues: EMPTY,
@@ -139,7 +141,8 @@ export function DespachosClient({
           {filtered.map((d) => (
             <li
               key={d.id}
-              className="rounded-[var(--radius-md)] border border-border bg-surface p-3 shadow-[var(--shadow-soft-sm)]"
+              onClick={() => setTrace(d)}
+              className="cursor-pointer rounded-[var(--radius-md)] border border-border bg-surface p-3 shadow-[var(--shadow-soft-sm)] transition-colors hover:border-accent/40"
             >
               <div className="flex items-start justify-between gap-2">
                 <span className="min-w-0 flex-1 font-medium text-fg">
@@ -168,7 +171,10 @@ export function DespachosClient({
                   )}
                   {canWrite && (
                     <button
-                      onClick={() => onDelete(d)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onDelete(d);
+                      }}
                       className="rounded p-1.5 text-fg-subtle hover:bg-danger-soft hover:text-danger"
                       aria-label="Eliminar"
                     >
@@ -197,7 +203,11 @@ export function DespachosClient({
             </thead>
             <tbody>
               {filtered.map((d) => (
-                <tr key={d.id} className="border-b border-border last:border-0 hover:bg-bg-subtle/50">
+                <tr
+                  key={d.id}
+                  onClick={() => setTrace(d)}
+                  className="cursor-pointer border-b border-border last:border-0 hover:bg-bg-subtle/50"
+                >
                   <td className="px-4 py-3 font-mono text-xs text-fg-subtle">
                     {formatDate(d.dispatch_date)}
                   </td>
@@ -222,7 +232,10 @@ export function DespachosClient({
                   <td className="px-4 py-3 text-right">
                     {canWrite && (
                       <button
-                        onClick={() => onDelete(d)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onDelete(d);
+                        }}
                         className="rounded p-1.5 text-fg-subtle hover:bg-danger-soft hover:text-danger"
                         aria-label="Eliminar"
                       >
@@ -237,6 +250,12 @@ export function DespachosClient({
         </div>
         </>
       )}
+
+      <DispatchTrace
+        dispatch={trace}
+        open={trace !== null}
+        onClose={() => setTrace(null)}
+      />
 
       <Modal
         open={open}
