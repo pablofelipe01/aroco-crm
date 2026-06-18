@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { getSessionContext } from "@/lib/auth";
 import { LEAD_STAGES, type LeadStage } from "@/lib/status";
-import { getMarketData } from "@/lib/market";
+import { getMarketData, getInternationalSeries } from "@/lib/market";
 import { DashboardView, type DashboardData } from "./dashboard-view";
 import type { PriceSeriesPoint } from "@/components/charts/price-chart";
 
@@ -18,6 +18,9 @@ const STAGE_COLOR: Record<LeadStage, string> = {
 };
 
 const ACTIVE_STAGES = ["Cotización", "Negociación", "Enviado"];
+
+/** Label for the international ICE line in the price chart. */
+const INTL = "Internacional (ICE)";
 
 /** Friendly names for the department code segment. */
 const DEPT_NAMES: Record<string, string> = {
@@ -117,15 +120,25 @@ export default async function DashboardPage() {
   const restKg = sortedRegions.slice(6).reduce((s, [, kg]) => s + kg, 0);
   if (restKg > 0) topRegions.push({ region: "Otros", kg: restKg });
 
-  // Price series — pivot to one row per date (last 18 dates).
+  // Price series — pivot to one row per date, overlay the international ICE
+  // reference (COP/kg), keep the last 18 dates.
   const companies = [...new Set(prices.map((p) => p.company))];
+  const intlByDate = await getInternationalSeries([
+    ...new Set(prices.map((p) => p.date)),
+  ]);
   const byDate = new Map<string, PriceSeriesPoint>();
   for (const p of prices) {
     const row = byDate.get(p.date) ?? { date: shortDate(p.date) };
     row[p.company] = Number(p.price_cop_kg);
     byDate.set(p.date, row);
   }
+  for (const [iso, row] of byDate) {
+    const intl = intlByDate[iso];
+    if (intl != null) row[INTL] = intl;
+  }
+  const hasIntl = Object.keys(intlByDate).length > 0;
   const priceSeries = [...byDate.values()].slice(-18);
+  const priceCompanies = hasIntl ? [...companies, INTL] : companies;
 
   // Market references: latest cacao price per company (prices are asc, so the
   // last seen is the latest) + TRM and international cocoa from the last quote.
@@ -175,7 +188,7 @@ export default async function DashboardPage() {
     pipeline,
     inventory: topRegions,
     priceSeries,
-    priceCompanies: companies,
+    priceCompanies,
   };
 
   return <DashboardView data={data} />;

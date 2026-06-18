@@ -259,8 +259,11 @@ export function DashboardView({ data }: { data: DashboardData }) {
 
       <Card>
         <CardHeader>
-          <CardTitle>Histórico de precios de referencia (COP/kg)</CardTitle>
-          <Badge tone="neutral">{data.priceCompanies.length} compañías</Badge>
+          <CardTitle>Tendencia · nacional vs internacional</CardTitle>
+          <Badge tone="neutral">
+            {data.priceCompanies.filter((c) => !c.toUpperCase().includes("INTERNACIONAL")).length}{" "}
+            compañías
+          </Badge>
         </CardHeader>
         <CardBody>
           {data.priceSeries.length > 0 ? (
