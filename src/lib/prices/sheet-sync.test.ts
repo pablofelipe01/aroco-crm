@@ -21,10 +21,6 @@ test("resolveCompany maps to canonical price_history labels", () => {
     resolveCompany("Más $500 premium", "NAC. CHOCOLATE BTA"),
     "NAC. CHOCOLATE BTA",
   );
-  assert.equal(
-    resolveCompany("Más $500 premium", "Nac. CHOCOLATE IBAGUE"),
-    "NAC. CHOCOLATE IBAGUÉ",
-  );
   // Unknown row falls back to "company (category)".
   assert.equal(resolveCompany("Otra", "NUEVA EMPRESA"), "NUEVA EMPRESA (Otra)");
 });
@@ -48,8 +44,11 @@ test("parsePricesSheet un-pivots the matrix into price_history rows", () => {
   const { rows, dateCols, companies } = parsePricesSheet(SHEET);
 
   assert.equal(dateCols, 3); // three date columns
-  assert.equal(companies, 4); // four company series
-  assert.equal(rows.length, 12); // 4 companies × 3 dates
+  assert.equal(companies, 3); // three company series (Ibagué excluded)
+  assert.equal(rows.length, 9); // 3 companies × 3 dates
+
+  // Ibagué is excluded from the sync.
+  assert.ok(!rows.some((r) => /ibagu/i.test(r.company)));
 
   // Spot-check a few mapped rows.
   const luker0618 = rows.find(
