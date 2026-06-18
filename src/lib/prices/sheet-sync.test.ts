@@ -19,7 +19,7 @@ test("resolveCompany maps to canonical price_history labels", () => {
   );
   assert.equal(
     resolveCompany("Más $500 premium", "NAC. CHOCOLATE BTA"),
-    "NAC. CHOCOLATE BTA",
+    "Nacional de Chocolates",
   );
   // Unknown row falls back to "company (category)".
   assert.equal(resolveCompany("Otra", "NUEVA EMPRESA"), "NUEVA EMPRESA (Otra)");

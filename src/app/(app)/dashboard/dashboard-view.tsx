@@ -69,9 +69,10 @@ export interface DashboardData {
 
 function shortCompany(c: string): string {
   const u = c.toUpperCase();
-  if (u.includes("LUKER")) return "Casa Luker";
+  if (u.includes("LUKER")) return u.includes("ALTO") ? "Casa Luker (Alto Cd)" : "Casa Luker";
   if (u.includes("IBAGU")) return "Ibagué";
-  if (u.includes("BTA") || u.includes("BOGOT")) return "Nal. Bta";
+  if (u.includes("NACIONAL") || u.includes("BTA") || u.includes("BOGOT"))
+    return "Nal. Chocolate";
   return c;
 }
 

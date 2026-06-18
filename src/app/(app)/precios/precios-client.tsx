@@ -25,8 +25,8 @@ import { addPrices, deletePriceDate } from "./actions";
 
 const PREFERRED_ORDER = [
   "CASA LUKER",
-  "NAC. CHOCOLATE BTA",
-  "NAC. CHOCOLATE IBAGUÉ",
+  "CASA LUKER (Alto Cadmio)",
+  "Nacional de Chocolates",
 ];
 
 const INTL = "Internacional (ICE)";

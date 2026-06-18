@@ -27,9 +27,10 @@ function isIntl(company: string): boolean {
 function shortName(company: string): string {
   const c = company.toUpperCase();
   if (c.includes("INTERNACIONAL")) return "Internacional (ICE)";
-  if (c.includes("LUKER")) return "Casa Luker";
+  if (c.includes("LUKER")) return c.includes("ALTO") ? "Casa Luker (Alto Cd)" : "Casa Luker";
   if (c.includes("IBAGU")) return "Nal. Chocolate Ibagué";
-  if (c.includes("BTA") || c.includes("BOGOT")) return "Nal. Chocolate Bta";
+  if (c.includes("NACIONAL") || c.includes("BTA") || c.includes("BOGOT"))
+    return "Nacional de Chocolates";
   return company;
 }
 
