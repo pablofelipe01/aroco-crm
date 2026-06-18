@@ -19,6 +19,12 @@ export type CommissionRole = "Compra+Venta" | "Solo Venta" | "Solo Compra";
 export const VENTA_SHARE = 0.6;
 export const COMPRA_SHARE = 0.4;
 
+/** Monthly tons-moved target per market (commission tracking board). */
+export const MONTHLY_TON_TARGET: Record<Market, number> = {
+  Nacional: 48,
+  Internacional: 50,
+};
+
 export interface CommissionRule {
   market: Market;
   level: CommissionLevel;

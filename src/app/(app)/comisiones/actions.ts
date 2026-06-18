@@ -87,3 +87,47 @@ export async function saveCommissionCalc(input: unknown): Promise<ActionResult> 
   revalidatePath("/comisiones");
   return { ok: true };
 }
+
+const tonnageSchema = z.object({
+  agent: z.string().uuid(),
+  period: z.string().regex(/^\d{4}-\d{2}$/, "Mes inválido."), // YYYY-MM
+  market: z.enum(["Nacional", "Internacional"]),
+  role: z.enum(["Compra+Venta", "Solo Venta", "Solo Compra"]),
+  tons: z.coerce.number().min(0, "Las toneladas no pueden ser negativas."),
+  note: z.string().trim().nullable().optional(),
+});
+
+/** Upsert a commercial's tons moved for a given month + market. */
+export async function saveMonthlyTonnage(input: unknown): Promise<ActionResult> {
+  const parsed = tonnageSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues[0]?.message ?? "Datos inválidos." };
+  }
+  const session = await requireSession();
+  const supabase = await createClient();
+
+  const { error } = await supabase.from("monthly_tonnage").upsert(
+    {
+      agent: parsed.data.agent,
+      period: `${parsed.data.period}-01`,
+      market: parsed.data.market,
+      role: parsed.data.role,
+      tons: parsed.data.tons,
+      note: parsed.data.note ?? null,
+      created_by: session.userId,
+    },
+    { onConflict: "agent,period,market" },
+  );
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/comisiones");
+  return { ok: true };
+}
+
+export async function deleteMonthlyTonnage(id: string): Promise<ActionResult> {
+  await requireSession();
+  const supabase = await createClient();
+  const { error } = await supabase.from("monthly_tonnage").delete().eq("id", id);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/comisiones");
+  return { ok: true };
+}

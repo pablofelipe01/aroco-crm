@@ -1,7 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { getSessionContext } from "@/lib/auth";
 import { ComisionesClient } from "./comisiones-client";
-import type { CommissionRule, TeamMember } from "@/lib/types/database";
+import { MonthlyTonnage } from "./monthly-tonnage";
+import type { CommissionRule, MonthlyTonnage as MonthlyTonnageRow, TeamMember } from "@/lib/types/database";
 
 export const dynamic = "force-dynamic";
 
@@ -18,18 +19,30 @@ export default async function ComisionesPage() {
   const canEditRules =
     session?.profile?.role === "admin" ||
     session?.profile?.department === "Financiero";
+  // The tonnage board is a Financiero/admin tool.
+  const canEditTonnage =
+    session?.profile?.role === "admin" ||
+    session?.profile?.department === "Financiero";
 
-  const [{ data: rules }, { data: team }] = await Promise.all([
+  const [{ data: rules }, { data: team }, { data: tonnage }] = await Promise.all([
     supabase.from("commission_rules").select("*").order("market").order("level"),
     supabase.from("team_members").select("*").eq("active", true).order("name"),
+    supabase.from("monthly_tonnage").select("*").order("period", { ascending: false }),
   ]);
 
   return (
-    <ComisionesClient
-      rules={(rules ?? []) as CommissionRule[]}
-      team={(team ?? []) as TeamMember[]}
-      canWrite={canWrite}
-      canEditRules={canEditRules}
-    />
+    <div className="space-y-8">
+      <ComisionesClient
+        rules={(rules ?? []) as CommissionRule[]}
+        team={(team ?? []) as TeamMember[]}
+        canWrite={canWrite}
+        canEditRules={canEditRules}
+      />
+      <MonthlyTonnage
+        team={(team ?? []) as TeamMember[]}
+        records={(tonnage ?? []) as MonthlyTonnageRow[]}
+        canWrite={canEditTonnage}
+      />
+    </div>
   );
 }

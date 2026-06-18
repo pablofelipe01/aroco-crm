@@ -386,6 +386,45 @@ export type Database = {
         };
         Relationships: [];
       };
+      monthly_tonnage: {
+        Row: {
+          agent: string;
+          created_at: string;
+          created_by: string | null;
+          id: string;
+          market: Database["public"]["Enums"]["market"];
+          note: string | null;
+          period: string;
+          role: Database["public"]["Enums"]["commission_role"];
+          tons: number;
+          updated_at: string;
+        };
+        Insert: {
+          agent: string;
+          created_at?: string;
+          created_by?: string | null;
+          id?: string;
+          market: Database["public"]["Enums"]["market"];
+          note?: string | null;
+          period: string;
+          role?: Database["public"]["Enums"]["commission_role"];
+          tons?: number;
+          updated_at?: string;
+        };
+        Update: {
+          agent?: string;
+          created_at?: string;
+          created_by?: string | null;
+          id?: string;
+          market?: Database["public"]["Enums"]["market"];
+          note?: string | null;
+          period?: string;
+          role?: Database["public"]["Enums"]["commission_role"];
+          tons?: number;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       notifications: {
         Row: {
           id: string;
@@ -810,6 +849,7 @@ export type PriceHistory = Tables<"price_history">;
 export type Notification = Tables<"notifications">;
 export type CommissionRule = Tables<"commission_rules">;
 export type CommissionCalc = Tables<"commission_calcs">;
+export type MonthlyTonnage = Tables<"monthly_tonnage">;
 export type Task = Tables<"tasks">;
 export type Meeting = Tables<"meetings">;
 
