@@ -3,7 +3,7 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
-import { Plus, Truck, Trash2, Search } from "lucide-react";
+import { Plus, Truck, Trash2, Search, X } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
 import { Input, Select, Field } from "@/components/ui/input";
@@ -58,6 +58,9 @@ export function DespachosClient({
   const [open, setOpen] = React.useState(false);
   const [trace, setTrace] = React.useState<DispatchWithLinks | null>(null);
   const [query, setQuery] = React.useState("");
+  const [destino, setDestino] = React.useState("");
+  const [desde, setDesde] = React.useState("");
+  const [hasta, setHasta] = React.useState("");
   const { register, handleSubmit, reset, formState } = useForm<FormValues>({
     defaultValues: EMPTY,
   });
@@ -67,15 +70,37 @@ export function DespachosClient({
     if (open) reset(EMPTY);
   }
 
+  // Distinct destinations for the dropdown.
+  const destinations = React.useMemo(
+    () =>
+      [...new Set(initialDispatches.map((d) => d.destination).filter(Boolean))].sort() as string[],
+    [initialDispatches],
+  );
+
   const filtered = React.useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return initialDispatches;
-    return initialDispatches.filter((d) =>
-      `${d.destination ?? ""} ${d.origin ?? ""} ${d.remision_salida ?? ""} ${d.lot?.code ?? ""}`
-        .toLowerCase()
-        .includes(q),
-    );
-  }, [initialDispatches, query]);
+    return initialDispatches.filter((d) => {
+      if (
+        q &&
+        !`${d.destination ?? ""} ${d.origin ?? ""} ${d.remision_salida ?? ""} ${d.lot?.code ?? ""}`
+          .toLowerCase()
+          .includes(q)
+      )
+        return false;
+      if (destino && d.destination !== destino) return false;
+      if (desde && (d.dispatch_date ?? "") < desde) return false;
+      if (hasta && (d.dispatch_date ?? "") > hasta) return false;
+      return true;
+    });
+  }, [initialDispatches, query, destino, desde, hasta]);
+
+  const hasFilters = Boolean(query || destino || desde || hasta);
+  function clearFilters() {
+    setQuery("");
+    setDestino("");
+    setDesde("");
+    setHasta("");
+  }
 
   const onSubmit = handleSubmit(async (values) => {
     const res = await createDispatch({
@@ -122,18 +147,50 @@ export function DespachosClient({
         }
       />
 
-      <div className="relative max-w-xs">
-        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-fg-subtle" />
-        <Input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Buscar destino, procedencia…"
-          className="pl-9"
-        />
+      <div className="flex flex-wrap items-end gap-3">
+        <Field label="Buscar" className="w-full sm:w-56">
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-fg-subtle" />
+            <Input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Remisión, destino, procedencia…"
+              className="pl-9"
+            />
+          </div>
+        </Field>
+        <Field label="Destino" className="w-full sm:w-48">
+          <Select value={destino} onChange={(e) => setDestino(e.target.value)}>
+            <option value="">Todos</option>
+            {destinations.map((dest) => (
+              <option key={dest} value={dest}>
+                {dest}
+              </option>
+            ))}
+          </Select>
+        </Field>
+        <Field label="Desde" className="w-36">
+          <Input type="date" value={desde} onChange={(e) => setDesde(e.target.value)} />
+        </Field>
+        <Field label="Hasta" className="w-36">
+          <Input type="date" value={hasta} onChange={(e) => setHasta(e.target.value)} />
+        </Field>
+        {hasFilters && (
+          <Button variant="ghost" size="sm" onClick={clearFilters}>
+            <X className="h-4 w-4" />
+            Limpiar
+          </Button>
+        )}
+        <span className="ml-auto self-center text-xs text-fg-subtle">
+          {filtered.length} de {initialDispatches.length}
+        </span>
       </div>
 
       {filtered.length === 0 ? (
-        <EmptyState icon={<Truck className="h-6 w-6" />} title="Sin despachos" />
+        <EmptyState
+          icon={<Truck className="h-6 w-6" />}
+          title={hasFilters ? "Sin resultados con esos filtros" : "Sin despachos"}
+        />
       ) : (
         <>
         {/* Mobile: card list */}
