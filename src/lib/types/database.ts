@@ -290,6 +290,63 @@ export type Database = {
         };
         Relationships: [];
       };
+      inventory_quality: {
+        Row: {
+          cadmio: string | null;
+          en_bodega_kg: number;
+          entry_date: string | null;
+          id: string;
+          licor_kg: number;
+          oc: string | null;
+          por_llegar_kg: number;
+          position: number;
+          procedencia: string;
+          purchase_price_cop_kg: number | null;
+          qty_b_kg: number;
+          qty_c_kg: number;
+          qty_organico_kg: number;
+          qty_premium_kg: number;
+          synced_at: string;
+          tolimax_kg: number;
+        };
+        Insert: {
+          cadmio?: string | null;
+          en_bodega_kg?: number;
+          entry_date?: string | null;
+          id?: string;
+          licor_kg?: number;
+          oc?: string | null;
+          por_llegar_kg?: number;
+          position?: number;
+          procedencia: string;
+          purchase_price_cop_kg?: number | null;
+          qty_b_kg?: number;
+          qty_c_kg?: number;
+          qty_organico_kg?: number;
+          qty_premium_kg?: number;
+          synced_at?: string;
+          tolimax_kg?: number;
+        };
+        Update: {
+          cadmio?: string | null;
+          en_bodega_kg?: number;
+          entry_date?: string | null;
+          id?: string;
+          licor_kg?: number;
+          oc?: string | null;
+          por_llegar_kg?: number;
+          position?: number;
+          procedencia?: string;
+          purchase_price_cop_kg?: number | null;
+          qty_b_kg?: number;
+          qty_c_kg?: number;
+          qty_organico_kg?: number;
+          qty_premium_kg?: number;
+          synced_at?: string;
+          tolimax_kg?: number;
+        };
+        Relationships: [];
+      };
       lead_activities: {
         Row: {
           created_at: string;
@@ -783,6 +840,10 @@ export type Database = {
         Args: { p_lots: Json; p_dispatches: Json };
         Returns: Json;
       };
+      replace_inventory_quality: {
+        Args: { p_rows: Json };
+        Returns: number;
+      };
       is_active_member: { Args: Record<string, never>; Returns: boolean };
       is_admin: { Args: Record<string, never>; Returns: boolean };
     };
@@ -844,6 +905,7 @@ export type LeadActivity = Tables<"lead_activities">;
 export type Quote = Tables<"quotes">;
 export type InventoryLot = Tables<"inventory_lots">;
 export type InventoryMovement = Tables<"inventory_movements">;
+export type InventoryQuality = Tables<"inventory_quality">;
 export type Dispatch = Tables<"dispatches">;
 export type PriceHistory = Tables<"price_history">;
 export type Notification = Tables<"notifications">;

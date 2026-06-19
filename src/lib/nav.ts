@@ -3,6 +3,7 @@ import {
   Users,
   Calculator,
   Boxes,
+  Layers,
   Truck,
   Percent,
   LineChart,
@@ -55,6 +56,12 @@ export const NAV_ITEMS: NavItem[] = [
     href: "/inventario",
     label: "Inventario",
     icon: Boxes,
+    departments: ["Dirección", "Bodega Central", "Administrativo"],
+  },
+  {
+    href: "/inventario-calidad",
+    label: "Inventario calidad",
+    icon: Layers,
     departments: ["Dirección", "Bodega Central", "Administrativo"],
   },
   {

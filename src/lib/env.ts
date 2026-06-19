@@ -66,6 +66,13 @@ export const serverEnv = {
       "https://docs.google.com/spreadsheets/d/1ozHRoAKiNNwMHOMCY-lwYaoJYxba71lo6sr1ltsg094/export?format=csv&gid=826514579"
     );
   },
+  /** Inventory-by-quality tab (gid=1083634413) of the same sheet. */
+  get INVENTORY_QUALITY_SHEET_CSV_URL() {
+    return (
+      process.env.INVENTORY_QUALITY_SHEET_CSV_URL ??
+      "https://docs.google.com/spreadsheets/d/1ozHRoAKiNNwMHOMCY-lwYaoJYxba71lo6sr1ltsg094/export?format=csv&gid=1083634413"
+    );
+  },
   /**
    * Published CSV export of the daily prices Google Sheet (company × date
    * matrix). Override per-environment if it ever moves.

@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { serverEnv } from "@/lib/env";
 import { parseInventorySheet } from "@/lib/inventory/sheet-sync";
+import { parseQualitySheet } from "@/lib/inventory/quality-sheet";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -76,13 +77,62 @@ export async function GET(request: NextRequest) {
     duration_ms: durationMs,
   });
 
+  // 4) Inventory-by-quality tab (separate snapshot). Failures here are isolated
+  //    so they don't affect the lots/dispatches result above.
+  const quality = await syncQuality(db, startedAt);
+
   return NextResponse.json({
     ok: true,
     rows_read: rowsRead,
     lots_upserted: counts.lots ?? 0,
     dispatches_upserted: counts.dispatches ?? 0,
+    quality,
     duration_ms: durationMs,
   });
+}
+
+/** Fetch + full-replace the inventory-by-quality snapshot. */
+async function syncQuality(
+  db: ReturnType<typeof createAdminClient>,
+  startedAt: number,
+): Promise<{ ok: boolean; rows?: number; error?: string }> {
+  try {
+    const res = await fetch(serverEnv.INVENTORY_QUALITY_SHEET_CSV_URL, {
+      cache: "no-store",
+      redirect: "follow",
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status} al leer la hoja de calidad`);
+    const csv = await res.text();
+    if (csv.trimStart().startsWith("<!DOCTYPE")) {
+      throw new Error("La hoja de calidad no devolvió CSV (¿compartir?).");
+    }
+    const { rows } = parseQualitySheet(csv);
+    if (rows.length === 0) throw new Error("0 filas de inventario por calidad.");
+
+    const { data, error } = await db.rpc("replace_inventory_quality", {
+      p_rows: rows,
+    });
+    if (error) throw new Error(error.message);
+
+    const count = Number(data ?? rows.length);
+    await db.from("inventory_sync_runs").insert({
+      source: "inventory_quality_sheet",
+      status: "ok",
+      rows_read: count,
+      duration_ms: Date.now() - startedAt,
+    });
+    return { ok: true, rows: count };
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "Error desconocido.";
+    await db.from("inventory_sync_runs").insert({
+      source: "inventory_quality_sheet",
+      status: "error",
+      duration_ms: Date.now() - startedAt,
+      error: message,
+    });
+    console.error("[sync-inventory-quality]", message);
+    return { ok: false, error: message };
+  }
 }
 
 /** Log the failed run and return a 500. */
