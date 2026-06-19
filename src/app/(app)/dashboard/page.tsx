@@ -22,34 +22,14 @@ const ACTIVE_STAGES = ["Cotización", "Negociación", "Enviado"];
 /** Label for the international ICE line in the price chart. */
 const INTL = "Internacional (ICE)";
 
-/** Friendly names for the department code segment. */
-const DEPT_NAMES: Record<string, string> = {
-  ANT: "Antioquia",
-  MET: "Meta",
-  CUN: "Cundinamarca",
-  TOL: "Tolima",
-  CAU: "Cauca",
-  SAN: "Santander",
-  MAG: "Magdalena Medio",
-  ARA: "Arauca",
-  ARAU: "Arauca",
-  BOL: "Bolívar",
-  HUI: "Huila",
-  NDS: "N. de Santander",
-};
-
 /**
- * Map a lot code to a readable procedencia.
- *   "CO-ANT-URA-050525"           → "Antioquia"
- *   "CAU-080526(Ruta Guachene)"   → "Cauca"
- *   "...-080526(Ruta Guachene)"   → "Ruta Guachene"
+ * Group a quality-sheet procedencia name into a readable bucket.
+ *   "Cauca-(Ruta Guachene)"   → "Cauca"
+ *   "Uraba (Asopraur)"        → "Uraba"
+ *   "Nilo finca"              → "Nilo finca"
  */
-function regionFromCode(code: string): string {
-  const seg = code.split("-")[1]?.trim() ?? "";
-  if (DEPT_NAMES[seg]) return DEPT_NAMES[seg];
-  const paren = code.match(/\(([^)]+)\)/);
-  if (paren) return paren[1].trim();
-  return seg || "Otro";
+function procedenciaGroup(name: string): string {
+  return name.split(/[-(]/)[0].trim() || "Otro";
 }
 
 function shortDate(iso: string): string {
@@ -78,10 +58,10 @@ export default async function DashboardPage() {
     .limit(5);
   if (isAdmin && dept) tasksQuery = tasksQuery.eq("person.department", dept);
 
-  const [leadsRes, lotsRes, pricesRes, dispatchRes, market, tasksRes] =
+  const [leadsRes, stockRes, pricesRes, dispatchRes, market, tasksRes] =
     await Promise.all([
       supabase.from("leads").select("status, potential_value_cop"),
-      supabase.from("inventory_lots").select("code, qty_available_kg"),
+      supabase.from("inventory_quality").select("procedencia, en_bodega_kg"),
       supabase
         .from("price_history")
         .select("company, date, price_cop_kg")
@@ -92,7 +72,7 @@ export default async function DashboardPage() {
     ]);
 
   const leads = leadsRes.data ?? [];
-  const lots = lotsRes.data ?? [];
+  const stock = stockRes.data ?? [];
   const prices = pricesRes.data ?? [];
   const dispatches = dispatchRes.data ?? [];
 
@@ -116,14 +96,14 @@ export default async function DashboardPage() {
     if (l.status !== "Descartado") pipelineTotal += v;
   }
 
-  // Inventory by region (top 8 + Otros).
+  // Inventory in bodega by procedencia (from the quality sheet — current stock).
   const regionKg = new Map<string, number>();
   let kgAvailable = 0;
-  for (const lot of lots) {
-    const kg = Number(lot.qty_available_kg) || 0;
+  for (const row of stock) {
+    const kg = Number(row.en_bodega_kg) || 0;
     kgAvailable += kg;
     if (kg <= 0) continue;
-    const region = regionFromCode(lot.code);
+    const region = procedenciaGroup(row.procedencia);
     regionKg.set(region, (regionKg.get(region) ?? 0) + kg);
   }
   const sortedRegions = [...regionKg.entries()].sort((a, b) => b[1] - a[1]);
@@ -182,7 +162,7 @@ export default async function DashboardPage() {
       totalLeads: leads.length,
       activeLeads: leads.filter((l) => ACTIVE_STAGES.includes(l.status)).length,
       kgAvailable,
-      lotsCount: lots.length,
+      lotsCount: stock.length,
       dispatchCount: dispatches.length,
       dispatchedKg: dispatches.reduce((s, d) => s + (Number(d.qty_kg) || 0), 0),
     },
