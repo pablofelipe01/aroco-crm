@@ -76,7 +76,7 @@ function LoginForm() {
         );
         return;
       }
-      const redirectTo = params.get("redirectedFrom") ?? "/dashboard";
+      const redirectTo = params.get("redirectedFrom") ?? "/elegir";
       router.push(redirectTo);
       router.refresh();
     } catch {

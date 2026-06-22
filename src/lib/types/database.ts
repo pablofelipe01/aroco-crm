@@ -482,6 +482,207 @@ export type Database = {
         };
         Relationships: [];
       };
+      proceso_casos: {
+        Row: {
+          created_at: string;
+          created_by: string | null;
+          estado: Database["public"]["Enums"]["proceso_estado"];
+          fase_actual: number;
+          id: string;
+          origen: string | null;
+          proceso_key: string;
+          proveedor_ref: string | null;
+          tipo: Database["public"]["Enums"]["proceso_tipo"];
+          titulo: string;
+          updated_at: string;
+        };
+        Insert: {
+          created_at?: string;
+          created_by?: string | null;
+          estado?: Database["public"]["Enums"]["proceso_estado"];
+          fase_actual?: number;
+          id?: string;
+          origen?: string | null;
+          proceso_key?: string;
+          proveedor_ref?: string | null;
+          tipo: Database["public"]["Enums"]["proceso_tipo"];
+          titulo: string;
+          updated_at?: string;
+        };
+        Update: {
+          created_at?: string;
+          created_by?: string | null;
+          estado?: Database["public"]["Enums"]["proceso_estado"];
+          fase_actual?: number;
+          id?: string;
+          origen?: string | null;
+          proceso_key?: string;
+          proveedor_ref?: string | null;
+          tipo?: Database["public"]["Enums"]["proceso_tipo"];
+          titulo?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      proceso_pasos: {
+        Row: {
+          asignado_a: string | null;
+          caso_id: string;
+          completado_el: string | null;
+          completado_por: string | null;
+          created_at: string;
+          es_automatico: boolean;
+          es_rama: boolean;
+          estado: Database["public"]["Enums"]["paso_estado"];
+          fase_nombre: string;
+          fase_numero: number;
+          fecha_limite: string | null;
+          id: string;
+          notas: string | null;
+          numero: string;
+          orden: number;
+          rol: string;
+          titulo: string;
+          updated_at: string;
+        };
+        Insert: {
+          asignado_a?: string | null;
+          caso_id: string;
+          completado_el?: string | null;
+          completado_por?: string | null;
+          created_at?: string;
+          es_automatico?: boolean;
+          es_rama?: boolean;
+          estado?: Database["public"]["Enums"]["paso_estado"];
+          fase_nombre: string;
+          fase_numero: number;
+          fecha_limite?: string | null;
+          id?: string;
+          notas?: string | null;
+          numero: string;
+          orden?: number;
+          rol: string;
+          titulo: string;
+          updated_at?: string;
+        };
+        Update: {
+          asignado_a?: string | null;
+          caso_id?: string;
+          completado_el?: string | null;
+          completado_por?: string | null;
+          created_at?: string;
+          es_automatico?: boolean;
+          es_rama?: boolean;
+          estado?: Database["public"]["Enums"]["paso_estado"];
+          fase_nombre?: string;
+          fase_numero?: number;
+          fecha_limite?: string | null;
+          id?: string;
+          notas?: string | null;
+          numero?: string;
+          orden?: number;
+          rol?: string;
+          titulo?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      proceso_decisiones: {
+        Row: {
+          caso_id: string;
+          clave: string;
+          created_at: string;
+          elegida: string | null;
+          fase_numero: number;
+          id: string;
+          opciones: Json;
+          orden: number;
+          pregunta: string;
+          rol: string;
+          updated_at: string;
+        };
+        Insert: {
+          caso_id: string;
+          clave: string;
+          created_at?: string;
+          elegida?: string | null;
+          fase_numero: number;
+          id?: string;
+          opciones: Json;
+          orden?: number;
+          pregunta: string;
+          rol: string;
+          updated_at?: string;
+        };
+        Update: {
+          caso_id?: string;
+          clave?: string;
+          created_at?: string;
+          elegida?: string | null;
+          fase_numero?: number;
+          id?: string;
+          opciones?: Json;
+          orden?: number;
+          pregunta?: string;
+          rol?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      proceso_eventos: {
+        Row: {
+          actor: string | null;
+          caso_id: string;
+          created_at: string;
+          descripcion: string;
+          id: string;
+          paso_numero: string | null;
+        };
+        Insert: {
+          actor?: string | null;
+          caso_id: string;
+          created_at?: string;
+          descripcion: string;
+          id?: string;
+          paso_numero?: string | null;
+        };
+        Update: {
+          actor?: string | null;
+          caso_id?: string;
+          created_at?: string;
+          descripcion?: string;
+          id?: string;
+          paso_numero?: string | null;
+        };
+        Relationships: [];
+      };
+      proceso_revisiones: {
+        Row: {
+          caso_id: string;
+          created_at: string;
+          fecha: string;
+          id: string;
+          metas: string | null;
+          notas: string | null;
+        };
+        Insert: {
+          caso_id: string;
+          created_at?: string;
+          fecha: string;
+          id?: string;
+          metas?: string | null;
+          notas?: string | null;
+        };
+        Update: {
+          caso_id?: string;
+          created_at?: string;
+          fecha?: string;
+          id?: string;
+          metas?: string | null;
+          notas?: string | null;
+        };
+        Relationships: [];
+      };
       notifications: {
         Row: {
           id: string;
@@ -857,6 +1058,14 @@ export type Database = {
         | "Cambio de estado";
       commission_level: "Senior" | "Junior";
       commission_role: "Compra+Venta" | "Solo Venta" | "Solo Compra";
+      paso_estado:
+        | "pendiente"
+        | "en_curso"
+        | "completado"
+        | "bloqueado"
+        | "no_aplica";
+      proceso_estado: "en_curso" | "bloqueado" | "completado";
+      proceso_tipo: "proveedor" | "orden_compra";
       department:
         | "Dirección"
         | "Comercial"
