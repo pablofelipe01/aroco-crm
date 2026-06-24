@@ -22,9 +22,11 @@ const NAV_ADMIN = [
 export function ProcesosShell({
   children,
   isAdmin = false,
+  bell,
 }: {
   children: React.ReactNode;
   isAdmin?: boolean;
+  bell?: React.ReactNode;
 }) {
   const pathname = usePathname();
   const nav = isAdmin ? [...NAV, ...NAV_ADMIN] : NAV;
@@ -34,8 +36,9 @@ export function ProcesosShell({
   return (
     <div className="flex h-dvh overflow-hidden">
       <aside className="hidden w-64 shrink-0 flex-col border-r border-border bg-surface lg:flex">
-        <div className="flex h-16 items-center px-4">
+        <div className="flex h-16 items-center justify-between px-4">
           <Wordmark />
+          {bell}
         </div>
         <div className="px-3 pb-1">
           <span className="rounded-full bg-accent-soft px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide text-accent-soft-fg">
@@ -77,9 +80,12 @@ export function ProcesosShell({
         {/* Top bar (móvil + acceso rápido) */}
         <header className="flex h-14 shrink-0 items-center justify-between border-b border-border px-4 lg:hidden">
           <Wordmark className="h-7" />
-          <Link href="/dashboard" className="text-xs text-fg-muted hover:text-fg">
-            Operación →
-          </Link>
+          <div className="flex items-center gap-1">
+            {bell}
+            <Link href="/dashboard" className="text-xs text-fg-muted hover:text-fg">
+              Operación →
+            </Link>
+          </div>
         </header>
         <nav className="flex gap-1 overflow-x-auto border-b border-border px-3 py-2 lg:hidden">
           {nav.map((item) => (

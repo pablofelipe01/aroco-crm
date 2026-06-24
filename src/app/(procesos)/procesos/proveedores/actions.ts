@@ -4,6 +4,10 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getSessionContext } from "@/lib/auth";
 import { logAudit } from "@/lib/procesos/audit";
+import {
+  notificarGerenciaAdministrativa,
+  notificarUsuarios,
+} from "@/lib/procesos/notificaciones";
 import type { TablesInsert, TablesUpdate } from "@/lib/types/database";
 
 export type ActionResult = { ok: boolean; error?: string; id?: string };
@@ -52,7 +56,19 @@ export async function crearProveedor(input: ProveedorInput): Promise<ActionResul
     .select("id")
     .single();
   if (error) return { ok: false, error: error.message };
-  await logAudit("proveedor", data.id, "crear", `Creó el proveedor "${input.nombre.trim()}"`);
+  const nombre = input.nombre.trim();
+  await logAudit("proveedor", data.id, "crear", `Creó el proveedor "${nombre}"`);
+  await notificarGerenciaAdministrativa(
+    {
+      tipo: "proveedor_en_estudio",
+      titulo: "Nuevo proveedor en estudio",
+      cuerpo: `${nombre} fue registrado y está pendiente de aprobación.`,
+      enlace: `/procesos/proveedores/${data.id}`,
+      entidad: "proveedor",
+      entidadId: data.id,
+    },
+    session.userId,
+  );
   revalidatePath("/procesos/proveedores");
   return { ok: true, id: data.id };
 }
@@ -191,7 +207,7 @@ export async function cambiarEstadoProveedor(
   const supabase = await createClient();
   const { data: prov } = await supabase
     .from("proveedores")
-    .select("estado")
+    .select("estado, nombre, created_by")
     .eq("id", proveedorId)
     .maybeSingle();
   if (!prov) return { ok: false, error: "Proveedor no encontrado." };
@@ -219,6 +235,28 @@ export async function cambiarEstadoProveedor(
     `Cambió el estado: ${prov.estado} → ${nuevoEstado}`,
     motivo?.trim() ? { motivo: motivo.trim() } : undefined,
   );
+
+  // Avisa al creador cuando su proveedor queda resuelto (habilitado o rechazado).
+  if (
+    (nuevoEstado === "Habilitado" || nuevoEstado === "Rechazado") &&
+    prov.created_by &&
+    prov.created_by !== session.userId
+  ) {
+    await notificarUsuarios([prov.created_by], {
+      tipo: "proveedor_resuelto",
+      titulo:
+        nuevoEstado === "Habilitado"
+          ? `Proveedor habilitado: ${prov.nombre}`
+          : `Proveedor rechazado: ${prov.nombre}`,
+      cuerpo:
+        nuevoEstado === "Rechazado" && motivo?.trim()
+          ? `Motivo: ${motivo.trim()}`
+          : undefined,
+      enlace: `/procesos/proveedores/${proveedorId}`,
+      entidad: "proveedor",
+      entidadId: proveedorId,
+    });
+  }
 
   revalidatePath(`/procesos/proveedores/${proveedorId}`);
   revalidatePath("/procesos/proveedores");

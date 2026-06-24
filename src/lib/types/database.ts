@@ -746,6 +746,45 @@ export type Database = {
         };
         Relationships: [];
       };
+      notificaciones: {
+        Row: {
+          id: string;
+          usuario_id: string;
+          tipo: string;
+          titulo: string;
+          cuerpo: string | null;
+          enlace: string | null;
+          entidad: string | null;
+          entidad_id: string | null;
+          leida: boolean;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          usuario_id: string;
+          tipo: string;
+          titulo: string;
+          cuerpo?: string | null;
+          enlace?: string | null;
+          entidad?: string | null;
+          entidad_id?: string | null;
+          leida?: boolean;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          usuario_id?: string;
+          tipo?: string;
+          titulo?: string;
+          cuerpo?: string | null;
+          enlace?: string | null;
+          entidad?: string | null;
+          entidad_id?: string | null;
+          leida?: boolean;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
       audit_log: {
         Row: {
           id: string;
@@ -1520,6 +1559,7 @@ export type ProveedorDocumento = Tables<"proveedor_documentos">;
 export type ProveedorEstadoLog = Tables<"proveedor_estado_log">;
 export type Catalogo = Tables<"catalogos">;
 export type AuditLog = Tables<"audit_log">;
+export type Notificacion = Tables<"notificaciones">;
 export type Contrato = Tables<"contratos">;
 export type Task = Tables<"tasks">;
 export type Meeting = Tables<"meetings">;
