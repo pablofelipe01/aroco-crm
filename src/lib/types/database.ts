@@ -746,6 +746,39 @@ export type Database = {
         };
         Relationships: [];
       };
+      catalogos: {
+        Row: {
+          id: string;
+          tipo: string;
+          valor: string;
+          descripcion: string | null;
+          orden: number;
+          activo: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          tipo: string;
+          valor: string;
+          descripcion?: string | null;
+          orden?: number;
+          activo?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          tipo?: string;
+          valor?: string;
+          descripcion?: string | null;
+          orden?: number;
+          activo?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       departamentos: {
         Row: { id: string; nombre: string };
         Insert: { id: string; nombre: string };
@@ -1449,6 +1482,7 @@ export type Departamento = Tables<"departamentos">;
 export type Municipio = Tables<"municipios">;
 export type ProveedorDocumento = Tables<"proveedor_documentos">;
 export type ProveedorEstadoLog = Tables<"proveedor_estado_log">;
+export type Catalogo = Tables<"catalogos">;
 export type Contrato = Tables<"contratos">;
 export type Task = Tables<"tasks">;
 export type Meeting = Tables<"meetings">;

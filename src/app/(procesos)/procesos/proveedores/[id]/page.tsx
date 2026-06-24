@@ -36,6 +36,7 @@ export default async function ProveedorPage({
     { data: docs },
     { data: contrato },
     { data: estadoLog },
+    { data: cats },
   ] = await Promise.all([
     supabase.from("proveedores").select("*").eq("id", id).maybeSingle(),
     supabase.from("departamentos").select("*").order("nombre"),
@@ -51,8 +52,16 @@ export default async function ProveedorPage({
       .select("*")
       .eq("proveedor_id", id)
       .order("created_at", { ascending: false }),
+    supabase
+      .from("catalogos")
+      .select("tipo, valor")
+      .eq("activo", true)
+      .order("orden", { ascending: true }),
   ]);
   if (!prov) notFound();
+
+  const catOf = (tipo: string) =>
+    (cats ?? []).filter((c) => c.tipo === tipo).map((c) => c.valor);
 
   return (
     <ProveedorDetalle
@@ -64,6 +73,8 @@ export default async function ProveedorPage({
       estadoLog={(estadoLog ?? []) as ProveedorEstadoLog[]}
       canWrite={canWrite}
       canApprove={canApprove}
+      certOpts={catOf("certificacion")}
+      selloOpts={catOf("sello")}
     />
   );
 }

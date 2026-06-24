@@ -32,16 +32,25 @@ export default async function ProveedoresPage() {
     session?.profile?.role === "admin" ||
     session?.profile?.department === "Administrativo";
 
-  const [{ data: provs }, { data: deptos }, { data: munis }] = await Promise.all([
-    supabase
-      .from("proveedores")
-      .select(
-        "id, codigo, nombre, tipo_proveedor, departamento, municipio, asociacion, celular, numero_documento, estado",
-      )
-      .order("nombre", { ascending: true }),
-    supabase.from("departamentos").select("*").order("nombre"),
-    supabase.from("municipios").select("departamento, nombre").order("nombre"),
-  ]);
+  const [{ data: provs }, { data: deptos }, { data: munis }, { data: cats }] =
+    await Promise.all([
+      supabase
+        .from("proveedores")
+        .select(
+          "id, codigo, nombre, tipo_proveedor, departamento, municipio, asociacion, celular, numero_documento, estado",
+        )
+        .order("nombre", { ascending: true }),
+      supabase.from("departamentos").select("*").order("nombre"),
+      supabase.from("municipios").select("departamento, nombre").order("nombre"),
+      supabase
+        .from("catalogos")
+        .select("tipo, valor")
+        .eq("activo", true)
+        .order("orden", { ascending: true }),
+    ]);
+
+  const catOf = (tipo: string) =>
+    (cats ?? []).filter((c) => c.tipo === tipo).map((c) => c.valor);
 
   return (
     <ProveedoresClient
@@ -50,6 +59,8 @@ export default async function ProveedoresPage() {
       municipios={(munis ?? []) as { departamento: string; nombre: string }[]}
       canWrite={canWrite}
       canApprove={canApprove}
+      certOpts={catOf("certificacion")}
+      selloOpts={catOf("sello")}
     />
   );
 }

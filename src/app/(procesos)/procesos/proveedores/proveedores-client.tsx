@@ -20,12 +20,16 @@ export function ProveedoresClient({
   municipios,
   canWrite,
   canApprove,
+  certOpts,
+  selloOpts,
 }: {
   proveedores: ProveedorLista[];
   departamentos: Departamento[];
   municipios: { departamento: string; nombre: string }[];
   canWrite: boolean;
   canApprove: boolean;
+  certOpts: string[];
+  selloOpts: string[];
 }) {
   const router = useRouter();
   const [q, setQ] = React.useState("");
@@ -178,6 +182,8 @@ export function ProveedoresClient({
         onClose={() => setFormOpen(false)}
         departamentos={departamentos}
         municipios={municipios}
+        certOpts={certOpts}
+        selloOpts={selloOpts}
         onSaved={(id) => {
           setFormOpen(false);
           router.push(`/procesos/proveedores/${id}`);

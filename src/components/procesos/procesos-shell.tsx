@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Workflow, Users, Sprout, ArrowLeftRight } from "lucide-react";
+import { LayoutDashboard, Workflow, Users, Sprout, ArrowLeftRight, Tags } from "lucide-react";
 import { Wordmark } from "@/components/brand";
 import { cn } from "@/lib/utils";
 
@@ -14,8 +14,17 @@ const NAV = [
   { href: "/procesos/equipo", label: "Equipo y carga", icon: Users },
 ];
 
-export function ProcesosShell({ children }: { children: React.ReactNode }) {
+const NAV_ADMIN = [{ href: "/procesos/admin/catalogos", label: "Catálogos", icon: Tags }];
+
+export function ProcesosShell({
+  children,
+  isAdmin = false,
+}: {
+  children: React.ReactNode;
+  isAdmin?: boolean;
+}) {
   const pathname = usePathname();
+  const nav = isAdmin ? [...NAV, ...NAV_ADMIN] : NAV;
   const isActive = (href: string) =>
     href === "/procesos" ? pathname === "/procesos" : pathname.startsWith(href);
 
@@ -31,7 +40,7 @@ export function ProcesosShell({ children }: { children: React.ReactNode }) {
           </span>
         </div>
         <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 py-2">
-          {NAV.map((item) => {
+          {nav.map((item) => {
             const active = isActive(item.href);
             return (
               <Link
@@ -70,7 +79,7 @@ export function ProcesosShell({ children }: { children: React.ReactNode }) {
           </Link>
         </header>
         <nav className="flex gap-1 overflow-x-auto border-b border-border px-3 py-2 lg:hidden">
-          {NAV.map((item) => (
+          {nav.map((item) => (
             <Link
               key={item.href}
               href={item.href}

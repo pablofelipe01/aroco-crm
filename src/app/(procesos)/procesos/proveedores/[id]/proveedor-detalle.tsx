@@ -111,6 +111,8 @@ export function ProveedorDetalle({
   estadoLog,
   canWrite,
   canApprove,
+  certOpts,
+  selloOpts,
 }: {
   proveedor: Proveedor;
   departamentos: Departamento[];
@@ -120,6 +122,8 @@ export function ProveedorDetalle({
   estadoLog: ProveedorEstadoLog[];
   canWrite: boolean;
   canApprove: boolean;
+  certOpts: string[];
+  selloOpts: string[];
 }) {
   const router = useRouter();
   const [edit, setEdit] = React.useState(false);
@@ -197,6 +201,8 @@ export function ProveedorDetalle({
         onClose={() => setEdit(false)}
         departamentos={departamentos}
         municipios={municipios}
+        certOpts={certOpts}
+        selloOpts={selloOpts}
         initial={proveedor}
         onSaved={() => {
           setEdit(false);

@@ -9,9 +9,11 @@ export default async function ProcesosLayout({
 }: {
   children: React.ReactNode;
 }) {
+  let isAdmin = false;
   if (hasSupabaseEnv()) {
     const session = await getSessionContext();
     if (!session) redirect("/login");
+    isAdmin = session.profile?.role === "admin";
   }
-  return <ProcesosShell>{children}</ProcesosShell>;
+  return <ProcesosShell isAdmin={isAdmin}>{children}</ProcesosShell>;
 }

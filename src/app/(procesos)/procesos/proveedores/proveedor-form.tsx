@@ -63,6 +63,8 @@ export function ProveedorForm({
   municipios,
   initial,
   onSaved,
+  certOpts,
+  selloOpts,
 }: {
   open: boolean;
   onClose: () => void;
@@ -70,11 +72,22 @@ export function ProveedorForm({
   municipios: { departamento: string; nombre: string }[];
   initial?: Proveedor | null;
   onSaved: (id: string) => void;
+  certOpts?: string[];
+  selloOpts?: string[];
 }) {
   const { toast } = useToast();
   const [form, setForm] = React.useState<FormState>(() => initialState(initial));
   const [certs, setCerts] = React.useState<string[]>(initial?.certificaciones ?? []);
   const [sellos, setSellos] = React.useState<string[]>(initial?.sellos ?? []);
+
+  // Opciones desde catálogo (BD) con fallback a las estáticas; se unen las ya
+  // seleccionadas para no perder valores que se hayan desactivado en el catálogo.
+  const union = (opts: string[] | undefined, base: string[], selected: string[]) => {
+    const list = opts && opts.length > 0 ? opts : base;
+    return [...list, ...selected.filter((s) => !list.includes(s))];
+  };
+  const certOptions = union(certOpts, CERTIFICACIONES, certs);
+  const selloOptions = union(selloOpts, SELLOS, sellos);
   const [saving, setSaving] = React.useState(false);
   const [docDup, setDocDup] = React.useState(false);
   const [prevOpen, setPrevOpen] = React.useState(false);
@@ -214,8 +227,8 @@ export function ProveedorForm({
         </Seccion>
 
         <Seccion titulo="Certificaciones, sellos y referencias">
-          <Checks label="Certificaciones vigentes" opts={CERTIFICACIONES} values={certs} setValues={setCerts} />
-          <Checks label="Sellos vigentes" opts={SELLOS} values={sellos} setValues={setSellos} />
+          <Checks label="Certificaciones vigentes" opts={certOptions} values={certs} setValues={setCerts} />
+          <Checks label="Sellos vigentes" opts={selloOptions} values={sellos} setValues={setSellos} />
           <Txt label="Referencia comercial 1" v={form.referencia_comercial_1} set={(x) => set("referencia_comercial_1", x)} />
           <Txt label="Referencia comercial 2" v={form.referencia_comercial_2} set={(x) => set("referencia_comercial_2", x)} />
           <Sel label="Acepta compromisos éticos" v={form.acepta_compromisos_eticos} set={(x) => set("acepta_compromisos_eticos", x)} opts={SI_NO} />
