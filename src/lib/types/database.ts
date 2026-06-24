@@ -848,6 +848,42 @@ export type Database = {
         };
         Relationships: [];
       };
+      proveedor_documentos: {
+        Row: {
+          categoria: string;
+          content_type: string | null;
+          created_at: string;
+          file_path: string;
+          id: string;
+          nombre: string;
+          proveedor_id: string;
+          size_bytes: number | null;
+          uploaded_by: string | null;
+        };
+        Insert: {
+          categoria: string;
+          content_type?: string | null;
+          created_at?: string;
+          file_path: string;
+          id?: string;
+          nombre: string;
+          proveedor_id: string;
+          size_bytes?: number | null;
+          uploaded_by?: string | null;
+        };
+        Update: {
+          categoria?: string;
+          content_type?: string | null;
+          created_at?: string;
+          file_path?: string;
+          id?: string;
+          nombre?: string;
+          proveedor_id?: string;
+          size_bytes?: number | null;
+          uploaded_by?: string | null;
+        };
+        Relationships: [];
+      };
       notifications: {
         Row: {
           id: string;
@@ -1294,6 +1330,7 @@ export type MonthlyTonnage = Tables<"monthly_tonnage">;
 export type Proveedor = Tables<"proveedores">;
 export type Departamento = Tables<"departamentos">;
 export type Municipio = Tables<"municipios">;
+export type ProveedorDocumento = Tables<"proveedor_documentos">;
 export type Task = Tables<"tasks">;
 export type Meeting = Tables<"meetings">;
 

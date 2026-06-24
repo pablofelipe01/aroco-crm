@@ -8,8 +8,9 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/card";
 import { ESTADO_TONE } from "@/lib/procesos/proveedor-opts";
-import type { Departamento, Proveedor } from "@/lib/types/database";
+import type { Departamento, Proveedor, ProveedorDocumento } from "@/lib/types/database";
 import { ProveedorForm } from "../proveedor-form";
+import { Documentos } from "./documentos";
 
 const SECCIONES: { titulo: string; campos: [keyof Proveedor, string][] }[] = [
   {
@@ -90,11 +91,13 @@ export function ProveedorDetalle({
   proveedor,
   departamentos,
   municipios,
+  documentos,
   canWrite,
 }: {
   proveedor: Proveedor;
   departamentos: Departamento[];
   municipios: { departamento: string; nombre: string }[];
+  documentos: ProveedorDocumento[];
   canWrite: boolean;
 }) {
   const router = useRouter();
@@ -161,6 +164,8 @@ export function ProveedorDetalle({
           );
         })}
       </div>
+
+      <Documentos proveedorId={proveedor.id} documentos={documentos} canWrite={canWrite} />
 
       <ProveedorForm
         open={edit}

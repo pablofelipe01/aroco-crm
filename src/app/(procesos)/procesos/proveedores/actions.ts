@@ -70,3 +70,83 @@ export async function actualizarProveedor(
   revalidatePath("/procesos/proveedores");
   return { ok: true, id };
 }
+
+// ── Documentos soporte (Supabase Storage, bucket 'proveedores') ──────────────
+
+const MAX_BYTES = 5 * 1024 * 1024; // 5 MB
+const MAX_POR_CATEGORIA = 10;
+const TIPOS_OK = ["application/pdf", "image/png", "image/jpeg", "image/jpg"];
+export const CATEGORIAS_DOC = ["legales", "tecnicos", "contrato"] as const;
+
+/** Sube un documento soporte de un proveedor (FormData: proveedorId, categoria, file). */
+export async function subirDocumento(formData: FormData): Promise<ActionResult> {
+  const session = await requireSession();
+  const proveedorId = String(formData.get("proveedorId") ?? "");
+  const categoria = String(formData.get("categoria") ?? "");
+  const file = formData.get("file");
+
+  if (!proveedorId || !CATEGORIAS_DOC.includes(categoria as (typeof CATEGORIAS_DOC)[number]))
+    return { ok: false, error: "Petición inválida." };
+  if (!(file instanceof File) || file.size === 0)
+    return { ok: false, error: "Selecciona un archivo." };
+  if (file.size > MAX_BYTES) return { ok: false, error: "El archivo supera 5 MB." };
+  if (!TIPOS_OK.includes(file.type))
+    return { ok: false, error: "Solo se permiten PDF o imágenes." };
+
+  const supabase = await createClient();
+  const { count } = await supabase
+    .from("proveedor_documentos")
+    .select("id", { count: "exact", head: true })
+    .eq("proveedor_id", proveedorId)
+    .eq("categoria", categoria);
+  if ((count ?? 0) >= MAX_POR_CATEGORIA)
+    return { ok: false, error: `Máximo ${MAX_POR_CATEGORIA} archivos por categoría.` };
+
+  const safe = file.name.replace(/[^\w.\-]+/g, "_").slice(-80);
+  const path = `${proveedorId}/${categoria}/${Date.now()}-${safe}`;
+  const buffer = Buffer.from(await file.arrayBuffer());
+  const up = await supabase.storage
+    .from("proveedores")
+    .upload(path, buffer, { contentType: file.type || "application/octet-stream" });
+  if (up.error) return { ok: false, error: up.error.message };
+
+  const { error } = await supabase.from("proveedor_documentos").insert({
+    proveedor_id: proveedorId,
+    categoria,
+    nombre: file.name,
+    file_path: path,
+    size_bytes: file.size,
+    content_type: file.type,
+    uploaded_by: session.userId,
+  });
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath(`/procesos/proveedores/${proveedorId}`);
+  return { ok: true };
+}
+
+export async function eliminarDocumento(id: string): Promise<ActionResult> {
+  await requireSession();
+  const supabase = await createClient();
+  const { data: doc } = await supabase
+    .from("proveedor_documentos")
+    .select("proveedor_id, file_path")
+    .eq("id", id)
+    .maybeSingle();
+  if (!doc) return { ok: false, error: "Documento no encontrado." };
+
+  await supabase.storage.from("proveedores").remove([doc.file_path]);
+  const { error } = await supabase.from("proveedor_documentos").delete().eq("id", id);
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath(`/procesos/proveedores/${doc.proveedor_id}`);
+  return { ok: true };
+}
+
+/** URL firmada (2 min) para descargar/ver un documento. */
+export async function urlDocumento(filePath: string): Promise<string | null> {
+  await requireSession();
+  const supabase = await createClient();
+  const { data } = await supabase.storage.from("proveedores").createSignedUrl(filePath, 120);
+  return data?.signedUrl ?? null;
+}
