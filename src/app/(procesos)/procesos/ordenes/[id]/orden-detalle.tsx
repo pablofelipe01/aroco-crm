@@ -11,6 +11,7 @@ import {
   XCircle,
   Megaphone,
   Sprout,
+  FileDown,
 } from "lucide-react";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -109,11 +110,20 @@ export function OrdenDetalle({
             <Badge tone={OC_ESTADO_TONE[e]}>{e}</Badge>
           </p>
         </div>
-        {canWrite && (e === "Borrador" || e === "En revisión") && (
-          <Button size="sm" variant="secondary" onClick={() => setEdit(true)}>
-            <Pencil className="h-4 w-4" /> Editar
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          {(e === "Aprobada" || e === "Emitida") && (
+            <Link href={`/print/orden/${orden.id}`} target="_blank">
+              <Button size="sm" variant="secondary">
+                <FileDown className="h-4 w-4" /> Generar PDF
+              </Button>
+            </Link>
+          )}
+          {canWrite && (e === "Borrador" || e === "En revisión") && (
+            <Button size="sm" variant="secondary" onClick={() => setEdit(true)}>
+              <Pencil className="h-4 w-4" /> Editar
+            </Button>
+          )}
+        </div>
       </div>
 
       <Card>
