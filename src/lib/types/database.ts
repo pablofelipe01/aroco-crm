@@ -746,6 +746,42 @@ export type Database = {
         };
         Relationships: [];
       };
+      audit_log: {
+        Row: {
+          id: string;
+          entidad: string;
+          entidad_id: string | null;
+          accion: string;
+          descripcion: string;
+          meta: Json | null;
+          usuario_id: string | null;
+          usuario_nombre: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          entidad: string;
+          entidad_id?: string | null;
+          accion: string;
+          descripcion: string;
+          meta?: Json | null;
+          usuario_id?: string | null;
+          usuario_nombre?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          entidad?: string;
+          entidad_id?: string | null;
+          accion?: string;
+          descripcion?: string;
+          meta?: Json | null;
+          usuario_id?: string | null;
+          usuario_nombre?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
       catalogos: {
         Row: {
           id: string;
@@ -1483,6 +1519,7 @@ export type Municipio = Tables<"municipios">;
 export type ProveedorDocumento = Tables<"proveedor_documentos">;
 export type ProveedorEstadoLog = Tables<"proveedor_estado_log">;
 export type Catalogo = Tables<"catalogos">;
+export type AuditLog = Tables<"audit_log">;
 export type Contrato = Tables<"contratos">;
 export type Task = Tables<"tasks">;
 export type Meeting = Tables<"meetings">;

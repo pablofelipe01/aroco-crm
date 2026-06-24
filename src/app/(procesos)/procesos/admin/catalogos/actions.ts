@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getSessionContext } from "@/lib/auth";
 import { CATALOGO_TIPOS_VALIDOS } from "@/lib/procesos/catalogos";
+import { logAudit } from "@/lib/procesos/audit";
 import type { TablesUpdate } from "@/lib/types/database";
 
 export type ActionResult = { ok: boolean; error?: string; id?: string };
@@ -50,6 +51,7 @@ export async function crearItemCatalogo(
       ok: false,
       error: error.code === "23505" ? "Ya existe ese valor en el catálogo." : error.message,
     };
+  await logAudit("catalogo", data.id, "crear", `Agregó ${tipo}: "${valor.trim()}"`);
   revalidatePath("/procesos/admin/catalogos");
   return { ok: true, id: data.id };
 }
@@ -77,6 +79,11 @@ export async function actualizarItemCatalogo(
       ok: false,
       error: error.code === "23505" ? "Ya existe ese valor en el catálogo." : error.message,
     };
+  const desc =
+    patch.activo !== undefined
+      ? `${patch.activo ? "Activó" : "Desactivó"} un valor del catálogo`
+      : "Editó un valor del catálogo";
+  await logAudit("catalogo", id, "actualizar", desc);
   revalidatePath("/procesos/admin/catalogos");
   return { ok: true, id };
 }
@@ -85,8 +92,15 @@ export async function eliminarItemCatalogo(id: string): Promise<ActionResult> {
   const guard = await requireAdmin();
   if (guard.error) return { ok: false, error: guard.error };
   const supabase = await createClient();
+  const { data: item } = await supabase.from("catalogos").select("tipo, valor").eq("id", id).maybeSingle();
   const { error } = await supabase.from("catalogos").delete().eq("id", id);
   if (error) return { ok: false, error: error.message };
+  await logAudit(
+    "catalogo",
+    id,
+    "eliminar",
+    item ? `Eliminó ${item.tipo}: "${item.valor}"` : "Eliminó un valor del catálogo",
+  );
   revalidatePath("/procesos/admin/catalogos");
   return { ok: true };
 }

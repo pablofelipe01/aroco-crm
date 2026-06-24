@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getSessionContext } from "@/lib/auth";
+import { logAudit } from "@/lib/procesos/audit";
 import type { TablesInsert, TablesUpdate } from "@/lib/types/database";
 
 export type ActionResult = { ok: boolean; error?: string; id?: string };
@@ -51,6 +52,7 @@ export async function crearProveedor(input: ProveedorInput): Promise<ActionResul
     .select("id")
     .single();
   if (error) return { ok: false, error: error.message };
+  await logAudit("proveedor", data.id, "crear", `Creó el proveedor "${input.nombre.trim()}"`);
   revalidatePath("/procesos/proveedores");
   return { ok: true, id: data.id };
 }
@@ -66,6 +68,7 @@ export async function actualizarProveedor(
   const supabase = await createClient();
   const { error } = await supabase.from("proveedores").update(clean(input)).eq("id", id);
   if (error) return { ok: false, error: error.message };
+  await logAudit("proveedor", id, "actualizar", "Actualizó los datos del proveedor");
   revalidatePath(`/procesos/proveedores/${id}`);
   revalidatePath("/procesos/proveedores");
   return { ok: true, id };
@@ -121,6 +124,12 @@ export async function subirDocumento(formData: FormData): Promise<ActionResult> 
   });
   if (error) return { ok: false, error: error.message };
 
+  await logAudit(
+    "documento",
+    proveedorId,
+    "documento_subir",
+    `Subió documento (${categoria}): ${file.name}`,
+  );
   revalidatePath(`/procesos/proveedores/${proveedorId}`);
   return { ok: true };
 }
@@ -139,6 +148,7 @@ export async function eliminarDocumento(id: string): Promise<ActionResult> {
   const { error } = await supabase.from("proveedor_documentos").delete().eq("id", id);
   if (error) return { ok: false, error: error.message };
 
+  await logAudit("documento", doc.proveedor_id, "documento_eliminar", "Eliminó un documento soporte");
   revalidatePath(`/procesos/proveedores/${doc.proveedor_id}`);
   return { ok: true };
 }
@@ -202,6 +212,14 @@ export async function cambiarEstadoProveedor(
     usuario_nombre: session.profile?.full_name ?? null,
   });
 
+  await logAudit(
+    "proveedor",
+    proveedorId,
+    "estado",
+    `Cambió el estado: ${prov.estado} → ${nuevoEstado}`,
+    motivo?.trim() ? { motivo: motivo.trim() } : undefined,
+  );
+
   revalidatePath(`/procesos/proveedores/${proveedorId}`);
   revalidatePath("/procesos/proveedores");
   return { ok: true };
@@ -244,6 +262,12 @@ export async function guardarContrato(
         .insert({ ...row, created_by: session.userId } as unknown as TablesInsert<"contratos">);
   if (error) return { ok: false, error: error.message };
 
+  await logAudit(
+    "contrato",
+    proveedorId,
+    existe ? "actualizar" : "crear",
+    existe ? "Actualizó el contrato" : "Generó el contrato",
+  );
   revalidatePath(`/procesos/proveedores/${proveedorId}`);
   return { ok: true };
 }
@@ -278,6 +302,7 @@ export async function agregarNovedad(
     .eq("id", contratoId);
   if (error) return { ok: false, error: error.message };
 
+  await logAudit("contrato", c.proveedor_id, "novedad", `Agregó una novedad (${origen})`);
   revalidatePath(`/procesos/proveedores/${c.proveedor_id}`);
   return { ok: true };
 }

@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Workflow, Users, Sprout, ArrowLeftRight, Tags } from "lucide-react";
+import { LayoutDashboard, Workflow, Users, Sprout, ArrowLeftRight, Tags, ScrollText } from "lucide-react";
 import { Wordmark } from "@/components/brand";
 import { cn } from "@/lib/utils";
 
@@ -14,7 +14,10 @@ const NAV = [
   { href: "/procesos/equipo", label: "Equipo y carga", icon: Users },
 ];
 
-const NAV_ADMIN = [{ href: "/procesos/admin/catalogos", label: "Catálogos", icon: Tags }];
+const NAV_ADMIN = [
+  { href: "/procesos/admin/catalogos", label: "Catálogos", icon: Tags },
+  { href: "/procesos/admin/auditoria", label: "Auditoría", icon: ScrollText },
+];
 
 export function ProcesosShell({
   children,
