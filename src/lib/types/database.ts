@@ -697,6 +697,7 @@ export type Database = {
           id: string;
           libre_olores: string | null;
           lugar_entrega: string | null;
+          numero_contrato: string | null;
           novedades_aroco: string | null;
           novedades_proveedor: string | null;
           proveedor_id: string;
@@ -716,6 +717,7 @@ export type Database = {
           id?: string;
           libre_olores?: string | null;
           lugar_entrega?: string | null;
+          numero_contrato?: string | null;
           novedades_aroco?: string | null;
           novedades_proveedor?: string | null;
           proveedor_id: string;
@@ -735,6 +737,7 @@ export type Database = {
           id?: string;
           libre_olores?: string | null;
           lugar_entrega?: string | null;
+          numero_contrato?: string | null;
           novedades_aroco?: string | null;
           novedades_proveedor?: string | null;
           proveedor_id?: string;
@@ -759,6 +762,13 @@ export type Database = {
         Row: {
           acepta_compromisos_eticos: string | null;
           acepta_politica_datos: string | null;
+          autoriza_verificacion: string | null;
+          capacidad_comercializacion: string | null;
+          declara_origen_licito: string | null;
+          documento_representante: string | null;
+          municipios_produccion: string | null;
+          representante_legal: string | null;
+          tipo_documento_titular: string | null;
           asociacion: string | null;
           banco: string | null;
           cap_baba_anual: number | null;
@@ -809,6 +819,13 @@ export type Database = {
         Insert: {
           acepta_compromisos_eticos?: string | null;
           acepta_politica_datos?: string | null;
+          autoriza_verificacion?: string | null;
+          capacidad_comercializacion?: string | null;
+          declara_origen_licito?: string | null;
+          documento_representante?: string | null;
+          municipios_produccion?: string | null;
+          representante_legal?: string | null;
+          tipo_documento_titular?: string | null;
           asociacion?: string | null;
           banco?: string | null;
           cap_baba_anual?: number | null;
@@ -859,6 +876,13 @@ export type Database = {
         Update: {
           acepta_compromisos_eticos?: string | null;
           acepta_politica_datos?: string | null;
+          autoriza_verificacion?: string | null;
+          capacidad_comercializacion?: string | null;
+          declara_origen_licito?: string | null;
+          documento_representante?: string | null;
+          municipios_produccion?: string | null;
+          representante_legal?: string | null;
+          tipo_documento_titular?: string | null;
           asociacion?: string | null;
           banco?: string | null;
           cap_baba_anual?: number | null;

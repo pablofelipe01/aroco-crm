@@ -1,8 +1,9 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FileSignature, Plus, Pencil, MessageSquarePlus } from "lucide-react";
+import { FileSignature, Plus, Pencil, MessageSquarePlus, FileDown } from "lucide-react";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -16,6 +17,7 @@ const LUGAR_DEFAULT = "Cra 90 # 81A-14, Barrio La Primavera, Localidad Engativá
 
 type F = Record<string, string>;
 const initial = (c?: Contrato | null): F => ({
+  numero_contrato: c?.numero_contrato ?? "",
   humedad_maxima: c?.humedad_maxima != null ? String(c.humedad_maxima) : "",
   granos_enteros_minimo: c?.granos_enteros_minimo != null ? String(c.granos_enteros_minimo) : "",
   fermentacion_minima: c?.fermentacion_minima != null ? String(c.fermentacion_minima) : "",
@@ -73,6 +75,13 @@ export function ContratoCard({
             <Badge tone={contrato.estado === "Vigente" ? "success" : "neutral"}>
               {contrato.estado}
             </Badge>
+          )}
+          {contrato && (
+            <Link href={`/print/contrato/${proveedorId}`} target="_blank">
+              <Button size="sm" variant="secondary">
+                <FileDown className="h-4 w-4" /> Generar PDF
+              </Button>
+            </Link>
           )}
           {canWrite && (
             <Button size="sm" variant="secondary" onClick={abrir}>
@@ -140,6 +149,9 @@ export function ContratoCard({
         }
       >
         <div className="space-y-4">
+          <Field label="Número de contrato (ej. CTO-AROCM-004)">
+            <Input value={form.numero_contrato} onChange={(e) => set("numero_contrato", e.target.value)} className="font-mono" />
+          </Field>
           <p className="text-xs font-semibold uppercase tracking-wide text-accent-soft-fg">Condiciones de calidad</p>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <Field label="Humedad máxima (%)"><Input type="number" step="any" value={form.humedad_maxima} onChange={(e) => set("humedad_maxima", e.target.value)} className="font-mono tnum" /></Field>

@@ -38,13 +38,16 @@ function initialState(p?: Proveedor | null): FormState {
   const s: FormState = {};
   const keys = [
     "codigo", "nombre", "tipo_proveedor", "tipo_documento", "numero_documento", "direccion",
+    "representante_legal", "documento_representante",
     "departamento", "municipio", "pertenece_asociacion", "asociacion", "pertenece_programa",
     "programa", "nit_asociacion", "contacto", "celular", "whatsapp", "email", "variedad_cacao",
     "cap_baba_mensual", "cap_baba_anual", "cap_seco_mensual", "cap_seco_anual", "tipo_secado",
-    "humedad", "libre_deforestacion", "libre_trabajo_infantil", "banco", "tipo_cuenta",
-    "numero_cuenta", "cedula_titular", "nombre_titular", "regimen_tributario",
+    "humedad", "capacidad_comercializacion", "municipios_produccion", "libre_deforestacion",
+    "libre_trabajo_infantil", "banco", "tipo_cuenta", "numero_cuenta", "tipo_documento_titular",
+    "cedula_titular", "nombre_titular", "regimen_tributario",
     "referencia_comercial_1", "referencia_comercial_2", "num_productores_compra", "coordenadas",
-    "acepta_compromisos_eticos", "acepta_politica_datos",
+    "acepta_compromisos_eticos", "acepta_politica_datos", "declara_origen_licito",
+    "autoriza_verificacion",
   ];
   for (const k of keys) {
     const v = (p as Record<string, unknown> | undefined)?.[k];
@@ -152,6 +155,8 @@ export function ProveedorForm({
             {docDup && <span className="mt-1 block text-xs text-danger">Ya existe un proveedor con ese documento.</span>}
           </Field>
           <Txt label="Código productor" v={form.codigo} set={(x) => set("codigo", x)} />
+          <Txt label="Representante legal (empresas/asociaciones)" v={form.representante_legal} set={(x) => set("representante_legal", x)} />
+          <Txt label="Documento del representante / persona natural" v={form.documento_representante} set={(x) => set("documento_representante", x)} />
         </Seccion>
 
         <Seccion titulo="Ubicación">
@@ -192,6 +197,8 @@ export function ProveedorForm({
           <Num label="Cap. seco anual (kg)" v={form.cap_seco_anual} set={(x) => set("cap_seco_anual", x)} />
           <Num label="Humedad promedio (%)" v={form.humedad} set={(x) => set("humedad", x)} />
           <Num label="# productores a los que compra" v={form.num_productores_compra} set={(x) => set("num_productores_compra", x)} />
+          <Txt label="Capacidad de comercialización (Ton/mes o año)" v={form.capacidad_comercializacion} set={(x) => set("capacidad_comercializacion", x)} />
+          <Txt label="Municipios de producción (comercializadores)" v={form.municipios_produccion} set={(x) => set("municipios_produccion", x)} />
           <Sel label="Libre de deforestación" v={form.libre_deforestacion} set={(x) => set("libre_deforestacion", x)} opts={LIBRE_DEFORESTACION} className="sm:col-span-2" />
           <Sel label="Libre de trabajo infantil" v={form.libre_trabajo_infantil} set={(x) => set("libre_trabajo_infantil", x)} opts={LIBRE_TRABAJO_INFANTIL} className="sm:col-span-2" />
         </Seccion>
@@ -200,7 +207,8 @@ export function ProveedorForm({
           <Txt label="Banco / billetera" v={form.banco} set={(x) => set("banco", x)} />
           <Sel label="Tipo de cuenta" v={form.tipo_cuenta} set={(x) => set("tipo_cuenta", x)} opts={TIPO_CUENTA} />
           <Txt label="# de cuenta" v={form.numero_cuenta} set={(x) => set("numero_cuenta", x)} />
-          <Txt label="Cédula titular" v={form.cedula_titular} set={(x) => set("cedula_titular", x)} />
+          <Sel label="Tipo de documento del titular" v={form.tipo_documento_titular} set={(x) => set("tipo_documento_titular", x)} opts={TIPO_DOCUMENTO} />
+          <Txt label="Documento del titular" v={form.cedula_titular} set={(x) => set("cedula_titular", x)} />
           <Txt label="Nombre titular" v={form.nombre_titular} set={(x) => set("nombre_titular", x)} />
           <Sel label="Régimen tributario" v={form.regimen_tributario} set={(x) => set("regimen_tributario", x)} opts={REGIMEN_TRIBUTARIO} />
         </Seccion>
@@ -211,7 +219,9 @@ export function ProveedorForm({
           <Txt label="Referencia comercial 1" v={form.referencia_comercial_1} set={(x) => set("referencia_comercial_1", x)} />
           <Txt label="Referencia comercial 2" v={form.referencia_comercial_2} set={(x) => set("referencia_comercial_2", x)} />
           <Sel label="Acepta compromisos éticos" v={form.acepta_compromisos_eticos} set={(x) => set("acepta_compromisos_eticos", x)} opts={SI_NO} />
-          <Sel label="Acepta política de datos" v={form.acepta_politica_datos} set={(x) => set("acepta_politica_datos", x)} opts={SI_NO} />
+          <Sel label="Acepta política de datos (Habeas Data)" v={form.acepta_politica_datos} set={(x) => set("acepta_politica_datos", x)} opts={SI_NO} />
+          <Sel label="Declara origen lícito de fondos (SARLAFT)" v={form.declara_origen_licito} set={(x) => set("declara_origen_licito", x)} opts={SI_NO} />
+          <Sel label="Autoriza verificación de datos" v={form.autoriza_verificacion} set={(x) => set("autoriza_verificacion", x)} opts={SI_NO} />
         </Seccion>
       </div>
     </Modal>
