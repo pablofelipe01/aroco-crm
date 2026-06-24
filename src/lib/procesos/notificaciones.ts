@@ -55,16 +55,16 @@ export async function notificarGerenciaAdministrativa(
 /**
  * Canal de email — DESACTIVADO por defecto (decisión del negocio: las
  * automatizaciones de comunicación se construyen pero se activan por env var).
- * Para habilitarlo: NOTIF_EMAIL_ENABLED=true, RESEND_API_KEY y NOTIF_EMAIL_FROM.
+ * Para habilitarlo: ENABLE_EMAIL_NOTIFICATIONS=true, RESEND_API_KEY y EMAIL_FROM.
  */
 async function enviarEmails(
   admin: ReturnType<typeof createAdminClient>,
   usuarioIds: string[],
   p: NotifPayload,
 ): Promise<void> {
-  if (process.env.NOTIF_EMAIL_ENABLED !== "true") return;
+  if (process.env.ENABLE_EMAIL_NOTIFICATIONS !== "true") return;
   const apiKey = process.env.RESEND_API_KEY;
-  const from = process.env.NOTIF_EMAIL_FROM;
+  const from = process.env.EMAIL_FROM;
   if (!apiKey || !from) return;
 
   const { data } = await admin
@@ -75,7 +75,7 @@ async function enviarEmails(
   const to = (data ?? []).map((r) => r.email).filter(Boolean);
   if (to.length === 0) return;
 
-  const base = process.env.NEXT_PUBLIC_APP_URL ?? "";
+  const base = process.env.NEXT_PUBLIC_SITE_URL ?? "";
   const link = p.enlace ? `${base}${p.enlace}` : base;
   const html =
     `<p>${p.titulo}</p>` +
