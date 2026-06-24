@@ -746,6 +746,67 @@ export type Database = {
         };
         Relationships: [];
       };
+      ordenes_compra: {
+        Row: {
+          id: string;
+          consecutivo: string | null;
+          proveedor_id: string;
+          tipo_caso: Database["public"]["Enums"]["oc_caso"];
+          estado: Database["public"]["Enums"]["oc_estado"];
+          volumen_kg: number | null;
+          precio_kg: number | null;
+          valor_total: number | null;
+          fecha_entrega: string | null;
+          lugar_entrega: string | null;
+          observaciones: string | null;
+          motivo_rechazo: string | null;
+          created_by: string | null;
+          aprobada_por: string | null;
+          aprobada_en: string | null;
+          emitida_en: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          consecutivo?: string | null;
+          proveedor_id: string;
+          tipo_caso?: Database["public"]["Enums"]["oc_caso"];
+          estado?: Database["public"]["Enums"]["oc_estado"];
+          volumen_kg?: number | null;
+          precio_kg?: number | null;
+          fecha_entrega?: string | null;
+          lugar_entrega?: string | null;
+          observaciones?: string | null;
+          motivo_rechazo?: string | null;
+          created_by?: string | null;
+          aprobada_por?: string | null;
+          aprobada_en?: string | null;
+          emitida_en?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          consecutivo?: string | null;
+          proveedor_id?: string;
+          tipo_caso?: Database["public"]["Enums"]["oc_caso"];
+          estado?: Database["public"]["Enums"]["oc_estado"];
+          volumen_kg?: number | null;
+          precio_kg?: number | null;
+          fecha_entrega?: string | null;
+          lugar_entrega?: string | null;
+          observaciones?: string | null;
+          motivo_rechazo?: string | null;
+          created_by?: string | null;
+          aprobada_por?: string | null;
+          aprobada_en?: string | null;
+          emitida_en?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       notificaciones: {
         Row: {
           id: string;
@@ -1518,6 +1579,8 @@ export type Database = {
       movement_kind: "entrada" | "salida";
       quote_status: "borrador" | "enviada" | "aceptada" | "rechazada";
       task_status: "pending" | "progress" | "done" | "blocked";
+      oc_caso: "roc" | "otros_sin" | "otros_con";
+      oc_estado: "Borrador" | "En revisión" | "Aprobada" | "Rechazada" | "Emitida";
       user_role: "admin" | "member";
     };
     CompositeTypes: {
@@ -1560,6 +1623,7 @@ export type ProveedorEstadoLog = Tables<"proveedor_estado_log">;
 export type Catalogo = Tables<"catalogos">;
 export type AuditLog = Tables<"audit_log">;
 export type Notificacion = Tables<"notificaciones">;
+export type OrdenCompra = Tables<"ordenes_compra">;
 export type Contrato = Tables<"contratos">;
 export type Task = Tables<"tasks">;
 export type Meeting = Tables<"meetings">;

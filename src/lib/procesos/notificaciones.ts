@@ -52,6 +52,38 @@ export async function notificarGerenciaAdministrativa(
   }
 }
 
+/** Notifica a los miembros activos de uno o más departamentos (+ admins). */
+export async function notificarDepartamentos(
+  departamentos: string[],
+  p: NotifPayload,
+  excludeUserId?: string,
+): Promise<void> {
+  try {
+    const admin = createAdminClient();
+    const filtro = ["role.eq.admin", ...departamentos.map((d) => `department.eq.${d}`)].join(",");
+    const { data } = await admin.from("profiles").select("id").eq("active", true).or(filtro);
+    const ids = (data ?? []).map((r) => r.id).filter((id) => id !== excludeUserId);
+    await notificarUsuarios(ids, p);
+  } catch {
+    // Silencioso a propósito.
+  }
+}
+
+/** Notifica a todo el equipo activo (alertas de logística). */
+export async function notificarTodoElEquipo(
+  p: NotifPayload,
+  excludeUserId?: string,
+): Promise<void> {
+  try {
+    const admin = createAdminClient();
+    const { data } = await admin.from("profiles").select("id").eq("active", true);
+    const ids = (data ?? []).map((r) => r.id).filter((id) => id !== excludeUserId);
+    await notificarUsuarios(ids, p);
+  } catch {
+    // Silencioso a propósito.
+  }
+}
+
 /**
  * Canal de email — DESACTIVADO por defecto (decisión del negocio: las
  * automatizaciones de comunicación se construyen pero se activan por env var).

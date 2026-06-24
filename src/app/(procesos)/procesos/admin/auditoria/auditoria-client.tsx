@@ -11,6 +11,7 @@ import {
   FileText,
   Files,
   Tags,
+  ShoppingCart,
 } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { Input, Select } from "@/components/ui/input";
@@ -21,6 +22,7 @@ import type { AuditLog } from "@/lib/types/database";
 
 const ENTIDADES: Record<string, { label: string; icon: React.ElementType }> = {
   proveedor: { label: "Proveedor", icon: Sprout },
+  orden: { label: "Orden de compra", icon: ShoppingCart },
   contrato: { label: "Contrato", icon: FileText },
   documento: { label: "Documento", icon: Files },
   catalogo: { label: "Catálogo", icon: Tags },
@@ -34,6 +36,10 @@ const ACCION_TONE: Record<string, "neutral" | "success" | "warn" | "danger" | "i
   documento_subir: "info",
   documento_eliminar: "danger",
   novedad: "neutral",
+  aprobar: "success",
+  rechazar: "danger",
+  enviar_revision: "warn",
+  emitir: "info",
 };
 
 const ACCION_LABEL: Record<string, string> = {
@@ -44,6 +50,10 @@ const ACCION_LABEL: Record<string, string> = {
   documento_subir: "Documento subido",
   documento_eliminar: "Documento eliminado",
   novedad: "Novedad",
+  aprobar: "Aprobación",
+  rechazar: "Rechazo",
+  enviar_revision: "Envío a revisión",
+  emitir: "Emisión",
 };
 
 function fmt(iso: string) {
@@ -173,11 +183,18 @@ export function AuditoriaClient({ entradas }: { entradas: AuditLog[] }) {
                       </Badge>
                     </td>
                     <td className="px-4 py-3 text-fg">
-                      {e.entidad === "proveedor" && e.entidad_id ? (
+                      {e.entidad_id &&
+                      (e.entidad === "proveedor" ||
+                        e.entidad === "contrato" ||
+                        e.entidad === "documento") ? (
                         <Link
                           href={`/procesos/proveedores/${e.entidad_id}`}
                           className="hover:text-accent"
                         >
+                          {e.descripcion}
+                        </Link>
+                      ) : e.entidad === "orden" && e.entidad_id ? (
+                        <Link href={`/procesos/ordenes/${e.entidad_id}`} className="hover:text-accent">
                           {e.descripcion}
                         </Link>
                       ) : (
