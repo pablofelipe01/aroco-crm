@@ -28,6 +28,9 @@ export default async function ProveedoresPage() {
     session?.profile?.role === "admin" ||
     (session?.profile?.department != null &&
       WRITE_DEPTS.includes(session.profile.department));
+  const canApprove =
+    session?.profile?.role === "admin" ||
+    session?.profile?.department === "Administrativo";
 
   const [{ data: provs }, { data: deptos }, { data: munis }] = await Promise.all([
     supabase
@@ -46,6 +49,7 @@ export default async function ProveedoresPage() {
       departamentos={(deptos ?? []) as Departamento[]}
       municipios={(munis ?? []) as { departamento: string; nombre: string }[]}
       canWrite={canWrite}
+      canApprove={canApprove}
     />
   );
 }

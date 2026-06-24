@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { Search, X, Plus, Users } from "lucide-react";
+import { Search, X, Plus, Users, Inbox } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatCard } from "@/components/ui/stat-card";
 import { Button } from "@/components/ui/button";
@@ -19,11 +19,13 @@ export function ProveedoresClient({
   departamentos,
   municipios,
   canWrite,
+  canApprove,
 }: {
   proveedores: ProveedorLista[];
   departamentos: Departamento[];
   municipios: { departamento: string; nombre: string }[];
   canWrite: boolean;
+  canApprove: boolean;
 }) {
   const router = useRouter();
   const [q, setQ] = React.useState("");
@@ -57,12 +59,27 @@ export function ProveedoresClient({
         title="Proveedores"
         description="Crea, busca y gestiona los proveedores de cacao."
         actions={
-          canWrite && (
-            <Button size="sm" onClick={() => setFormOpen(true)}>
-              <Plus className="h-4 w-4" />
-              Nuevo proveedor
-            </Button>
-          )
+          <div className="flex items-center gap-2">
+            {canApprove && (
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => router.push("/procesos/proveedores/aprobaciones")}
+              >
+                <Inbox className="h-4 w-4" />
+                Aprobaciones
+                {enEstudio > 0 && (
+                  <Badge tone="warn" className="ml-1">{enEstudio}</Badge>
+                )}
+              </Button>
+            )}
+            {canWrite && (
+              <Button size="sm" onClick={() => setFormOpen(true)}>
+                <Plus className="h-4 w-4" />
+                Nuevo proveedor
+              </Button>
+            )}
+          </div>
         }
       />
 
