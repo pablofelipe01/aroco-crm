@@ -746,6 +746,102 @@ export type Database = {
         };
         Relationships: [];
       };
+      recepciones: {
+        Row: {
+          id: string;
+          orden_id: string;
+          estado: Database["public"]["Enums"]["recepcion_estado"];
+          tipo_envio: Database["public"]["Enums"]["recepcion_envio"] | null;
+          peso_solicitado_kg: number | null;
+          peso_recibido_kg: number | null;
+          humedad_pct: number | null;
+          fermentacion_pct: number | null;
+          impurezas_pct: number | null;
+          analisis_sensorial: string | null;
+          remisiones: string | null;
+          observaciones: string | null;
+          recibido_por: string | null;
+          cerrada_en: string | null;
+          created_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          orden_id: string;
+          estado?: Database["public"]["Enums"]["recepcion_estado"];
+          tipo_envio?: Database["public"]["Enums"]["recepcion_envio"] | null;
+          peso_solicitado_kg?: number | null;
+          peso_recibido_kg?: number | null;
+          humedad_pct?: number | null;
+          fermentacion_pct?: number | null;
+          impurezas_pct?: number | null;
+          analisis_sensorial?: string | null;
+          remisiones?: string | null;
+          observaciones?: string | null;
+          recibido_por?: string | null;
+          cerrada_en?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          orden_id?: string;
+          estado?: Database["public"]["Enums"]["recepcion_estado"];
+          tipo_envio?: Database["public"]["Enums"]["recepcion_envio"] | null;
+          peso_solicitado_kg?: number | null;
+          peso_recibido_kg?: number | null;
+          humedad_pct?: number | null;
+          fermentacion_pct?: number | null;
+          impurezas_pct?: number | null;
+          analisis_sensorial?: string | null;
+          remisiones?: string | null;
+          observaciones?: string | null;
+          recibido_por?: string | null;
+          cerrada_en?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      recepcion_fotos: {
+        Row: {
+          id: string;
+          recepcion_id: string;
+          categoria: string;
+          nombre: string;
+          file_path: string;
+          size_bytes: number | null;
+          content_type: string | null;
+          uploaded_by: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          recepcion_id: string;
+          categoria: string;
+          nombre: string;
+          file_path: string;
+          size_bytes?: number | null;
+          content_type?: string | null;
+          uploaded_by?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          recepcion_id?: string;
+          categoria?: string;
+          nombre?: string;
+          file_path?: string;
+          size_bytes?: number | null;
+          content_type?: string | null;
+          uploaded_by?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
       ordenes_compra: {
         Row: {
           id: string;
@@ -1581,6 +1677,8 @@ export type Database = {
       task_status: "pending" | "progress" | "done" | "blocked";
       oc_caso: "roc" | "otros_sin" | "otros_con";
       oc_estado: "Borrador" | "En revisión" | "Aprobada" | "Rechazada" | "Emitida";
+      recepcion_estado: "En proceso" | "Cerrada";
+      recepcion_envio: "Cauca" | "Finca" | "Otros";
       user_role: "admin" | "member";
     };
     CompositeTypes: {
@@ -1624,6 +1722,8 @@ export type Catalogo = Tables<"catalogos">;
 export type AuditLog = Tables<"audit_log">;
 export type Notificacion = Tables<"notificaciones">;
 export type OrdenCompra = Tables<"ordenes_compra">;
+export type Recepcion = Tables<"recepciones">;
+export type RecepcionFoto = Tables<"recepcion_fotos">;
 export type Contrato = Tables<"contratos">;
 export type Task = Tables<"tasks">;
 export type Meeting = Tables<"meetings">;

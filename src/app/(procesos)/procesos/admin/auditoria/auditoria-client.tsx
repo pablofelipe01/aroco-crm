@@ -12,6 +12,7 @@ import {
   Files,
   Tags,
   ShoppingCart,
+  Warehouse,
 } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { Input, Select } from "@/components/ui/input";
@@ -23,6 +24,7 @@ import type { AuditLog } from "@/lib/types/database";
 const ENTIDADES: Record<string, { label: string; icon: React.ElementType }> = {
   proveedor: { label: "Proveedor", icon: Sprout },
   orden: { label: "Orden de compra", icon: ShoppingCart },
+  recepcion: { label: "Recepción", icon: Warehouse },
   contrato: { label: "Contrato", icon: FileText },
   documento: { label: "Documento", icon: Files },
   catalogo: { label: "Catálogo", icon: Tags },
@@ -40,6 +42,7 @@ const ACCION_TONE: Record<string, "neutral" | "success" | "warn" | "danger" | "i
   rechazar: "danger",
   enviar_revision: "warn",
   emitir: "info",
+  cerrar: "success",
 };
 
 const ACCION_LABEL: Record<string, string> = {
@@ -54,6 +57,7 @@ const ACCION_LABEL: Record<string, string> = {
   rechazar: "Rechazo",
   enviar_revision: "Envío a revisión",
   emitir: "Emisión",
+  cerrar: "Cierre",
 };
 
 function fmt(iso: string) {
@@ -195,6 +199,10 @@ export function AuditoriaClient({ entradas }: { entradas: AuditLog[] }) {
                         </Link>
                       ) : e.entidad === "orden" && e.entidad_id ? (
                         <Link href={`/procesos/ordenes/${e.entidad_id}`} className="hover:text-accent">
+                          {e.descripcion}
+                        </Link>
+                      ) : e.entidad === "recepcion" && e.entidad_id ? (
+                        <Link href={`/procesos/recepcion/${e.entidad_id}`} className="hover:text-accent">
                           {e.descripcion}
                         </Link>
                       ) : (
