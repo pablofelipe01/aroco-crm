@@ -13,6 +13,7 @@ import {
   Tags,
   ShoppingCart,
   Warehouse,
+  Calculator,
 } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { Input, Select } from "@/components/ui/input";
@@ -25,6 +26,7 @@ const ENTIDADES: Record<string, { label: string; icon: React.ElementType }> = {
   proveedor: { label: "Proveedor", icon: Sprout },
   orden: { label: "Orden de compra", icon: ShoppingCart },
   recepcion: { label: "Recepción", icon: Warehouse },
+  liquidacion: { label: "Liquidación", icon: Calculator },
   contrato: { label: "Contrato", icon: FileText },
   documento: { label: "Documento", icon: Files },
   catalogo: { label: "Catálogo", icon: Tags },
@@ -203,6 +205,10 @@ export function AuditoriaClient({ entradas }: { entradas: AuditLog[] }) {
                         </Link>
                       ) : e.entidad === "recepcion" && e.entidad_id ? (
                         <Link href={`/procesos/recepcion/${e.entidad_id}`} className="hover:text-accent">
+                          {e.descripcion}
+                        </Link>
+                      ) : e.entidad === "liquidacion" && e.entidad_id ? (
+                        <Link href={`/procesos/liquidacion/${e.entidad_id}`} className="hover:text-accent">
                           {e.descripcion}
                         </Link>
                       ) : (

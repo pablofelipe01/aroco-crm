@@ -746,6 +746,81 @@ export type Database = {
         };
         Relationships: [];
       };
+      liquidaciones: {
+        Row: {
+          id: string;
+          recepcion_id: string;
+          orden_id: string;
+          estado: Database["public"]["Enums"]["liquidacion_estado"];
+          tipo_pago: Database["public"]["Enums"]["liquidacion_pago"];
+          peso_recibido_kg: number | null;
+          precio_kg: number | null;
+          humedad_pct: number | null;
+          fermentacion_pct: number | null;
+          impurezas_pct: number | null;
+          params: Json;
+          valor_base: number;
+          total_sanciones: number;
+          total_bonificaciones: number;
+          valor_total: number;
+          desglose: Json | null;
+          observaciones: string | null;
+          aprobada_por: string | null;
+          aprobada_en: string | null;
+          created_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          recepcion_id: string;
+          orden_id: string;
+          estado?: Database["public"]["Enums"]["liquidacion_estado"];
+          tipo_pago?: Database["public"]["Enums"]["liquidacion_pago"];
+          peso_recibido_kg?: number | null;
+          precio_kg?: number | null;
+          humedad_pct?: number | null;
+          fermentacion_pct?: number | null;
+          impurezas_pct?: number | null;
+          params?: Json;
+          valor_base?: number;
+          total_sanciones?: number;
+          total_bonificaciones?: number;
+          valor_total?: number;
+          desglose?: Json | null;
+          observaciones?: string | null;
+          aprobada_por?: string | null;
+          aprobada_en?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          recepcion_id?: string;
+          orden_id?: string;
+          estado?: Database["public"]["Enums"]["liquidacion_estado"];
+          tipo_pago?: Database["public"]["Enums"]["liquidacion_pago"];
+          peso_recibido_kg?: number | null;
+          precio_kg?: number | null;
+          humedad_pct?: number | null;
+          fermentacion_pct?: number | null;
+          impurezas_pct?: number | null;
+          params?: Json;
+          valor_base?: number;
+          total_sanciones?: number;
+          total_bonificaciones?: number;
+          valor_total?: number;
+          desglose?: Json | null;
+          observaciones?: string | null;
+          aprobada_por?: string | null;
+          aprobada_en?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       recepciones: {
         Row: {
           id: string;
@@ -1679,6 +1754,8 @@ export type Database = {
       oc_estado: "Borrador" | "En revisión" | "Aprobada" | "Rechazada" | "Emitida";
       recepcion_estado: "En proceso" | "Cerrada";
       recepcion_envio: "Cauca" | "Finca" | "Otros";
+      liquidacion_estado: "Por revisión" | "Aprobada";
+      liquidacion_pago: "general" | "roc";
       user_role: "admin" | "member";
     };
     CompositeTypes: {
@@ -1724,6 +1801,7 @@ export type Notificacion = Tables<"notificaciones">;
 export type OrdenCompra = Tables<"ordenes_compra">;
 export type Recepcion = Tables<"recepciones">;
 export type RecepcionFoto = Tables<"recepcion_fotos">;
+export type Liquidacion = Tables<"liquidaciones">;
 export type Contrato = Tables<"contratos">;
 export type Task = Tables<"tasks">;
 export type Meeting = Tables<"meetings">;

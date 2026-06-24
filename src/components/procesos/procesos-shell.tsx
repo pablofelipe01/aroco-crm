@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Workflow, Users, Sprout, ArrowLeftRight, Tags, ScrollText, ShoppingCart, Warehouse } from "lucide-react";
+import { LayoutDashboard, Workflow, Users, Sprout, ArrowLeftRight, Tags, ScrollText, ShoppingCart, Warehouse, Calculator } from "lucide-react";
 import { Wordmark } from "@/components/brand";
 import { cn } from "@/lib/utils";
 
@@ -12,6 +12,7 @@ const NAV = [
   { href: "/procesos/proveedores", label: "Proveedores", icon: Sprout },
   { href: "/procesos/ordenes", label: "Órdenes de compra", icon: ShoppingCart },
   { href: "/procesos/recepcion", label: "Recepción en bodega", icon: Warehouse },
+  { href: "/procesos/liquidacion", label: "Liquidación / Pago", icon: Calculator },
   { href: "/procesos/flujo", label: "Mapa del flujo", icon: Workflow },
   { href: "/procesos/equipo", label: "Equipo y carga", icon: Users },
 ];
