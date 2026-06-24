@@ -86,11 +86,12 @@ function parseFredCsv(csv: string): Map<string, number> {
  * This is the "precio de bolsa diario": one point per trading day, current.
  */
 async function yahooCocoaDaily(): Promise<Map<string, number>> {
-  const txt = await fetchText(
-    "https://query1.finance.yahoo.com/v8/finance/chart/CC=F?interval=1d&range=2y",
-    3600,
-    { "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)" },
-  );
+  const ua = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)";
+  const path = "/v8/finance/chart/CC=F?interval=1d&range=2y";
+  // query1/query2 son hosts equivalentes; si uno bloquea, probamos el otro.
+  const txt =
+    (await fetchText(`https://query1.finance.yahoo.com${path}`, 3600, { "User-Agent": ua })) ??
+    (await fetchText(`https://query2.finance.yahoo.com${path}`, 3600, { "User-Agent": ua }));
   const map = new Map<string, number>();
   if (!txt) return map;
   try {
