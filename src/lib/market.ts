@@ -1,9 +1,9 @@
 import "server-only";
 
 /**
- * Live market references, fetched server-side from public sources that work
- * from datacenter IPs (Yahoo Finance 429s server requests, so it's not used):
- *  - Cocoa: Stooq CSV for the ICE NY cocoa front future (cc.f) → USD/T.
+ * Live market references, fetched server-side from public sources:
+ *  - Cocoa: Yahoo Finance daily for the ICE NY cocoa future (CC=F) → USD/T,
+ *    with FRED (PCOCOUSDM, monthly) as fallback if Yahoo is blocked.
  *  - USD/COP spot: open.er-api.com (free, daily).
  *  - TRM oficial: Banco de la República via datos.gov.co (dataset 32sa-8pi3).
  *
@@ -37,25 +37,6 @@ async function fetchText(
   } catch {
     return null;
   }
-}
-
-/** Parse a Stooq quote CSV (Symbol,Date,Time,Open,High,Low,Close,Volume). */
-async function stooqClose(
-  symbol: string,
-  revalidate: number,
-): Promise<{ close: number; date: string } | null> {
-  const txt = await fetchText(
-    `https://stooq.com/q/l/?s=${symbol}&f=sd2t2ohlcv&h&e=csv`,
-    revalidate,
-  );
-  if (!txt) return null;
-  const line = txt.trim().split("\n")[1];
-  if (!line) return null;
-  const cols = line.split(",");
-  const date = cols[1];
-  const close = Number(cols[6]);
-  if (!date || date === "N/D" || !Number.isFinite(close)) return null;
-  return { close, date };
 }
 
 async function getSpot(): Promise<number | null> {
@@ -100,6 +81,51 @@ function parseFredCsv(csv: string): Map<string, number> {
   return map;
 }
 
+/**
+ * Daily ICE cocoa (CC=F) in USD/T from Yahoo Finance → Map<YYYY-MM-DD, usdT>.
+ * This is the "precio de bolsa diario": one point per trading day, current.
+ */
+async function yahooCocoaDaily(): Promise<Map<string, number>> {
+  const txt = await fetchText(
+    "https://query1.finance.yahoo.com/v8/finance/chart/CC=F?interval=1d&range=2y",
+    3600,
+    { "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)" },
+  );
+  const map = new Map<string, number>();
+  if (!txt) return map;
+  try {
+    const r = JSON.parse(txt)?.chart?.result?.[0];
+    const ts: number[] = r?.timestamp ?? [];
+    const cl: (number | null)[] = r?.indicators?.quote?.[0]?.close ?? [];
+    for (let i = 0; i < ts.length; i++) {
+      const c = cl[i];
+      if (c == null || !Number.isFinite(c)) continue;
+      map.set(new Date(ts[i] * 1000).toISOString().slice(0, 10), Number(c));
+    }
+  } catch {
+    /* ignore */
+  }
+  return map;
+}
+
+/** Monthly cocoa (USD/T) from FRED (PCOCOUSDM) — fallback if Yahoo is blocked. */
+async function fredCocoaMonthly(from: string): Promise<Map<string, number>> {
+  const cosd = `${from.slice(0, 4)}-01-01`;
+  const csv = await fetchText(
+    `https://fred.stlouisfed.org/graph/fredgraph.csv?id=PCOCOUSDM&cosd=${cosd}`,
+    86400,
+    { "User-Agent": "Mozilla/5.0" },
+  );
+  return csv ? parseFredCsv(csv) : new Map<string, number>();
+}
+
+/** Cocoa USD/T map: Yahoo daily preferred, FRED monthly as fallback. */
+async function cocoaUsdTMap(from: string): Promise<Map<string, number>> {
+  const yahoo = await yahooCocoaDaily();
+  if (yahoo.size > 0) return yahoo;
+  return fredCocoaMonthly(from);
+}
+
 /** Value of the latest entry with date ≤ target (nearest prior trading day). */
 function valueAtOrBefore(sorted: [string, number][], target: string): number | null {
   let v: number | null = null;
@@ -125,23 +151,18 @@ export async function getInternationalSeries(
 ): Promise<Record<string, number>> {
   if (dates.length === 0) return {};
   const from = dates.reduce((a, b) => (a < b ? a : b));
-  const cosd = `${from.slice(0, 4)}-01-01`;
 
-  const [cocoaCsv, trmTxt, live] = await Promise.all([
+  const [cocoa, trmTxt, latestTrm] = await Promise.all([
+    cocoaUsdTMap(from),
     fetchText(
-      `https://fred.stlouisfed.org/graph/fredgraph.csv?id=PCOCOUSDM&cosd=${cosd}`,
-      86400,
-      { "User-Agent": "Mozilla/5.0" },
-    ),
-    fetchText(
-      `https://www.datos.gov.co/resource/32sa-8pi3.json?$select=valor,vigenciadesde&$where=vigenciadesde%20%3E=%20'${from}'&$order=vigenciadesde&$limit=2000`,
+      `https://www.datos.gov.co/resource/32sa-8pi3.json?$select=valor,vigenciadesde&$where=vigenciadesde%20%3E=%20'${from}'&$order=vigenciadesde&$limit=4000`,
       3600,
       { Accept: "application/json" },
     ),
-    stooqClose("cc.f", 900),
+    getTRM(),
   ]);
+  if (cocoa.size === 0) return {};
 
-  const cocoa = cocoaCsv ? parseFredCsv(cocoaCsv) : new Map<string, number>();
   const trm = new Map<string, number>();
   if (trmTxt) {
     try {
@@ -155,20 +176,17 @@ export async function getInternationalSeries(
     }
   }
 
-  if (cocoa.size === 0 || trm.size === 0) return {};
   const cocoaSorted = [...cocoa.entries()].sort((a, b) => (a[0] < b[0] ? -1 : 1));
   const trmSorted = [...trm.entries()].sort((a, b) => (a[0] < b[0] ? -1 : 1));
-  const lastFredMonth = cocoaSorted[cocoaSorted.length - 1][0].slice(0, 7);
+  // Si la TRM histórica no carga, usamos la TRM más reciente como respaldo
+  // (así la línea internacional nunca desaparece por una fuente lenta).
+  const fallbackTrm = latestTrm.value;
 
   const out: Record<string, number> = {};
   for (const d of dates) {
-    const fx = valueAtOrBefore(trmSorted, d);
-    if (fx == null) continue;
-    // Beyond FRED's last published month, use the live ICE quote so recent
-    // dates reflect the current market rather than a stale monthly average.
-    const usdT =
-      d.slice(0, 7) > lastFredMonth && live ? live.close : valueAtOrBefore(cocoaSorted, d);
-    if (usdT != null) {
+    const usdT = valueAtOrBefore(cocoaSorted, d);
+    const fx = valueAtOrBefore(trmSorted, d) ?? fallbackTrm;
+    if (usdT != null && fx != null) {
       out[d] = Math.round(((usdT * fx) / 1000) * 100) / 100;
     }
   }
@@ -176,15 +194,18 @@ export async function getInternationalSeries(
 }
 
 export async function getMarketData(): Promise<MarketData> {
-  const [cocoa, trm, spot] = await Promise.all([
-    stooqClose("cc.f", 900),
+  const year = new Date().getFullYear();
+  const [cocoaMap, trm, spot] = await Promise.all([
+    cocoaUsdTMap(`${year}-01-01`),
     getTRM(),
     getSpot(),
   ]);
+  const sorted = [...cocoaMap.entries()].sort((a, b) => (a[0] < b[0] ? -1 : 1));
+  const last = sorted[sorted.length - 1] ?? null;
   return {
-    cocoaUsdT: cocoa?.close ?? null,
-    cocoaContract: cocoa ? "ICE NY" : null,
-    cocoaDate: cocoa?.date ?? null,
+    cocoaUsdT: last ? last[1] : null,
+    cocoaContract: last ? "ICE NY · CC=F" : null,
+    cocoaDate: last ? last[0] : null,
     trm: trm.value,
     trmDate: trm.date,
     spot,
