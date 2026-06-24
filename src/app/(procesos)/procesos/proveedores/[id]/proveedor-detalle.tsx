@@ -8,10 +8,17 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/card";
 import { ESTADO_TONE } from "@/lib/procesos/proveedor-opts";
-import type { Contrato, Departamento, Proveedor, ProveedorDocumento } from "@/lib/types/database";
+import type {
+  Contrato,
+  Departamento,
+  Proveedor,
+  ProveedorDocumento,
+  ProveedorEstadoLog,
+} from "@/lib/types/database";
 import { ProveedorForm } from "../proveedor-form";
 import { Documentos } from "./documentos";
 import { ContratoCard } from "./contrato";
+import { AprobacionCard } from "./aprobacion";
 
 const SECCIONES: { titulo: string; campos: [keyof Proveedor, string][] }[] = [
   {
@@ -101,14 +108,18 @@ export function ProveedorDetalle({
   municipios,
   documentos,
   contrato,
+  estadoLog,
   canWrite,
+  canApprove,
 }: {
   proveedor: Proveedor;
   departamentos: Departamento[];
   municipios: { departamento: string; nombre: string }[];
   documentos: ProveedorDocumento[];
   contrato: Contrato | null;
+  estadoLog: ProveedorEstadoLog[];
   canWrite: boolean;
+  canApprove: boolean;
 }) {
   const router = useRouter();
   const [edit, setEdit] = React.useState(false);
@@ -174,6 +185,8 @@ export function ProveedorDetalle({
           );
         })}
       </div>
+
+      <AprobacionCard proveedor={proveedor} estadoLog={estadoLog} canApprove={canApprove} />
 
       <ContratoCard proveedorId={proveedor.id} contrato={contrato} canWrite={canWrite} />
 

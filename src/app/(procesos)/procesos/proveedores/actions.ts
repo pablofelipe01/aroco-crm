@@ -151,6 +151,62 @@ export async function urlDocumento(filePath: string): Promise<string | null> {
   return data?.signedUrl ?? null;
 }
 
+// ── Aprobación / estado (Fase 1) ─────────────────────────────────────────────
+
+const ESTADOS = ["En estudio", "Habilitado", "Deshabilitado", "Rechazado"] as const;
+type EstadoProv = (typeof ESTADOS)[number];
+
+/** ¿El usuario puede gestionar el estado del proveedor? (Gerencia Administrativa) */
+export async function puedeAprobar(): Promise<boolean> {
+  const session = await getSessionContext();
+  return (
+    session?.profile?.role === "admin" ||
+    session?.profile?.department === "Administrativo"
+  );
+}
+
+/** Cambia el estado del proveedor dejando trazabilidad (fecha, usuario, motivo). */
+export async function cambiarEstadoProveedor(
+  proveedorId: string,
+  nuevoEstado: EstadoProv,
+  motivo?: string,
+): Promise<ActionResult> {
+  const session = await requireSession();
+  if (!(await puedeAprobar()))
+    return { ok: false, error: "Solo Gerencia Administrativa puede cambiar el estado." };
+  if (!ESTADOS.includes(nuevoEstado)) return { ok: false, error: "Estado inválido." };
+  if ((nuevoEstado === "Rechazado" || nuevoEstado === "Deshabilitado") && !motivo?.trim())
+    return { ok: false, error: "Indica el motivo." };
+
+  const supabase = await createClient();
+  const { data: prov } = await supabase
+    .from("proveedores")
+    .select("estado")
+    .eq("id", proveedorId)
+    .maybeSingle();
+  if (!prov) return { ok: false, error: "Proveedor no encontrado." };
+  if (prov.estado === nuevoEstado) return { ok: false, error: "El proveedor ya está en ese estado." };
+
+  const { error: e1 } = await supabase
+    .from("proveedores")
+    .update({ estado: nuevoEstado, comentarios_estado: motivo?.trim() || null })
+    .eq("id", proveedorId);
+  if (e1) return { ok: false, error: e1.message };
+
+  await supabase.from("proveedor_estado_log").insert({
+    proveedor_id: proveedorId,
+    estado_anterior: prov.estado,
+    estado_nuevo: nuevoEstado,
+    motivo: motivo?.trim() || null,
+    usuario_id: session.userId,
+    usuario_nombre: session.profile?.full_name ?? null,
+  });
+
+  revalidatePath(`/procesos/proveedores/${proveedorId}`);
+  revalidatePath("/procesos/proveedores");
+  return { ok: true };
+}
+
 // ── Contrato (uno por proveedor) ─────────────────────────────────────────────
 
 type ContratoInput = Partial<TablesInsert<"contratos">>;

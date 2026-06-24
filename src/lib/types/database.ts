@@ -932,6 +932,39 @@ export type Database = {
         };
         Relationships: [];
       };
+      proveedor_estado_log: {
+        Row: {
+          created_at: string;
+          estado_anterior: string | null;
+          estado_nuevo: string;
+          id: string;
+          motivo: string | null;
+          proveedor_id: string;
+          usuario_id: string | null;
+          usuario_nombre: string | null;
+        };
+        Insert: {
+          created_at?: string;
+          estado_anterior?: string | null;
+          estado_nuevo: string;
+          id?: string;
+          motivo?: string | null;
+          proveedor_id: string;
+          usuario_id?: string | null;
+          usuario_nombre?: string | null;
+        };
+        Update: {
+          created_at?: string;
+          estado_anterior?: string | null;
+          estado_nuevo?: string;
+          id?: string;
+          motivo?: string | null;
+          proveedor_id?: string;
+          usuario_id?: string | null;
+          usuario_nombre?: string | null;
+        };
+        Relationships: [];
+      };
       proveedor_documentos: {
         Row: {
           categoria: string;
@@ -1415,6 +1448,7 @@ export type Proveedor = Tables<"proveedores">;
 export type Departamento = Tables<"departamentos">;
 export type Municipio = Tables<"municipios">;
 export type ProveedorDocumento = Tables<"proveedor_documentos">;
+export type ProveedorEstadoLog = Tables<"proveedor_estado_log">;
 export type Contrato = Tables<"contratos">;
 export type Task = Tables<"tasks">;
 export type Meeting = Tables<"meetings">;

@@ -2,7 +2,13 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getSessionContext } from "@/lib/auth";
 import { ProveedorDetalle } from "./proveedor-detalle";
-import type { Contrato, Departamento, Proveedor, ProveedorDocumento } from "@/lib/types/database";
+import type {
+  Contrato,
+  Departamento,
+  Proveedor,
+  ProveedorDocumento,
+  ProveedorEstadoLog,
+} from "@/lib/types/database";
 
 export const dynamic = "force-dynamic";
 
@@ -20,19 +26,32 @@ export default async function ProveedorPage({
     session?.profile?.role === "admin" ||
     (session?.profile?.department != null &&
       WRITE_DEPTS.includes(session.profile.department));
+  const canApprove =
+    session?.profile?.role === "admin" || session?.profile?.department === "Administrativo";
 
-  const [{ data: prov }, { data: deptos }, { data: munis }, { data: docs }, { data: contrato }] =
-    await Promise.all([
-      supabase.from("proveedores").select("*").eq("id", id).maybeSingle(),
-      supabase.from("departamentos").select("*").order("nombre"),
-      supabase.from("municipios").select("departamento, nombre").order("nombre"),
-      supabase
-        .from("proveedor_documentos")
-        .select("*")
-        .eq("proveedor_id", id)
-        .order("created_at", { ascending: false }),
-      supabase.from("contratos").select("*").eq("proveedor_id", id).maybeSingle(),
-    ]);
+  const [
+    { data: prov },
+    { data: deptos },
+    { data: munis },
+    { data: docs },
+    { data: contrato },
+    { data: estadoLog },
+  ] = await Promise.all([
+    supabase.from("proveedores").select("*").eq("id", id).maybeSingle(),
+    supabase.from("departamentos").select("*").order("nombre"),
+    supabase.from("municipios").select("departamento, nombre").order("nombre"),
+    supabase
+      .from("proveedor_documentos")
+      .select("*")
+      .eq("proveedor_id", id)
+      .order("created_at", { ascending: false }),
+    supabase.from("contratos").select("*").eq("proveedor_id", id).maybeSingle(),
+    supabase
+      .from("proveedor_estado_log")
+      .select("*")
+      .eq("proveedor_id", id)
+      .order("created_at", { ascending: false }),
+  ]);
   if (!prov) notFound();
 
   return (
@@ -42,7 +61,9 @@ export default async function ProveedorPage({
       municipios={(munis ?? []) as { departamento: string; nombre: string }[]}
       documentos={(docs ?? []) as ProveedorDocumento[]}
       contrato={(contrato ?? null) as Contrato | null}
+      estadoLog={(estadoLog ?? []) as ProveedorEstadoLog[]}
       canWrite={canWrite}
+      canApprove={canApprove}
     />
   );
 }
