@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getSessionContext } from "@/lib/auth";
-import type { TablesInsert } from "@/lib/types/database";
+import type { TablesInsert, TablesUpdate } from "@/lib/types/database";
 
 export type ActionResult = { ok: boolean; error?: string; id?: string };
 
@@ -149,4 +149,79 @@ export async function urlDocumento(filePath: string): Promise<string | null> {
   const supabase = await createClient();
   const { data } = await supabase.storage.from("proveedores").createSignedUrl(filePath, 120);
   return data?.signedUrl ?? null;
+}
+
+// ── Contrato (uno por proveedor) ─────────────────────────────────────────────
+
+type ContratoInput = Partial<TablesInsert<"contratos">>;
+
+const NUM_CONTRATO = ["humedad_maxima", "granos_enteros_minimo", "fermentacion_minima"];
+
+/** Crea o actualiza el contrato del proveedor (upsert por proveedor_id). */
+export async function guardarContrato(
+  proveedorId: string,
+  input: ContratoInput,
+): Promise<ActionResult> {
+  const session = await requireSession();
+  const supabase = await createClient();
+
+  const row: Record<string, unknown> = { proveedor_id: proveedorId };
+  for (const [k, v] of Object.entries(input)) {
+    if (k === "proveedor_id") continue;
+    if (NUM_CONTRATO.includes(k)) row[k] = v === "" || v == null ? null : Number(v);
+    else row[k] = typeof v === "string" && v.trim() === "" ? null : v;
+  }
+
+  const { data: existe } = await supabase
+    .from("contratos")
+    .select("id")
+    .eq("proveedor_id", proveedorId)
+    .maybeSingle();
+
+  const { error } = existe
+    ? await supabase
+        .from("contratos")
+        .update(row as unknown as TablesUpdate<"contratos">)
+        .eq("id", existe.id)
+    : await supabase
+        .from("contratos")
+        .insert({ ...row, created_by: session.userId } as unknown as TablesInsert<"contratos">);
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath(`/procesos/proveedores/${proveedorId}`);
+  return { ok: true };
+}
+
+/** Agrega una observación fechada a las novedades del contrato (proveedor / aroco). */
+export async function agregarNovedad(
+  contratoId: string,
+  origen: "proveedor" | "aroco",
+  texto: string,
+): Promise<ActionResult> {
+  const session = await requireSession();
+  if (!texto.trim()) return { ok: false, error: "Escribe la observación." };
+  const supabase = await createClient();
+  const campo = origen === "proveedor" ? "novedades_proveedor" : "novedades_aroco";
+
+  const { data: c } = await supabase
+    .from("contratos")
+    .select(`id, proveedor_id, ${campo}`)
+    .eq("id", contratoId)
+    .maybeSingle();
+  if (!c) return { ok: false, error: "Contrato no encontrado." };
+
+  const fecha = new Date().toLocaleString("es-CO", { dateStyle: "short", timeStyle: "short" });
+  const autor = session.profile?.full_name ?? "Usuario";
+  const previo = (c as Record<string, string | null>)[campo] ?? "";
+  const linea = `[${fecha} · ${autor}] ${texto.trim()}`;
+  const nuevo = previo ? `${linea}\n${previo}` : linea;
+
+  const { error } = await supabase
+    .from("contratos")
+    .update({ [campo]: nuevo } as unknown as TablesUpdate<"contratos">)
+    .eq("id", contratoId);
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath(`/procesos/proveedores/${c.proveedor_id}`);
+  return { ok: true };
 }

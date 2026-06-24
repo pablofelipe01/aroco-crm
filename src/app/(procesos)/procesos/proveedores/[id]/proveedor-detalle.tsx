@@ -8,9 +8,10 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/card";
 import { ESTADO_TONE } from "@/lib/procesos/proveedor-opts";
-import type { Departamento, Proveedor, ProveedorDocumento } from "@/lib/types/database";
+import type { Contrato, Departamento, Proveedor, ProveedorDocumento } from "@/lib/types/database";
 import { ProveedorForm } from "../proveedor-form";
 import { Documentos } from "./documentos";
+import { ContratoCard } from "./contrato";
 
 const SECCIONES: { titulo: string; campos: [keyof Proveedor, string][] }[] = [
   {
@@ -92,12 +93,14 @@ export function ProveedorDetalle({
   departamentos,
   municipios,
   documentos,
+  contrato,
   canWrite,
 }: {
   proveedor: Proveedor;
   departamentos: Departamento[];
   municipios: { departamento: string; nombre: string }[];
   documentos: ProveedorDocumento[];
+  contrato: Contrato | null;
   canWrite: boolean;
 }) {
   const router = useRouter();
@@ -164,6 +167,8 @@ export function ProveedorDetalle({
           );
         })}
       </div>
+
+      <ContratoCard proveedorId={proveedor.id} contrato={contrato} canWrite={canWrite} />
 
       <Documentos proveedorId={proveedor.id} documentos={documentos} canWrite={canWrite} />
 

@@ -683,6 +683,66 @@ export type Database = {
         };
         Relationships: [];
       };
+      contratos: {
+        Row: {
+          bonificaciones_calidad: string | null;
+          created_at: string;
+          created_by: string | null;
+          estado: string;
+          fermentacion_minima: number | null;
+          forma_pago: string | null;
+          garantia: string | null;
+          granos_enteros_minimo: number | null;
+          humedad_maxima: number | null;
+          id: string;
+          libre_olores: string | null;
+          lugar_entrega: string | null;
+          novedades_aroco: string | null;
+          novedades_proveedor: string | null;
+          proveedor_id: string;
+          sanciones_calidad: string | null;
+          updated_at: string;
+        };
+        Insert: {
+          bonificaciones_calidad?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          estado?: string;
+          fermentacion_minima?: number | null;
+          forma_pago?: string | null;
+          garantia?: string | null;
+          granos_enteros_minimo?: number | null;
+          humedad_maxima?: number | null;
+          id?: string;
+          libre_olores?: string | null;
+          lugar_entrega?: string | null;
+          novedades_aroco?: string | null;
+          novedades_proveedor?: string | null;
+          proveedor_id: string;
+          sanciones_calidad?: string | null;
+          updated_at?: string;
+        };
+        Update: {
+          bonificaciones_calidad?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          estado?: string;
+          fermentacion_minima?: number | null;
+          forma_pago?: string | null;
+          garantia?: string | null;
+          granos_enteros_minimo?: number | null;
+          humedad_maxima?: number | null;
+          id?: string;
+          libre_olores?: string | null;
+          lugar_entrega?: string | null;
+          novedades_aroco?: string | null;
+          novedades_proveedor?: string | null;
+          proveedor_id?: string;
+          sanciones_calidad?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       departamentos: {
         Row: { id: string; nombre: string };
         Insert: { id: string; nombre: string };
@@ -1331,6 +1391,7 @@ export type Proveedor = Tables<"proveedores">;
 export type Departamento = Tables<"departamentos">;
 export type Municipio = Tables<"municipios">;
 export type ProveedorDocumento = Tables<"proveedor_documentos">;
+export type Contrato = Tables<"contratos">;
 export type Task = Tables<"tasks">;
 export type Meeting = Tables<"meetings">;
 
