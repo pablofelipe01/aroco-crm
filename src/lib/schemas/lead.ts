@@ -44,6 +44,7 @@ export const leadSchema = z.object({
   status: z.enum(LEAD_STAGES),
   product_interest: optionalText,
   volume: optionalText,
+  toneladas: optionalAmount,
   potential_value_cop: optionalAmount,
   next_action: optionalText,
   next_action_date: optionalText,

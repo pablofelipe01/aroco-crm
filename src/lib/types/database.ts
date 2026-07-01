@@ -395,6 +395,7 @@ export type Database = {
           product_interest: string | null;
           source: string | null;
           status: Database["public"]["Enums"]["lead_status"];
+          toneladas: number | null;
           type: Database["public"]["Enums"]["lead_type"] | null;
           updated_at: string;
           volume: string | null;
@@ -416,6 +417,7 @@ export type Database = {
           product_interest?: string | null;
           source?: string | null;
           status?: Database["public"]["Enums"]["lead_status"];
+          toneladas?: number | null;
           type?: Database["public"]["Enums"]["lead_type"] | null;
           updated_at?: string;
           volume?: string | null;
@@ -437,6 +439,7 @@ export type Database = {
           product_interest?: string | null;
           source?: string | null;
           status?: Database["public"]["Enums"]["lead_status"];
+          toneladas?: number | null;
           type?: Database["public"]["Enums"]["lead_type"] | null;
           updated_at?: string;
           volume?: string | null;

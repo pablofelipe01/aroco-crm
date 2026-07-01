@@ -17,6 +17,7 @@ import { LeadKanban } from "./lead-kanban";
 import { LeadList } from "./lead-list";
 import { LeadDetail } from "./lead-detail";
 import { LeadForm } from "./lead-form";
+import type { ReferencePrices } from "@/lib/calc/lead-value";
 import { updateLeadStatus } from "./actions";
 
 type View = "kanban" | "list";
@@ -26,11 +27,13 @@ export function ComercialClient({
   team,
   canWrite,
   currentUserName,
+  prices,
 }: {
   initialLeads: LeadWithOwner[];
   team: TeamMember[];
   canWrite: boolean;
   currentUserName: string;
+  prices: ReferencePrices;
 }) {
   const router = useRouter();
   const { toast } = useToast();
@@ -226,6 +229,7 @@ export function ComercialClient({
         onClose={() => setFormOpen(false)}
         team={team}
         initial={editing}
+        prices={prices}
         onSaved={() => {
           setFormOpen(false);
           router.refresh();

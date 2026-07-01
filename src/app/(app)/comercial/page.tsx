@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { getSessionContext } from "@/lib/auth";
+import { getReferencePrices } from "@/lib/lead-prices";
 import { ComercialClient } from "./comercial-client";
 import type { Lead, TeamMember } from "@/lib/types/database";
 
@@ -20,7 +21,7 @@ export default async function ComercialPage() {
     (session?.profile?.department != null &&
       WRITE_DEPTS.includes(session.profile.department));
 
-  const [{ data: leads }, { data: team }] = await Promise.all([
+  const [{ data: leads }, { data: team }, prices] = await Promise.all([
     supabase
       .from("leads")
       .select(
@@ -32,6 +33,7 @@ export default async function ComercialPage() {
       .select("*")
       .eq("active", true)
       .order("name"),
+    getReferencePrices(),
   ]);
 
   return (
@@ -40,6 +42,7 @@ export default async function ComercialPage() {
       team={(team ?? []) as TeamMember[]}
       canWrite={canWrite}
       currentUserName={session?.profile?.full_name ?? ""}
+      prices={prices}
     />
   );
 }

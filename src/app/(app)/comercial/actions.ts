@@ -5,6 +5,8 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { getSessionContext } from "@/lib/auth";
 import { leadSchema, activitySchema } from "@/lib/schemas/lead";
+import { getReferencePrices } from "@/lib/lead-prices";
+import { leadValueForMarket, type Market } from "@/lib/calc/lead-value";
 import type { LeadStage } from "@/lib/status";
 
 export type ActionResult = { ok: boolean; error?: string; id?: string };
@@ -15,6 +17,20 @@ async function requireSession() {
   return session;
 }
 
+/**
+ * Si el lead trae toneladas y hay precio de referencia para su mercado, calcula
+ * el valor total (toneladas × 1000 × precio) y lo fija en potential_value_cop.
+ * Si no, respeta el valor recibido (override manual).
+ */
+async function withComputedValue<
+  T extends { toneladas?: number | null; market?: Market | null; potential_value_cop?: number | null },
+>(data: T): Promise<T> {
+  if (data.toneladas == null) return data;
+  const prices = await getReferencePrices();
+  const valor = leadValueForMarket(data.toneladas, data.market ?? null, prices);
+  return valor != null ? { ...data, potential_value_cop: valor } : data;
+}
+
 export async function createLead(input: unknown): Promise<ActionResult> {
   const parsed = leadSchema.safeParse(input);
   if (!parsed.success) {
@@ -23,9 +39,10 @@ export async function createLead(input: unknown): Promise<ActionResult> {
   const session = await requireSession();
   const supabase = await createClient();
 
+  const values = await withComputedValue(parsed.data);
   const { data, error } = await supabase
     .from("leads")
-    .insert({ ...parsed.data, created_by: session.userId, source: "app" })
+    .insert({ ...values, created_by: session.userId, source: "app" })
     .select("id")
     .single();
 
@@ -55,9 +72,10 @@ export async function updateLead(
   await requireSession();
   const supabase = await createClient();
 
+  const values = await withComputedValue(parsed.data);
   const { error } = await supabase
     .from("leads")
-    .update(parsed.data)
+    .update(values)
     .eq("id", id);
 
   if (error) return { ok: false, error: error.message };

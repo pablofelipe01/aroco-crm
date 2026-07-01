@@ -8,6 +8,13 @@ import { Field, Input, Select, Textarea } from "@/components/ui/input";
 import { useToast } from "@/components/ui/toast";
 import { LEAD_STAGES } from "@/lib/status";
 import { MARKETS, LEAD_TYPES } from "@/lib/schemas/lead";
+import { formatCOP } from "@/lib/utils";
+import {
+  leadValueForMarket,
+  pickReferencePrice,
+  type Market,
+  type ReferencePrices,
+} from "@/lib/calc/lead-value";
 import type { TeamMember } from "@/lib/types/database";
 import type { LeadWithOwner } from "./page";
 import { createLead, updateLead } from "./actions";
@@ -23,6 +30,7 @@ interface FormValues {
   commercial_owner: string;
   product_interest: string;
   volume: string;
+  toneladas: string;
   potential_value_cop: string;
   next_action: string;
   next_action_date: string;
@@ -41,6 +49,7 @@ function toValues(lead: LeadWithOwner | null): FormValues {
     commercial_owner: lead?.commercial_owner ?? "",
     product_interest: lead?.product_interest ?? "",
     volume: lead?.volume ?? "",
+    toneladas: lead?.toneladas != null ? String(lead.toneladas) : "",
     potential_value_cop:
       lead?.potential_value_cop != null ? String(lead.potential_value_cop) : "",
     next_action: lead?.next_action ?? "",
@@ -54,18 +63,32 @@ export function LeadForm({
   onClose,
   team,
   initial,
+  prices,
   onSaved,
 }: {
   open: boolean;
   onClose: () => void;
   team: TeamMember[];
   initial: LeadWithOwner | null;
+  prices: ReferencePrices;
   onSaved: () => void;
 }) {
   const { toast } = useToast();
-  const { register, handleSubmit, reset, formState } = useForm<FormValues>({
+  const { register, handleSubmit, reset, watch, formState } = useForm<FormValues>({
     defaultValues: toValues(initial),
   });
+
+  // Live preview: valor = toneladas × 1000 × precio(mercado).
+  const tonWatch = watch("toneladas");
+  const marketWatch = watch("market");
+  const ton = Number(String(tonWatch ?? "").replace(/[^0-9.-]/g, ""));
+  const market = (marketWatch || null) as Market | null;
+  const refPrice = pickReferencePrice(market, prices);
+  const valorPreview = leadValueForMarket(
+    Number.isFinite(ton) ? ton : null,
+    market,
+    prices,
+  );
   const [prevKey, setPrevKey] = React.useState<string>("");
 
   // Reset the form whenever the modal opens or the edited lead changes.
@@ -169,19 +192,43 @@ export function LeadForm({
             ))}
           </Select>
         </Field>
-        <Field label="Volumen">
+        <Field label="Volumen (descriptivo)">
           <Input {...register("volume")} placeholder="p. ej. 25 MT/mes" />
         </Field>
-        <Field label="Valor potencial (COP)">
+        <Field label="Toneladas (TM)">
           <Input
             type="number"
             step="any"
             min="0"
-            {...register("potential_value_cop")}
-            placeholder="p. ej. 120000000"
+            {...register("toneladas")}
+            placeholder="p. ej. 25"
             className="font-mono tnum"
           />
         </Field>
+        <div className="sm:col-span-2">
+          <Field label="Valor total (COP)">
+            <Input
+              type="number"
+              step="any"
+              min="0"
+              {...register("potential_value_cop")}
+              placeholder="p. ej. 120000000"
+              className="font-mono tnum"
+              disabled={valorPreview != null}
+            />
+          </Field>
+          {valorPreview != null ? (
+            <p className="mt-1 text-xs text-fg-muted">
+              ≈ <span className="font-mono tnum text-fg">{formatCOP(valorPreview)}</span>{" "}
+              · {ton.toLocaleString("es-CO")} TM × {formatCOP(refPrice ?? 0)}/kg (
+              {market === "Nacional" ? "Luker" : "ICE"})
+            </p>
+          ) : (
+            <p className="mt-1 text-xs text-fg-subtle">
+              Indica toneladas y mercado para calcularlo automáticamente, o escríbelo a mano.
+            </p>
+          )}
+        </div>
         <Field label="Producto / Interés" className="sm:col-span-2">
           <Input {...register("product_interest")} />
         </Field>

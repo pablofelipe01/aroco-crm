@@ -123,7 +123,11 @@ export function LeadDetail({
     ["Interés", lead.product_interest],
     ["Volumen", lead.volume],
     [
-      "Valor potencial",
+      "Toneladas",
+      lead.toneladas != null ? `${lead.toneladas.toLocaleString("es-CO")} TM` : null,
+    ],
+    [
+      "Valor total",
       lead.potential_value_cop != null ? formatCOP(lead.potential_value_cop) : null,
     ],
     ["Próxima acción", lead.next_action],
