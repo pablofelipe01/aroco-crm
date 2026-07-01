@@ -12,6 +12,9 @@ import {
   Megaphone,
   Sprout,
   FileDown,
+  Users,
+  Plus,
+  Trash2,
 } from "lucide-react";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -23,15 +26,35 @@ import { useToast } from "@/components/ui/toast";
 import { OC_ESTADO_TONE, OC_CASOS, OC_CASO_LABEL, COP } from "@/lib/procesos/oc-opts";
 import type { OcCaso } from "@/lib/procesos/oc-opts";
 import type { OrdenCompra } from "@/lib/types/database";
+import type { CommissionRole } from "@/lib/calc/comisiones";
 import type { ProveedorHabilitado } from "../page";
+import type { ComercialOpcion, ComercialParticipante } from "./page";
 import { OrdenForm } from "../orden-form";
-import { enviarAprobacion, aprobarOrden, rechazarOrden, emitirOrden } from "../actions";
+import {
+  enviarAprobacion,
+  aprobarOrden,
+  rechazarOrden,
+  emitirOrden,
+  agregarComercialOC,
+  quitarComercialOC,
+} from "../actions";
+
+/** Roles de participación en la OC y su etiqueta corta. */
+const ROLES: { id: CommissionRole; label: string; tone: "info" | "success" | "accent" }[] = [
+  { id: "Solo Compra", label: "Compra", tone: "info" },
+  { id: "Solo Venta", label: "Venta", tone: "success" },
+  { id: "Compra+Venta", label: "Compra y venta", tone: "accent" },
+];
+const rolLabel = (r: CommissionRole) => ROLES.find((x) => x.id === r)?.label ?? r;
+const rolTone = (r: CommissionRole) => ROLES.find((x) => x.id === r)?.tone ?? "neutral";
 
 export function OrdenDetalle({
   orden,
   proveedorNombre,
   proveedorId,
   proveedores,
+  team,
+  participantes,
   canWrite,
   canApprove,
 }: {
@@ -39,6 +62,8 @@ export function OrdenDetalle({
   proveedorNombre: string;
   proveedorId: string | null;
   proveedores: ProveedorHabilitado[];
+  team: ComercialOpcion[];
+  participantes: ComercialParticipante[];
   canWrite: boolean;
   canApprove: boolean;
 }) {
@@ -146,6 +171,13 @@ export function OrdenDetalle({
           )}
         </CardBody>
       </Card>
+
+      <ComercialesCard
+        ordenId={orden.id}
+        participantes={participantes}
+        team={team}
+        canWrite={canWrite}
+      />
 
       {e === "Rechazada" && orden.motivo_rechazo && (
         <div className="rounded-[var(--radius-md)] border border-danger/40 bg-danger/5 p-3 text-sm">
@@ -292,5 +324,127 @@ export function OrdenDetalle({
         </Field>
       </Modal>
     </div>
+  );
+}
+
+/**
+ * Comerciales que participaron en la operación (compra / venta). Es la fuente
+ * única para las comisiones — reemplaza el registro manual en Excel.
+ */
+function ComercialesCard({
+  ordenId,
+  participantes,
+  team,
+  canWrite,
+}: {
+  ordenId: string;
+  participantes: ComercialParticipante[];
+  team: ComercialOpcion[];
+  canWrite: boolean;
+}) {
+  const router = useRouter();
+  const { toast } = useToast();
+  const [comercial, setComercial] = React.useState("");
+  const [rol, setRol] = React.useState<CommissionRole>("Solo Compra");
+  const [busy, setBusy] = React.useState(false);
+
+  // Solo ofrece comerciales que aún no están en la orden.
+  const yaAsignados = new Set(participantes.map((p) => p.comercialId));
+  const disponibles = team.filter((t) => !yaAsignados.has(t.id));
+
+  async function agregar() {
+    if (!comercial) {
+      toast({ tone: "error", title: "Selecciona el comercial" });
+      return;
+    }
+    setBusy(true);
+    const res = await agregarComercialOC(ordenId, comercial, rol);
+    setBusy(false);
+    if (!res.ok) {
+      toast({ tone: "error", title: "No se pudo agregar", description: res.error });
+      return;
+    }
+    setComercial("");
+    setRol("Solo Compra");
+    router.refresh();
+  }
+
+  async function quitar(id: string) {
+    const res = await quitarComercialOC(id);
+    if (!res.ok) {
+      toast({ tone: "error", title: "No se pudo quitar", description: res.error });
+      return;
+    }
+    router.refresh();
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Users className="h-4 w-4 text-accent" /> Comerciales participantes
+        </CardTitle>
+        <span className="text-xs text-fg-subtle">Alimenta las comisiones</span>
+      </CardHeader>
+      <CardBody className="space-y-4">
+        {participantes.length === 0 ? (
+          <p className="text-sm text-fg-subtle">
+            Aún no hay comerciales registrados en esta orden.
+          </p>
+        ) : (
+          <ul className="space-y-2">
+            {participantes.map((p) => (
+              <li
+                key={p.id}
+                className="flex items-center gap-2 rounded-[var(--radius-md)] border border-border px-3 py-2 text-sm"
+              >
+                <span className="flex-1 font-medium text-fg">{p.nombre}</span>
+                <Badge tone={rolTone(p.rol)}>{rolLabel(p.rol)}</Badge>
+                {canWrite && (
+                  <button
+                    onClick={() => quitar(p.id)}
+                    className="rounded p-1 text-fg-subtle hover:bg-danger-soft hover:text-danger"
+                    aria-label="Quitar comercial"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {canWrite && disponibles.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2 border-t border-border pt-3">
+            <Select
+              value={comercial}
+              onChange={(e) => setComercial(e.target.value)}
+              className="w-auto min-w-[10rem]"
+            >
+              <option value="">Comercial…</option>
+              {disponibles.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name}
+                </option>
+              ))}
+            </Select>
+            <Select
+              value={rol}
+              onChange={(e) => setRol(e.target.value as CommissionRole)}
+              className="w-auto"
+            >
+              {ROLES.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.label}
+                </option>
+              ))}
+            </Select>
+            <Button size="sm" variant="secondary" loading={busy} onClick={agregar}>
+              <Plus className="h-4 w-4" /> Agregar
+            </Button>
+          </div>
+        )}
+      </CardBody>
+    </Card>
   );
 }

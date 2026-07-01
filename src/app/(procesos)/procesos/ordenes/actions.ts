@@ -303,3 +303,53 @@ export async function emitirOrden(id: string): Promise<ActionResult> {
   revalidatePath("/procesos/ordenes");
   return { ok: true, id };
 }
+
+// ── Comerciales participantes (alimentan comisiones desde la OC) ─────────────
+
+const OC_ROLES = ["Compra+Venta", "Solo Venta", "Solo Compra"] as const;
+type OcRol = (typeof OC_ROLES)[number];
+
+/** Registra un comercial participante en la OC con su rol (compra / venta). */
+export async function agregarComercialOC(
+  ordenId: string,
+  comercialId: string,
+  rol: string,
+): Promise<ActionResult> {
+  const session = await requireSession();
+  if (!comercialId) return { ok: false, error: "Selecciona el comercial." };
+  if (!OC_ROLES.includes(rol as OcRol)) return { ok: false, error: "Rol inválido." };
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("oc_comerciales").insert({
+    orden_id: ordenId,
+    comercial_id: comercialId,
+    rol: rol as OcRol,
+    created_by: session.userId,
+  });
+  if (error) {
+    if (error.code === "23505")
+      return { ok: false, error: "Ese comercial ya está registrado en la orden." };
+    return { ok: false, error: error.message };
+  }
+  await logAudit("orden", ordenId, "comercial_agregar", `Registró un comercial participante (${rol})`);
+  revalidatePath(`/procesos/ordenes/${ordenId}`);
+  return { ok: true };
+}
+
+/** Quita un comercial participante de la OC. */
+export async function quitarComercialOC(id: string): Promise<ActionResult> {
+  await requireSession();
+  const supabase = await createClient();
+  const { data: row } = await supabase
+    .from("oc_comerciales")
+    .select("orden_id")
+    .eq("id", id)
+    .maybeSingle();
+  const { error } = await supabase.from("oc_comerciales").delete().eq("id", id);
+  if (error) return { ok: false, error: error.message };
+  if (row?.orden_id) {
+    await logAudit("orden", row.orden_id, "comercial_quitar", "Quitó un comercial participante");
+    revalidatePath(`/procesos/ordenes/${row.orden_id}`);
+  }
+  return { ok: true };
+}

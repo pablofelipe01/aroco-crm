@@ -978,6 +978,36 @@ export type Database = {
         };
         Relationships: [];
       };
+      oc_comerciales: {
+        Row: {
+          id: string;
+          orden_id: string;
+          comercial_id: string;
+          rol: Database["public"]["Enums"]["commission_role"];
+          nota: string | null;
+          created_by: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          orden_id: string;
+          comercial_id: string;
+          rol?: Database["public"]["Enums"]["commission_role"];
+          nota?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          orden_id?: string;
+          comercial_id?: string;
+          rol?: Database["public"]["Enums"]["commission_role"];
+          nota?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
       notificaciones: {
         Row: {
           id: string;
@@ -1799,6 +1829,7 @@ export type Catalogo = Tables<"catalogos">;
 export type AuditLog = Tables<"audit_log">;
 export type Notificacion = Tables<"notificaciones">;
 export type OrdenCompra = Tables<"ordenes_compra">;
+export type OcComercial = Tables<"oc_comerciales">;
 export type Recepcion = Tables<"recepciones">;
 export type RecepcionFoto = Tables<"recepcion_fotos">;
 export type Liquidacion = Tables<"liquidaciones">;

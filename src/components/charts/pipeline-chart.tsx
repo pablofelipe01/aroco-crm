@@ -17,21 +17,49 @@ export interface PipelineDatum {
   color: string;
 }
 
+/**
+ * Right-aligned category tick. A custom tick guarantees consistent alignment
+ * and enough room for the longest stage names ("Negociación", "Descartado"),
+ * which the default YAxis tick clipped at narrow widths.
+ */
+function StageTick({
+  x,
+  y,
+  payload,
+}: {
+  x?: number;
+  y?: number;
+  payload?: { value: string };
+}) {
+  return (
+    <text
+      x={x}
+      y={y}
+      dy={4}
+      textAnchor="end"
+      style={{ fontSize: 12, fill: "var(--fg-muted)" }}
+    >
+      {payload?.value}
+    </text>
+  );
+}
+
 export function PipelineChart({ data }: { data: PipelineDatum[] }) {
   return (
     <ResponsiveContainer width="100%" height={260}>
       <BarChart
         layout="vertical"
         data={data}
-        margin={{ top: 4, right: 28, left: 8, bottom: 4 }}
+        margin={{ top: 4, right: 28, left: 0, bottom: 4 }}
         barCategoryGap={8}
       >
         <XAxis type="number" hide domain={[0, "dataMax"]} allowDecimals={false} />
         <YAxis
           type="category"
           dataKey="stage"
-          width={92}
-          tick={{ fontSize: 12, fill: "var(--fg-muted)" }}
+          width={116}
+          tick={<StageTick />}
+          tickMargin={8}
           axisLine={false}
           tickLine={false}
         />

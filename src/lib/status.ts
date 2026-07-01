@@ -14,16 +14,17 @@ export const LEAD_STAGES = [
 export type LeadStage = (typeof LEAD_STAGES)[number];
 
 /**
- * Probability weight per stage for pipeline value estimation: from 10% at
- * "Nuevo" up to 100% at "Cerrado" (0% if "Descartado"). Multiply a lead's
- * potential value by its stage weight to get its expected (weighted) value.
+ * Probability weight per stage — the 6-phase sales scale defined in the
+ * 2026-06-30 CRM review: 10% (Nuevo) → 30 → 50 → 70 → 80 (En espera) → 100%
+ * (Cerrado); 0% if "Descartado". Multiply a lead's potential value by its
+ * stage weight to get its expected (weighted) value.
  */
 export const LEAD_STAGE_WEIGHT: Record<LeadStage, number> = {
   Nuevo: 0.1,
   Cotización: 0.3,
   Negociación: 0.5,
   Enviado: 0.7,
-  "En espera": 0.4,
+  "En espera": 0.8,
   Cerrado: 1,
   Descartado: 0,
 };
