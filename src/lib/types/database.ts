@@ -1384,6 +1384,7 @@ export type Database = {
           related_table: string | null;
           related_id: string | null;
           for_department: Database["public"]["Enums"]["department"] | null;
+          for_user: string | null;
           dedupe_key: string | null;
           read: boolean;
           created_at: string;
@@ -1397,6 +1398,7 @@ export type Database = {
           related_table?: string | null;
           related_id?: string | null;
           for_department?: Database["public"]["Enums"]["department"] | null;
+          for_user?: string | null;
           dedupe_key?: string | null;
           read?: boolean;
           created_at?: string;
@@ -1410,6 +1412,7 @@ export type Database = {
           related_table?: string | null;
           related_id?: string | null;
           for_department?: Database["public"]["Enums"]["department"] | null;
+          for_user?: string | null;
           dedupe_key?: string | null;
           read?: boolean;
           created_at?: string;
