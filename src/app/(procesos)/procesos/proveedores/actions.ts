@@ -95,7 +95,7 @@ export async function actualizarProveedor(
 const MAX_BYTES = 5 * 1024 * 1024; // 5 MB
 const MAX_POR_CATEGORIA = 10;
 const TIPOS_OK = ["application/pdf", "image/png", "image/jpeg", "image/jpg"];
-export const CATEGORIAS_DOC = ["legales", "tecnicos", "contrato"] as const;
+const CATEGORIAS_DOC = ["legales", "tecnicos", "contrato"] as const;
 
 /** Sube un documento soporte de un proveedor (FormData: proveedorId, categoria, file). */
 export async function subirDocumento(formData: FormData): Promise<ActionResult> {
