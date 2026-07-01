@@ -322,6 +322,14 @@ export function PreciosClient({
                         </dd>
                       </div>
                     ))}
+                    {hasIntl && (
+                      <div className="flex items-center justify-between gap-2 border-t border-border pt-1 text-sm">
+                        <dt className="min-w-0 truncate text-accent-soft-fg">Cacao (ICE)</dt>
+                        <dd className="shrink-0 font-mono tnum text-accent-soft-fg">
+                          {international[d] != null ? formatNumber(international[d]) : "—"}
+                        </dd>
+                      </div>
+                    )}
                   </dl>
                 </li>
               ))}
@@ -338,6 +346,11 @@ export function PreciosClient({
                         {c}
                       </th>
                     ))}
+                    {hasIntl && (
+                      <th className="border-l border-border px-4 py-3 text-right font-medium text-accent-soft-fg">
+                        Cacao (ICE)
+                      </th>
+                    )}
                     <th className="px-4 py-3" />
                   </tr>
                 </thead>
@@ -352,6 +365,11 @@ export function PreciosClient({
                           {row[c] != null ? formatNumber(row[c]) : "—"}
                         </td>
                       ))}
+                      {hasIntl && (
+                        <td className="border-l border-border px-4 py-2.5 text-right font-mono tnum text-accent-soft-fg">
+                          {international[d] != null ? formatNumber(international[d]) : "—"}
+                        </td>
+                      )}
                       <td className="px-4 py-2.5 text-right">
                         {canWrite && (
                           <button
