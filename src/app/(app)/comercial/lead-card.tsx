@@ -3,6 +3,7 @@
 import { MapPin, Package } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn, initials, formatCOP } from "@/lib/utils";
+import { LEAD_STAGE_WEIGHT, type LeadStage } from "@/lib/status";
 import type { LeadWithOwner } from "./page";
 
 export function LeadCard({
@@ -14,6 +15,7 @@ export function LeadCard({
   onClick?: () => void;
   dragging?: boolean;
 }) {
+  const prob = Math.round((LEAD_STAGE_WEIGHT[lead.status as LeadStage] ?? 0) * 100);
   return (
     <div
       onClick={onClick}
@@ -50,12 +52,26 @@ export function LeadCard({
         </p>
       )}
 
-      {lead.potential_value_cop != null && (
-        <p className="mt-2 font-mono text-xs font-semibold tnum text-fg">
-          {formatCOP(lead.potential_value_cop)}
-          <span className="ml-1 font-sans font-normal text-fg-subtle">potencial</span>
-        </p>
-      )}
+      <div className="mt-2 flex items-end justify-between gap-2">
+        <div className="min-w-0">
+          {lead.potential_value_cop != null && (
+            <p className="font-mono text-xs font-semibold tnum text-fg">
+              {formatCOP(lead.potential_value_cop)}
+            </p>
+          )}
+          {lead.toneladas != null && (
+            <p className="font-mono text-[11px] tnum text-fg-subtle">
+              {lead.toneladas.toLocaleString("es-CO")} TM
+            </p>
+          )}
+        </div>
+        <span
+          title="Probabilidad de cierre"
+          className="shrink-0 rounded-full bg-accent-soft px-2 py-0.5 font-mono text-[11px] font-semibold tnum text-accent-soft-fg"
+        >
+          {prob}%
+        </span>
+      </div>
 
       <div className="mt-2.5 flex items-center justify-between gap-2">
         {lead.country && (

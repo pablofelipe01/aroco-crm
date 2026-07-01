@@ -13,7 +13,7 @@ import { ArrowUpDown, ChevronDown, ChevronUp } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Users, MapPin } from "lucide-react";
-import { LEAD_STAGE_TONE, type LeadStage } from "@/lib/status";
+import { LEAD_STAGE_TONE, LEAD_STAGE_WEIGHT, type LeadStage } from "@/lib/status";
 import { formatDate, initials } from "@/lib/utils";
 import type { LeadWithOwner } from "./page";
 
@@ -55,6 +55,23 @@ export function LeadList({
             {c.getValue()}
           </Badge>
         ),
+      }),
+      col.accessor((l) => LEAD_STAGE_WEIGHT[l.status as LeadStage] ?? 0, {
+        id: "prob",
+        header: "Prob.",
+        cell: (c) => (
+          <span className="font-mono tnum font-semibold text-accent-soft-fg">
+            {Math.round((c.getValue() as number) * 100)}%
+          </span>
+        ),
+      }),
+      col.accessor((l) => l.toneladas ?? 0, {
+        id: "toneladas",
+        header: "TM",
+        cell: (c) =>
+          (c.getValue() as number) > 0
+            ? (c.getValue() as number).toLocaleString("es-CO")
+            : "—",
       }),
       col.accessor((l) => l.owner?.name ?? "", {
         id: "owner",

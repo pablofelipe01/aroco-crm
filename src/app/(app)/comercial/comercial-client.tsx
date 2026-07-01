@@ -17,6 +17,7 @@ import { LeadKanban } from "./lead-kanban";
 import { LeadList } from "./lead-list";
 import { LeadDetail } from "./lead-detail";
 import { LeadForm } from "./lead-form";
+import { PipelineSummary } from "./pipeline-summary";
 import type { ReferencePrices } from "@/lib/calc/lead-value";
 import { updateLeadStatus } from "./actions";
 
@@ -137,6 +138,8 @@ export function ComercialClient({
           )
         }
       />
+
+      <PipelineSummary leads={filtered} />
 
       {/* Toolbar */}
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
