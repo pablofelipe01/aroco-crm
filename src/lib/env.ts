@@ -56,6 +56,23 @@ export const serverEnv = {
   get CRON_SECRET() {
     return required("CRON_SECRET", process.env.CRON_SECRET);
   },
+  /** Gmail OAuth (lectura del buzón de Renata para el cron de Actas). */
+  get GMAIL_CLIENT_ID() {
+    return process.env.GMAIL_CLIENT_ID ?? "";
+  },
+  get GMAIL_CLIENT_SECRET() {
+    return process.env.GMAIL_CLIENT_SECRET ?? "";
+  },
+  get GMAIL_REFRESH_TOKEN() {
+    return process.env.GMAIL_REFRESH_TOKEN ?? "";
+  },
+  /** Búsqueda Gmail para las notas de reunión (auto-enviadas por Renata). */
+  get ACTAS_EMAIL_QUERY() {
+    return (
+      process.env.ACTAS_EMAIL_QUERY ??
+      'subject:"Notas de reunión" newer_than:14d'
+    );
+  },
   /**
    * Published CSV export of the inventory Google Sheet. Defaults to the AROCO
    * sheet's `gid=826514579` tab; override per-environment if it ever moves.
