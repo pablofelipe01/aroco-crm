@@ -14,6 +14,9 @@ export interface IngestSummary {
 /** Máximo de correos nuevos a procesar por corrida (la IA tarda por acta). */
 const BATCH = 3;
 
+/** Asuntos de prueba/ensayo del notetaker que NO deben volverse actas. */
+const TEST_RE = /\b(prueba|ensayo|test)\b/i;
+
 const norm = (s: string) =>
   s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
 
@@ -74,7 +77,7 @@ export async function ingestActasFromGmail(): Promise<IngestSummary> {
   for (const emailId of fresh) {
     try {
       const email = await fetchEmail(emailId);
-      if (!/notas?\s+de\s+reuni/i.test(email.subject)) {
+      if (!/notas?\s+de\s+reuni/i.test(email.subject) || TEST_RE.test(email.subject)) {
         summary.skipped++;
         continue;
       }

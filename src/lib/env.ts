@@ -66,11 +66,12 @@ export const serverEnv = {
   get GMAIL_REFRESH_TOKEN() {
     return process.env.GMAIL_REFRESH_TOKEN ?? "";
   },
-  /** Búsqueda Gmail para las notas de reunión (auto-enviadas por Renata). */
+  /** Búsqueda Gmail para las notas de reunión (auto-enviadas por Renata).
+   * Excluye pruebas/ensayos del notetaker. */
   get ACTAS_EMAIL_QUERY() {
     return (
       process.env.ACTAS_EMAIL_QUERY ??
-      'subject:"Notas de reunión" newer_than:14d'
+      'subject:"Notas de reunión" -subject:prueba -subject:ensayo -subject:test newer_than:14d'
     );
   },
   /**
