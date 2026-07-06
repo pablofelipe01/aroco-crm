@@ -63,6 +63,24 @@ function decode(data?: string): string {
   return data ? Buffer.from(data, "base64url").toString("utf-8") : "";
 }
 
+/**
+ * Fecha de calendario (YYYY-MM-DD) del correo en hora de Colombia. El header
+ * "Date" es un instante con offset; usar `toISOString()` lo pasa a UTC y para
+ * correos de la tarde/noche cae al día siguiente. Aquí resolvemos el día real
+ * en America/Bogota.
+ */
+function bogotaDate(header: string): string | null {
+  const d = new Date(header);
+  if (Number.isNaN(d.getTime())) return null;
+  // en-CA formatea como YYYY-MM-DD.
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Bogota",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(d);
+}
+
 function* walk(part?: Part): Generator<Part> {
   if (!part) return;
   yield part;
@@ -153,7 +171,7 @@ export async function fetchEmail(id: string): Promise<FetchedEmail> {
     id,
     subject: headerVal(headers, "Subject"),
     from: headerVal(headers, "From"),
-    date: dateHeader ? new Date(dateHeader).toISOString().slice(0, 10) : null,
+    date: dateHeader ? bogotaDate(dateHeader) : null,
     bodyText,
     pdf,
   };
