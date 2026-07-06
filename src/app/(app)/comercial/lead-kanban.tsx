@@ -16,7 +16,7 @@ import {
 import { motion } from "framer-motion";
 import { LEAD_STAGES, LEAD_STAGE_TONE, LEAD_STAGE_WEIGHT, type LeadStage } from "@/lib/status";
 import { Badge } from "@/components/ui/badge";
-import { cn } from "@/lib/utils";
+import { cn, formatCOP } from "@/lib/utils";
 import { staggerContainer, fadeUp } from "@/lib/motion";
 import type { LeadWithOwner } from "./page";
 import { LeadCard } from "./lead-card";
@@ -60,6 +60,7 @@ function Column({
   const { setNodeRef, isOver } = useDroppable({ id: stage });
   const prob = Math.round((LEAD_STAGE_WEIGHT[stage] ?? 0) * 100);
   const tons = leads.reduce((s, l) => s + (l.toneladas ?? 0), 0);
+  const value = leads.reduce((s, l) => s + (l.potential_value_cop ?? 0), 0);
   return (
     <div className="flex w-72 shrink-0 flex-col">
       <div className="mb-2 flex items-center justify-between gap-2 px-1">
@@ -102,6 +103,17 @@ function Column({
           </p>
         )}
       </motion.div>
+      {/* Totales de la etapa: toneladas y valor potencial. */}
+      <div className="mt-2 flex items-center justify-between gap-2 rounded-[var(--radius-md)] border border-border bg-surface px-3 py-2">
+        <span className="text-[11px] font-medium uppercase tracking-wide text-fg-subtle">
+          Total
+        </span>
+        <span className="flex items-center gap-2 font-mono text-xs tnum text-fg">
+          <span>{tons > 0 ? `${tons.toLocaleString("es-CO")} TM` : "—"}</span>
+          <span className="text-fg-subtle">·</span>
+          <span className="font-semibold">{value > 0 ? formatCOP(value) : "—"}</span>
+        </span>
+      </div>
     </div>
   );
 }
