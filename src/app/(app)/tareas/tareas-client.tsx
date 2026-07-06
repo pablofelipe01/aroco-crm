@@ -220,9 +220,11 @@ function Column({
 export function TareasClient({
   initialTasks,
   team,
+  currentPersonId = "",
 }: {
   initialTasks: TaskWithPerson[];
   team: TeamMember[];
+  currentPersonId?: string;
 }) {
   const router = useRouter();
   const { toast } = useToast();
@@ -236,7 +238,8 @@ export function TareasClient({
 
   const [view, setView] = React.useState<"kanban" | "list">("kanban");
   const [query, setQuery] = React.useState("");
-  const [fPerson, setFPerson] = React.useState("");
+  // Por defecto muestra las tareas del usuario conectado (si es del equipo).
+  const [fPerson, setFPerson] = React.useState(currentPersonId);
   const [formOpen, setFormOpen] = React.useState(false);
   const [editing, setEditing] = React.useState<TaskWithPerson | null>(null);
   const [calTask, setCalTask] = React.useState<TaskWithPerson | null>(null);

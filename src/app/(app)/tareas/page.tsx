@@ -11,7 +11,7 @@ export type TaskWithPerson = Task & {
 
 export default async function TareasPage() {
   const supabase = await createClient();
-  await getSessionContext();
+  const session = await getSessionContext();
 
   const [{ data: tasks }, { data: team }] = await Promise.all([
     supabase
@@ -21,10 +21,16 @@ export default async function TareasPage() {
     supabase.from("team_members").select("*").eq("active", true).order("name"),
   ]);
 
+  const members = (team ?? []) as TeamMember[];
+  // Miembro del equipo del usuario conectado (para filtrar sus tareas por defecto).
+  const currentPersonId =
+    members.find((m) => m.profile_id === session?.userId)?.id ?? "";
+
   return (
     <TareasClient
       initialTasks={(tasks ?? []) as unknown as TaskWithPerson[]}
-      team={(team ?? []) as TeamMember[]}
+      team={members}
+      currentPersonId={currentPersonId}
     />
   );
 }
