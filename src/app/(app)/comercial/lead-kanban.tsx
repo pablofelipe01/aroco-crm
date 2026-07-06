@@ -18,6 +18,8 @@ import { LEAD_STAGES, LEAD_STAGE_TONE, LEAD_STAGE_WEIGHT, type LeadStage } from 
 import { Badge } from "@/components/ui/badge";
 import { cn, formatCOP } from "@/lib/utils";
 import { staggerContainer, fadeUp } from "@/lib/motion";
+import { leadDisplayValue, type Market } from "@/lib/calc/lead-value";
+import type { ReferencePrices } from "@/lib/calc/lead-value";
 import type { LeadWithOwner } from "./page";
 import { LeadCard } from "./lead-card";
 
@@ -51,16 +53,26 @@ function Column({
   leads,
   canWrite,
   onSelect,
+  prices,
 }: {
   stage: LeadStage;
   leads: LeadWithOwner[];
   canWrite: boolean;
   onSelect: (l: LeadWithOwner) => void;
+  prices: ReferencePrices;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: stage });
   const prob = Math.round((LEAD_STAGE_WEIGHT[stage] ?? 0) * 100);
   const tons = leads.reduce((s, l) => s + (l.toneladas ?? 0), 0);
-  const value = leads.reduce((s, l) => s + (l.potential_value_cop ?? 0), 0);
+  const value = leads.reduce(
+    (s, l) =>
+      s +
+      leadDisplayValue(
+        { ...l, market: l.market as Market | null },
+        prices,
+      ),
+    0,
+  );
   return (
     <div className="flex w-72 shrink-0 flex-col">
       <div className="mb-2 flex items-center justify-between gap-2 px-1">
@@ -123,11 +135,13 @@ export function LeadKanban({
   canWrite,
   onSelect,
   onStatusChange,
+  prices,
 }: {
   leads: LeadWithOwner[];
   canWrite: boolean;
   onSelect: (l: LeadWithOwner) => void;
   onStatusChange: (id: string, status: LeadStage) => void;
+  prices: ReferencePrices;
 }) {
   const [activeId, setActiveId] = React.useState<string | null>(null);
   // Mouse: 5px threshold. Touch: press-and-hold 200ms so a normal swipe scrolls
@@ -174,6 +188,7 @@ export function LeadKanban({
             leads={byStage.get(stage) ?? []}
             canWrite={canWrite}
             onSelect={onSelect}
+            prices={prices}
           />
         ))}
       </div>

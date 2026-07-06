@@ -139,7 +139,7 @@ export function ComercialClient({
         }
       />
 
-      <PipelineSummary leads={filtered} />
+      <PipelineSummary leads={filtered} prices={prices} />
 
       {/* Toolbar */}
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -210,6 +210,7 @@ export function ComercialClient({
           canWrite={canWrite}
           onSelect={setSelected}
           onStatusChange={onStatusChange}
+          prices={prices}
         />
       ) : (
         <LeadList leads={filtered} onSelect={setSelected} />

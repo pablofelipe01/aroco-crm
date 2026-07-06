@@ -48,3 +48,22 @@ export function leadValueForMarket(
 ): number | null {
   return leadValueCop(toneladas, pickReferencePrice(market, prices));
 }
+
+/**
+ * Valor a mostrar/totalizar de un lead: respeta el valor escrito a mano
+ * (`potential_value_cop`) y, si no lo hay, lo deriva de las toneladas con el
+ * precio de referencia actual del mercado. Devuelve 0 cuando no hay datos, para
+ * poder sumar sin condicionales.
+ */
+export function leadDisplayValue(
+  lead: {
+    potential_value_cop: number | null | undefined;
+    toneladas: number | null | undefined;
+    market: Market | null | undefined;
+  },
+  prices: ReferencePrices,
+): number {
+  if (lead.potential_value_cop != null && Number.isFinite(lead.potential_value_cop))
+    return lead.potential_value_cop;
+  return leadValueForMarket(lead.toneladas, lead.market, prices) ?? 0;
+}

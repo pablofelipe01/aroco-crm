@@ -8,6 +8,8 @@ import {
   LEAD_STAGE_WEIGHT,
 } from "@/lib/status";
 import { formatCOP } from "@/lib/utils";
+import { leadDisplayValue, type Market } from "@/lib/calc/lead-value";
+import type { ReferencePrices } from "@/lib/calc/lead-value";
 import type { LeadWithOwner } from "./page";
 
 const ACTIVE_STAGES = LEAD_STAGES.filter((s) => s !== "Descartado");
@@ -18,11 +20,21 @@ const fmtTon = (t: number) => `${t.toLocaleString("es-CO", { maximumFractionDigi
  * Totaliza el pipeline por probabilidad de cierre: por cada etapa (10% … 100%),
  * cuántas toneladas y qué valor hay, y el valor ponderado (valor × probabilidad).
  */
-export function PipelineSummary({ leads }: { leads: LeadWithOwner[] }) {
+export function PipelineSummary({
+  leads,
+  prices,
+}: {
+  leads: LeadWithOwner[];
+  prices: ReferencePrices;
+}) {
   const rows = ACTIVE_STAGES.map((stage) => {
     const ls = leads.filter((l) => l.status === stage);
     const tons = ls.reduce((s, l) => s + (l.toneladas ?? 0), 0);
-    const value = ls.reduce((s, l) => s + (l.potential_value_cop ?? 0), 0);
+    const value = ls.reduce(
+      (s, l) =>
+        s + leadDisplayValue({ ...l, market: l.market as Market | null }, prices),
+      0,
+    );
     const weight = LEAD_STAGE_WEIGHT[stage] ?? 0;
     return {
       stage,
