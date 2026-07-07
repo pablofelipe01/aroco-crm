@@ -10,7 +10,7 @@ export type DispatchWithLinks = Dispatch & {
   lead: Pick<Lead, "id" | "company"> | null;
 };
 
-const WRITE_DEPTS = ["Bodega Central", "Comercial"];
+const WRITE_DEPTS = ["Bodega Central", "Comercial", "Operaciones"];
 
 export default async function DespachosPage() {
   const supabase = await createClient();

@@ -5,7 +5,7 @@ import type { InventoryLot } from "@/lib/types/database";
 
 export const dynamic = "force-dynamic";
 
-const WRITE_DEPTS = ["Bodega Central", "Administrativo"];
+const WRITE_DEPTS = ["Bodega Central", "Administrativo", "Operaciones"];
 
 export default async function InventarioPage() {
   const supabase = await createClient();
