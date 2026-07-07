@@ -16,8 +16,8 @@ export function InviteForm() {
 
   return (
     <form action={action} className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-      <Field label="Correo (@aroco.co)" className="sm:col-span-2">
-        <Input name="email" type="email" placeholder="nombre@aroco.co" required />
+      <Field label="Correo" className="sm:col-span-2">
+        <Input name="email" type="email" placeholder="nombre@correo.com" required />
       </Field>
       <Field label="Nombre completo">
         <Input name="full_name" placeholder="Nombre del invitado" />

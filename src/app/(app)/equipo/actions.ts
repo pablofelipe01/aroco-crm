@@ -40,8 +40,10 @@ export async function inviteUser(
   const department = String(formData.get("department") ?? "").trim();
   const role = String(formData.get("role") ?? "member").trim();
 
-  if (!email.endsWith("@aroco.co")) {
-    return { error: "El correo debe pertenecer al dominio @aroco.co." };
+  // Se acepta cualquier correo válido: parte del equipo es externa o usa Gmail
+  // (p. ej. operaciones/finca). El dominio ya no se restringe a @aroco.co.
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return { error: "Correo inválido." };
   }
   if (department && !DEPARTMENTS.includes(department as Department)) {
     return { error: "Departamento inválido." };

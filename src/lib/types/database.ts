@@ -1774,7 +1774,8 @@ export type Database = {
         | "Financiero"
         | "Administrativo"
         | "Bodega Central"
-        | "Finca";
+        | "Finca"
+        | "Operaciones";
       incoterm: "NACIONAL" | "FOB" | "CIF";
       lead_status:
         | "Nuevo"

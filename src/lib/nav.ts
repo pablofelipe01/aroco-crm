@@ -21,6 +21,7 @@ export const DEPARTMENTS = [
   "Administrativo",
   "Bodega Central",
   "Finca",
+  "Operaciones",
 ] as const;
 
 export type Department = (typeof DEPARTMENTS)[number];
@@ -56,19 +57,19 @@ export const NAV_ITEMS: NavItem[] = [
     href: "/inventario",
     label: "Inventario",
     icon: Boxes,
-    departments: ["Dirección", "Bodega Central", "Administrativo"],
+    departments: ["Dirección", "Bodega Central", "Administrativo", "Operaciones"],
   },
   {
     href: "/inventario-calidad",
     label: "Inventario calidad",
     icon: Layers,
-    departments: ["Dirección", "Bodega Central", "Administrativo"],
+    departments: ["Dirección", "Bodega Central", "Administrativo", "Operaciones"],
   },
   {
     href: "/despachos",
     label: "Despachos",
     icon: Truck,
-    departments: ["Dirección", "Bodega Central", "Comercial"],
+    departments: ["Dirección", "Bodega Central", "Comercial", "Operaciones"],
   },
   {
     href: "/comisiones",
