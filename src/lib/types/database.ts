@@ -306,6 +306,7 @@ export type Database = {
           qty_c_kg: number;
           qty_organico_kg: number;
           qty_premium_kg: number;
+          source: string;
           synced_at: string;
           tolimax_kg: number;
         };
@@ -324,6 +325,7 @@ export type Database = {
           qty_c_kg?: number;
           qty_organico_kg?: number;
           qty_premium_kg?: number;
+          source?: string;
           synced_at?: string;
           tolimax_kg?: number;
         };
@@ -342,6 +344,7 @@ export type Database = {
           qty_c_kg?: number;
           qty_organico_kg?: number;
           qty_premium_kg?: number;
+          source?: string;
           synced_at?: string;
           tolimax_kg?: number;
         };
