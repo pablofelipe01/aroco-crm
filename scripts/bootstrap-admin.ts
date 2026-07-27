@@ -59,7 +59,15 @@ async function main() {
     user = data.user;
     console.log(`✓ Created auth user ${email} (password: ${password})`);
   } else {
-    console.log(`• Auth user ${email} already exists — ensuring admin profile.`);
+    // Existing user: reset the password and confirm the email so the account
+    // is usable right away.
+    const { error } = await admin.auth.admin.updateUserById(user.id, {
+      password,
+      email_confirm: true,
+      user_metadata: { ...user.user_metadata, full_name: fullName, department: "Dirección", role: "admin" },
+    });
+    if (error) throw error;
+    console.log(`• Auth user ${email} already existed — password reset, ensuring admin profile.`);
   }
 
   // Ensure the profile row exists and is admin/Dirección/active.
@@ -71,12 +79,14 @@ async function main() {
       department: "Dirección",
       role: "admin",
       active: true,
+      // Password is set here, so skip the onboarding screen.
+      onboarded: true,
     },
     { onConflict: "id" },
   );
   if (upErr) throw upErr;
 
-  console.log(`✓ Profile ready: ${fullName} · Dirección · admin · active`);
+  console.log(`✓ Profile ready: ${fullName} · Dirección · admin · active · onboarded`);
   console.log(`\nLog in at /login with:\n  email:    ${email}\n  password: ${password}`);
 }
 
