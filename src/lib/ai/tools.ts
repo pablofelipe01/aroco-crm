@@ -4,8 +4,14 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/types/database";
 import { cotizar } from "@/lib/calc/cotizador";
 import { quoteSchema, toCotizadorInput } from "@/lib/schemas/quote";
+import { getMarketData } from "@/lib/market";
+import { canSeeAssignee, scopeLabel, type AgentContext } from "@/lib/ai/context";
+import { DEPARTMENTS as DEPARTMENT_LIST } from "@/lib/departments";
 
 type DB = SupabaseClient<Database>;
+
+/** Copia mutable para los `enum` de los esquemas JSON de las herramientas. */
+const DEPARTMENTS: string[] = [...DEPARTMENT_LIST];
 
 /**
  * Read-only AI tools. Each executor runs against the *user's* Supabase client
@@ -51,7 +57,7 @@ export const AI_TOOLS: Anthropic.Tool[] = [
   {
     name: "get_inventory_summary",
     description:
-      "Resumen del inventario en bodega: total disponible en kg, número de lotes y desglose por procedencia (región del código del lote). Para preguntas como '¿cuánto cacao queda disponible?' o '¿cuánto hay del Meta?'.",
+      "Inventario actual en bodega: kg disponibles, lotes con saldo, desglose por procedencia y por clasificación (premium / corriente / corriente C / orgánico), y marca de cadmio. Para '¿cuál es el inventario actual?', '¿cuánto cacao queda disponible?', '¿cuánto hay del Meta?' o '¿qué lotes tienen cadmio alto?'.",
     input_schema: {
       type: "object",
       properties: {
@@ -59,6 +65,16 @@ export const AI_TOOLS: Anthropic.Tool[] = [
           type: "string",
           description:
             "Opcional: filtrar por código/procedencia (coincidencia parcial, ej. 'MET', 'CAU').",
+        },
+        include_zero: {
+          type: "boolean",
+          description:
+            "Incluir lotes ya agotados. Por defecto false: solo lo que queda en bodega.",
+        },
+        include_lots: {
+          type: "boolean",
+          description:
+            "Devolver el detalle lote por lote además de los totales. Por defecto true.",
         },
       },
     },
@@ -101,6 +117,163 @@ export const AI_TOOLS: Anthropic.Tool[] = [
     description:
       "Conteo de leads por etapa del pipeline y por mercado. Para '¿cómo va el pipeline?' o '¿cuántos leads activos hay?'.",
     input_schema: { type: "object", properties: {} },
+  },
+  {
+    name: "query_tasks",
+    description:
+      "Tareas del equipo. Para '¿qué tareas tiene Nicolás?', '¿qué hay pendiente esta semana?', '¿qué está vencido?' o '¿en qué anda Bodega Central?'. El alcance depende del rol de quien pregunta: Dirección ve todo, el resto ve lo propio y lo de su área.",
+    input_schema: {
+      type: "object",
+      properties: {
+        person: {
+          type: "string",
+          description: "Nombre (o parte) del responsable.",
+        },
+        status: {
+          type: "string",
+          enum: ["pending", "progress", "done", "blocked"],
+          description:
+            "Estado: pending=pendiente, progress=en curso, done=hecha, blocked=bloqueada.",
+        },
+        department: {
+          type: "string",
+          enum: DEPARTMENTS,
+          description: "Filtrar por área del responsable.",
+        },
+        overdue: {
+          type: "boolean",
+          description: "Solo tareas vencidas y sin terminar.",
+        },
+        due_before: {
+          type: "string",
+          description: "Vencen hasta esta fecha (YYYY-MM-DD).",
+        },
+      },
+    },
+  },
+  {
+    name: "get_team",
+    description:
+      "Directorio del equipo: quién es quién, su cargo y su área. Para '¿quién está en Operaciones?', '¿quién es el responsable comercial?' o para resolver un nombre antes de consultar sus tareas.",
+    input_schema: {
+      type: "object",
+      properties: {
+        department: {
+          type: "string",
+          enum: DEPARTMENTS,
+          description: "Filtrar por área.",
+        },
+        search: { type: "string", description: "Nombre (o parte) a buscar." },
+      },
+    },
+  },
+  {
+    name: "query_dispatches",
+    description:
+      "Despachos y salidas de bodega. Para '¿qué le despachamos a Casa Luker?', '¿cuánto salió en julio?' o '¿de qué lote salió la remisión 2031?'. Incluye el desglose por clasificación cuando existe.",
+    input_schema: {
+      type: "object",
+      properties: {
+        client: {
+          type: "string",
+          description: "Destino/cliente (coincidencia parcial, ej. 'luker').",
+        },
+        origin: {
+          type: "string",
+          description: "Código de procedencia del lote (coincidencia parcial).",
+        },
+        remision: { type: "string", description: "Remisión de salida o de entrada." },
+        since: { type: "string", description: "Desde esta fecha (YYYY-MM-DD)." },
+        until: { type: "string", description: "Hasta esta fecha (YYYY-MM-DD)." },
+      },
+    },
+  },
+  {
+    name: "query_quotes",
+    description:
+      "Cotizaciones emitidas: estado, cliente, incoterm, precio final y utilidad. Para '¿qué cotizaciones están enviadas?' o '¿en cuánto quedó la cotización de X?'.",
+    input_schema: {
+      type: "object",
+      properties: {
+        status: {
+          type: "string",
+          enum: ["borrador", "enviada", "aceptada", "rechazada"],
+          description: "Estado de la cotización.",
+        },
+        client: { type: "string", description: "Cliente (coincidencia parcial)." },
+        incoterm: {
+          type: "string",
+          enum: ["NACIONAL", "FOB", "CIF"],
+          description: "Incoterm.",
+        },
+      },
+    },
+  },
+  {
+    name: "get_commissions",
+    description:
+      "Comisiones calculadas y toneladas mensuales por agente. Para '¿cuánto lleva de comisión fulano?' o '¿cuántas toneladas hizo el equipo este mes?'.",
+    input_schema: {
+      type: "object",
+      properties: {
+        agent: { type: "string", description: "Nombre del agente (parcial)." },
+        period: {
+          type: "string",
+          description: "Periodo de toneladas en formato YYYY-MM.",
+        },
+      },
+    },
+  },
+  {
+    name: "query_proveedores",
+    description:
+      "Proveedores de cacao y su estado de vinculación. Para '¿qué proveedores están habilitados?', '¿cuántos hay en estudio?' o datos de contacto y capacidad de un proveedor.",
+    input_schema: {
+      type: "object",
+      properties: {
+        estado: {
+          type: "string",
+          enum: ["En estudio", "Habilitado", "Deshabilitado", "Rechazado"],
+          description: "Estado de vinculación.",
+        },
+        search: {
+          type: "string",
+          description: "Nombre, código, asociación o municipio (parcial).",
+        },
+        departamento: { type: "string", description: "Departamento de origen." },
+      },
+    },
+  },
+  {
+    name: "query_ordenes_compra",
+    description:
+      "Órdenes de compra a proveedores, con sus recepciones y liquidaciones. Para '¿qué OC están pendientes de aprobar?', '¿qué se recibió de la OC X?' o '¿cuánto se liquidó?'.",
+    input_schema: {
+      type: "object",
+      properties: {
+        estado: {
+          type: "string",
+          enum: ["Borrador", "En revisión", "Aprobada", "Rechazada", "Emitida"],
+          description: "Estado de la orden.",
+        },
+        proveedor: { type: "string", description: "Proveedor (coincidencia parcial)." },
+        consecutivo: { type: "string", description: "Consecutivo de la OC." },
+      },
+    },
+  },
+  {
+    name: "compare_prices",
+    description:
+      "Compara el precio nacional de cada compañía (COP/kg) contra el cacao internacional (futuro ICE NY convertido a COP/kg con la TRM). Para '¿cómo está Casa Luker frente al internacional?', '¿conviene vender nacional o exportar?' o '¿cuál es la brecha hoy?'.",
+    input_schema: {
+      type: "object",
+      properties: {
+        company: {
+          type: "string",
+          description: "Opcional: limitar a una compañía (coincidencia parcial).",
+        },
+      },
+    },
   },
   {
     name: "propose_lead_status_change",
@@ -222,17 +395,33 @@ export const AI_TOOLS: Anthropic.Tool[] = [
   },
 ];
 
+/**
+ * Región del lote: el segundo segmento del código (CO-MET-…, COL-CUN-…).
+ * Algunos códigos son texto libre ("CISCA ruta #3 (Guachene…)"), así que solo
+ * se acepta el segmento cuando parece un código de departamento de 3 letras.
+ */
 function regionFromCode(code: string): string {
-  return code.split("-")[1]?.trim() || "Otro";
+  const seg = code.split("-")[1]?.trim() ?? "";
+  return /^[A-Za-z]{3}$/.test(seg) ? seg.toUpperCase() : "Otro";
 }
 
 type ToolResult = Record<string, unknown> | { error: string };
 
-/** Execute a read-only tool by name. Returns a JSON-serializable result. */
+const str = (v: unknown): string => String(v ?? "").trim();
+const today = (): string => new Date().toISOString().slice(0, 10);
+
+/**
+ * Execute a tool by name. Returns a JSON-serializable result.
+ *
+ * `ctx` identifies who is asking; las herramientas que tocan datos de personas
+ * (tareas) recortan el resultado con él. El resto ya queda acotado por la RLS
+ * del cliente Supabase del usuario.
+ */
 export async function executeTool(
   db: DB,
   name: string,
   input: Record<string, unknown>,
+  ctx: AgentContext,
 ): Promise<ToolResult> {
   switch (name) {
     case "query_leads": {
@@ -258,30 +447,67 @@ export async function executeTool(
     }
 
     case "get_inventory_summary": {
-      let q = db.from("inventory_lots").select("code, qty_available_kg, quality");
-      if (typeof input.region === "string" && input.region.trim()) {
-        q = q.ilike("code", `%${input.region.trim()}%`);
-      }
+      let q = db
+        .from("inventory_lots")
+        // Un solo literal: TypeScript no constant-folds `+`, y el parser de
+        // tipos de supabase-js necesita el string completo para inferir la fila.
+        .select(
+          "code, remision, entry_date, quality, cadmio, qty_available_kg, qty_avail_premium_kg, qty_avail_corriente_kg, qty_avail_corriente_c_kg, qty_avail_organico_kg, purchase_price_cop_kg, pct_humedad",
+        )
+        .order("qty_available_kg", { ascending: false });
+      if (str(input.region)) q = q.ilike("code", `%${str(input.region)}%`);
       const { data, error } = await q;
       if (error) return { error: error.message };
-      const lots = data ?? [];
+
+      const all = data ?? [];
+      const conSaldo = all.filter((l) => Number(l.qty_available_kg) > 0);
+      const lots = input.include_zero === true ? all : conSaldo;
+
       const byRegion = new Map<string, number>();
+      const byQuality = new Map<string, number>();
       let total = 0;
-      for (const l of lots) {
+      for (const l of conSaldo) {
         const kg = Number(l.qty_available_kg) || 0;
         total += kg;
-        if (kg <= 0) continue;
         const r = regionFromCode(l.code);
         byRegion.set(r, (byRegion.get(r) ?? 0) + kg);
+        if (l.quality) byQuality.set(l.quality, (byQuality.get(l.quality) ?? 0) + kg);
       }
+
+      const sum = (k: keyof (typeof conSaldo)[number]) =>
+        Math.round(conSaldo.reduce((s, l) => s + (Number(l[k]) || 0), 0));
+
       return {
         total_disponible_kg: Math.round(total),
-        lotes: lots.length,
+        lotes_con_saldo: conSaldo.length,
+        lotes_totales: all.length,
         por_procedencia: Object.fromEntries(
           [...byRegion.entries()]
             .sort((a, b) => b[1] - a[1])
             .map(([r, kg]) => [r, Math.round(kg)]),
         ),
+        por_clasificacion: {
+          premium: sum("qty_avail_premium_kg"),
+          corriente: sum("qty_avail_corriente_kg"),
+          corriente_c: sum("qty_avail_corriente_c_kg"),
+          organico: sum("qty_avail_organico_kg"),
+        },
+        con_cadmio: conSaldo
+          .filter((l) => l.cadmio)
+          .map((l) => ({ lote: l.code, cadmio: l.cadmio })),
+        lotes:
+          input.include_lots === false
+            ? undefined
+            : lots.slice(0, 40).map((l) => ({
+                codigo: l.code,
+                remision: l.remision,
+                ingreso: l.entry_date,
+                clasificacion: l.quality,
+                disponible_kg: Number(l.qty_available_kg) || 0,
+                cadmio: l.cadmio,
+                precio_compra_cop_kg: l.purchase_price_cop_kg,
+                humedad_pct: l.pct_humedad,
+              })),
       };
     }
 
@@ -346,6 +572,426 @@ export async function executeTool(
         if (l.market) byMarket[l.market] = (byMarket[l.market] ?? 0) + 1;
       }
       return { total: data?.length ?? 0, por_estado: byStatus, por_mercado: byMarket };
+    }
+
+    case "query_tasks": {
+      type Person = {
+        id: string;
+        name: string | null;
+        department: string | null;
+        profile_id: string | null;
+      } | null;
+      type Row = {
+        name: string;
+        description: string | null;
+        status: string;
+        start_date: string | null;
+        due_date: string | null;
+        person_name: string | null;
+        person: Person;
+      };
+
+      let q = db
+        .from("tasks")
+        .select(
+          "name, description, status, start_date, due_date, person_name, person:team_members!tasks_person_id_fkey(id,name,department,profile_id)",
+        )
+        .order("due_date", { ascending: true, nullsFirst: false })
+        .limit(300);
+
+      if (typeof input.status === "string")
+        q = q.eq("status", input.status as Database["public"]["Enums"]["task_status"]);
+      if (str(input.due_before)) q = q.lte("due_date", str(input.due_before));
+      if (input.overdue === true) q = q.lt("due_date", today()).neq("status", "done");
+
+      const { data, error } = await q;
+      if (error) return { error: error.message };
+
+      const rows = (data ?? []) as unknown as Row[];
+      const person = str(input.person).toLowerCase();
+      const dept = str(input.department);
+
+      // El recorte por jerarquía va primero: lo que no se puede ver no se
+      // cuenta ni siquiera en los totales.
+      const visible = rows.filter((t) => canSeeAssignee(ctx, t.person));
+      const filtered = visible.filter((t) => {
+        if (dept && t.person?.department !== dept) return false;
+        if (!person) return true;
+        return `${t.person?.name ?? ""} ${t.person_name ?? ""}`
+          .toLowerCase()
+          .includes(person);
+      });
+
+      // Lo abierto primero: quien pregunta "¿qué tiene fulano?" quiere lo
+      // pendiente, no el histórico de lo ya cerrado.
+      const ordered = [...filtered].sort((a, b) => {
+        const openA = a.status === "done" ? 1 : 0;
+        const openB = b.status === "done" ? 1 : 0;
+        if (openA !== openB) return openA - openB;
+        return (a.due_date ?? "9999").localeCompare(b.due_date ?? "9999");
+      });
+
+      return {
+        alcance: scopeLabel(ctx),
+        total: filtered.length,
+        pendientes: filtered.filter((t) => t.status !== "done").length,
+        ocultas_por_permiso: rows.length - visible.length,
+        tareas: ordered.slice(0, 40).map((t) => ({
+          nombre: t.name,
+          estado: t.status,
+          responsable: t.person?.name ?? t.person_name ?? null,
+          area: t.person?.department ?? null,
+          vence: t.due_date,
+          inicia: t.start_date,
+          detalle: t.description,
+          vencida:
+            t.due_date != null && t.due_date < today() && t.status !== "done",
+        })),
+      };
+    }
+
+    case "get_team": {
+      let q = db
+        .from("team_members")
+        .select("name, role_title, department, active")
+        .eq("active", true)
+        .order("name")
+        .limit(100);
+      if (typeof input.department === "string")
+        q = q.eq(
+          "department",
+          input.department as Database["public"]["Enums"]["department"],
+        );
+      if (str(input.search)) q = q.ilike("name", `%${str(input.search)}%`);
+      const { data, error } = await q;
+      if (error) return { error: error.message };
+      return {
+        total: data?.length ?? 0,
+        equipo: (data ?? []).map((m) => ({
+          nombre: m.name,
+          cargo: m.role_title,
+          area: m.department,
+        })),
+      };
+    }
+
+    case "query_dispatches": {
+      let q = db
+        .from("dispatches")
+        .select(
+          "dispatch_date, destination, remision_salida, remision_entrada, origin, qty_kg, qty_premium_kg, qty_corriente_kg, qty_corriente_c_kg, qty_organico_kg",
+        )
+        .order("dispatch_date", { ascending: false, nullsFirst: false })
+        .limit(60);
+      if (str(input.client)) q = q.ilike("destination", `%${str(input.client)}%`);
+      if (str(input.origin)) q = q.ilike("origin", `%${str(input.origin)}%`);
+      if (str(input.since)) q = q.gte("dispatch_date", str(input.since));
+      if (str(input.until)) q = q.lte("dispatch_date", str(input.until));
+      if (str(input.remision)) {
+        const r = str(input.remision);
+        q = q.or(`remision_salida.eq.${r},remision_entrada.eq.${r}`);
+      }
+      const { data, error } = await q;
+      if (error) return { error: error.message };
+      const rows = data ?? [];
+      return {
+        total: rows.length,
+        total_kg: Math.round(rows.reduce((s, d) => s + (Number(d.qty_kg) || 0), 0)),
+        despachos: rows.map((d) => ({
+          fecha: d.dispatch_date,
+          cliente: d.destination,
+          remision_salida: d.remision_salida,
+          procedencia: d.origin,
+          kg: Number(d.qty_kg) || 0,
+          clasificacion: {
+            premium: Number(d.qty_premium_kg) || 0,
+            corriente: Number(d.qty_corriente_kg) || 0,
+            corriente_c: Number(d.qty_corriente_c_kg) || 0,
+            organico: Number(d.qty_organico_kg) || 0,
+          },
+        })),
+      };
+    }
+
+    case "query_quotes": {
+      let q = db
+        .from("quotes")
+        .select(
+          "quote_number, client_name, status, incoterm, market, volume_tm, precio_final_usd_tm, precio_final_cop_tm, utilidad_pct, created_at",
+        )
+        .order("created_at", { ascending: false })
+        .limit(30);
+      if (typeof input.status === "string")
+        q = q.eq("status", input.status as Database["public"]["Enums"]["quote_status"]);
+      if (typeof input.incoterm === "string")
+        q = q.eq("incoterm", input.incoterm as Database["public"]["Enums"]["incoterm"]);
+      if (str(input.client)) q = q.ilike("client_name", `%${str(input.client)}%`);
+      const { data, error } = await q;
+      if (error) return { error: error.message };
+      return {
+        total: data?.length ?? 0,
+        cotizaciones: (data ?? []).map((c) => ({
+          numero: c.quote_number,
+          cliente: c.client_name,
+          estado: c.status,
+          incoterm: c.incoterm,
+          mercado: c.market,
+          volumen_tm: c.volume_tm,
+          precio_final_usd_tm: c.precio_final_usd_tm,
+          precio_final_cop_tm: c.precio_final_cop_tm,
+          utilidad_pct: c.utilidad_pct,
+          fecha: c.created_at?.slice(0, 10),
+        })),
+      };
+    }
+
+    case "get_commissions": {
+      const agent = str(input.agent);
+      let cq = db
+        .from("commission_calcs")
+        .select(
+          "agent, role, level, market, sale_total_cop, cost_total_cop, gross_utility, applied_pct, commission_cop, created_at",
+        )
+        .order("created_at", { ascending: false })
+        .limit(50);
+      if (agent) cq = cq.ilike("agent", `%${agent}%`);
+
+      let tq = db
+        .from("monthly_tonnage")
+        .select("agent, period, role, market, tons, note")
+        .order("period", { ascending: false })
+        .limit(50);
+      if (agent) tq = tq.ilike("agent", `%${agent}%`);
+      if (str(input.period)) tq = tq.eq("period", str(input.period));
+
+      const [{ data: calcs, error: ce }, { data: tons, error: te }] =
+        await Promise.all([cq, tq]);
+      if (ce) return { error: ce.message };
+      if (te) return { error: te.message };
+
+      const totalComision = (calcs ?? []).reduce(
+        (s, c) => s + (Number(c.commission_cop) || 0),
+        0,
+      );
+      const totalTon = (tons ?? []).reduce((s, t) => s + (Number(t.tons) || 0), 0);
+      return {
+        total_comision_cop: Math.round(totalComision),
+        total_toneladas: totalTon,
+        comisiones: (calcs ?? []).map((c) => ({
+          agente: c.agent,
+          rol: c.role,
+          nivel: c.level,
+          mercado: c.market,
+          venta_cop: c.sale_total_cop,
+          utilidad_bruta: c.gross_utility,
+          pct_aplicado: c.applied_pct,
+          comision_cop: c.commission_cop,
+          fecha: c.created_at?.slice(0, 10),
+        })),
+        toneladas: (tons ?? []).map((t) => ({
+          agente: t.agent,
+          periodo: t.period,
+          rol: t.role,
+          mercado: t.market,
+          toneladas: t.tons,
+          nota: t.note,
+        })),
+      };
+    }
+
+    case "query_proveedores": {
+      let q = db
+        .from("proveedores")
+        .select(
+          "codigo, nombre, estado, departamento, municipios_produccion, asociacion, contacto, celular, email, cap_seco_mensual, cap_seco_anual, certificaciones",
+        )
+        .order("nombre")
+        .limit(40);
+      if (typeof input.estado === "string")
+        q = q.eq(
+          "estado",
+          input.estado as Database["public"]["Enums"]["proveedor_estado"],
+        );
+      if (str(input.departamento))
+        q = q.ilike("departamento", `%${str(input.departamento)}%`);
+      if (str(input.search)) {
+        const s = `%${str(input.search)}%`;
+        q = q.or(
+          `nombre.ilike.${s},codigo.ilike.${s},asociacion.ilike.${s},municipios_produccion.ilike.${s}`,
+        );
+      }
+      const { data, error } = await q;
+      if (error) return { error: error.message };
+      const rows = data ?? [];
+      const byEstado: Record<string, number> = {};
+      for (const p of rows) byEstado[p.estado] = (byEstado[p.estado] ?? 0) + 1;
+      return {
+        total: rows.length,
+        por_estado: byEstado,
+        proveedores: rows.map((p) => ({
+          codigo: p.codigo,
+          nombre: p.nombre,
+          estado: p.estado,
+          departamento: p.departamento,
+          municipios: p.municipios_produccion,
+          asociacion: p.asociacion,
+          contacto: p.contacto,
+          celular: p.celular,
+          email: p.email,
+          capacidad_seco_mensual_kg: p.cap_seco_mensual,
+          certificaciones: p.certificaciones,
+        })),
+      };
+    }
+
+    case "query_ordenes_compra": {
+      type OcRow = {
+        id: string;
+        consecutivo: string | null;
+        estado: string;
+        tipo_caso: string;
+        volumen_kg: number | null;
+        precio_kg: number | null;
+        valor_total: number | null;
+        fecha_entrega: string | null;
+        emitida_en: string | null;
+        proveedores: { nombre: string } | null;
+      };
+
+      let q = db
+        .from("ordenes_compra")
+        .select(
+          "id, consecutivo, estado, tipo_caso, volumen_kg, precio_kg, valor_total, fecha_entrega, emitida_en, proveedores(nombre)",
+        )
+        .order("created_at", { ascending: false })
+        .limit(30);
+      if (typeof input.estado === "string")
+        q = q.eq("estado", input.estado as Database["public"]["Enums"]["oc_estado"]);
+      if (str(input.consecutivo))
+        q = q.ilike("consecutivo", `%${str(input.consecutivo)}%`);
+      const { data, error } = await q;
+      if (error) return { error: error.message };
+
+      let ocs = (data ?? []) as unknown as OcRow[];
+      const prov = str(input.proveedor).toLowerCase();
+      if (prov) {
+        ocs = ocs.filter((o) =>
+          (o.proveedores?.nombre ?? "").toLowerCase().includes(prov),
+        );
+      }
+      if (ocs.length === 0) return { total: 0, ordenes: [] };
+
+      // Recepciones y liquidaciones de esas órdenes, en dos consultas.
+      const ids = ocs.map((o) => o.id);
+      const [{ data: recs }, { data: liqs }] = await Promise.all([
+        db
+          .from("recepciones")
+          .select(
+            "orden_id, estado, peso_solicitado_kg, peso_recibido_kg, humedad_pct, fermentacion_pct, cerrada_en",
+          )
+          .in("orden_id", ids),
+        db
+          .from("liquidaciones")
+          .select(
+            "orden_id, estado, tipo_pago, peso_recibido_kg, valor_base, total_sanciones, total_bonificaciones, valor_total",
+          )
+          .in("orden_id", ids),
+      ]);
+
+      return {
+        total: ocs.length,
+        ordenes: ocs.map((o) => ({
+          consecutivo: o.consecutivo,
+          proveedor: o.proveedores?.nombre ?? null,
+          estado: o.estado,
+          tipo: o.tipo_caso,
+          volumen_kg: o.volumen_kg,
+          precio_kg: o.precio_kg,
+          valor_total: o.valor_total,
+          fecha_entrega: o.fecha_entrega,
+          emitida_en: o.emitida_en,
+          recepciones: (recs ?? [])
+            .filter((r) => r.orden_id === o.id)
+            .map((r) => ({
+              estado: r.estado,
+              solicitado_kg: r.peso_solicitado_kg,
+              recibido_kg: r.peso_recibido_kg,
+              humedad_pct: r.humedad_pct,
+              fermentacion_pct: r.fermentacion_pct,
+              cerrada_en: r.cerrada_en,
+            })),
+          liquidaciones: (liqs ?? [])
+            .filter((l) => l.orden_id === o.id)
+            .map((l) => ({
+              estado: l.estado,
+              tipo_pago: l.tipo_pago,
+              recibido_kg: l.peso_recibido_kg,
+              valor_base: l.valor_base,
+              sanciones: l.total_sanciones,
+              bonificaciones: l.total_bonificaciones,
+              valor_total: l.valor_total,
+            })),
+        })),
+      };
+    }
+
+    case "compare_prices": {
+      const [{ data: rows, error }, market] = await Promise.all([
+        db
+          .from("price_history")
+          .select("company, date, price_cop_kg")
+          .order("date", { ascending: false })
+          .limit(400),
+        getMarketData(),
+      ]);
+      if (error) return { error: error.message };
+
+      // Cacao internacional en COP/kg: USD/T × TRM ÷ 1000.
+      const iceCopKg =
+        market.cocoaUsdT != null && market.trm != null
+          ? (market.cocoaUsdT * market.trm) / 1000
+          : null;
+
+      const filter = str(input.company).toLowerCase();
+      const latest = new Map<string, { date: string; price: number }>();
+      for (const r of rows ?? []) {
+        if (filter && !r.company.toLowerCase().includes(filter)) continue;
+        // Las filas vienen ordenadas por fecha desc: la primera de cada
+        // compañía es la vigente.
+        if (!latest.has(r.company)) {
+          latest.set(r.company, { date: r.date, price: Number(r.price_cop_kg) });
+        }
+      }
+
+      const nacionales = [...latest.entries()]
+        .map(([company, v]) => ({
+          compania: company,
+          fecha: v.date,
+          precio_cop_kg: v.price,
+          vs_internacional_cop_kg:
+            iceCopKg != null ? Math.round(v.price - iceCopKg) : null,
+          vs_internacional_pct:
+            iceCopKg != null && iceCopKg > 0
+              ? Number((((v.price - iceCopKg) / iceCopKg) * 100).toFixed(1))
+              : null,
+        }))
+        .sort((a, b) => b.precio_cop_kg - a.precio_cop_kg);
+
+      return {
+        internacional: {
+          contrato: market.cocoaContract,
+          fecha: market.cocoaDate,
+          usd_por_tonelada: market.cocoaUsdT,
+          trm: market.trm,
+          trm_fecha: market.trmDate,
+          equivalente_cop_kg: iceCopKg != null ? Math.round(iceCopKg) : null,
+        },
+        nacionales,
+        nota:
+          iceCopKg == null
+            ? "No se pudo obtener el precio internacional o la TRM; solo hay precios nacionales."
+            : "La brecha positiva significa que el nacional paga por encima del equivalente internacional.",
+      };
     }
 
     case "propose_lead_status_change": {

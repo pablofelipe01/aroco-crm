@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getSessionContext } from "@/lib/auth";
 import { serverEnv } from "@/lib/env";
 import { AI_TOOLS, executeTool } from "@/lib/ai/tools";
+import { resolveAgentContext } from "@/lib/ai/context";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -24,15 +25,30 @@ const bodySchema = z.object({
     .max(40),
 });
 
-function systemPrompt(userName: string, department: string | null): string {
-  return `Eres el asistente de IA de la plataforma interna de AROCO S.A.S, una exportadora y comercializadora de cacao colombiano. Ayudas al equipo comercial, de bodega y financiero a consultar y entender sus datos.
+function systemPrompt(
+  userName: string,
+  department: string | null,
+  isAdmin: boolean,
+): string {
+  return `Eres el asistente de IA de la plataforma interna de AROCO S.A.S, una exportadora y comercializadora de cacao colombiano. Ayudas al equipo comercial, de bodega, de operaciones y financiero a consultar y entender sus datos.
 
-El usuario actual es ${userName}${department ? ` (departamento: ${department})` : ""}.
+El usuario actual es ${userName}${department ? ` (departamento: ${department})` : ""}. Rol: ${isAdmin ? "Dirección — acceso total a la información del CRM" : "miembro — ve lo propio y lo de su área"}.
+Hoy es ${new Date().toISOString().slice(0, 10)}.
+
+Qué puedes consultar:
+- Comercial: leads, pipeline, bitácora de actividad, cotizaciones, comisiones y toneladas mensuales.
+- Bodega: inventario actual por lote, procedencia, clasificación (premium / corriente / corriente C / orgánico) y cadmio; despachos y trazabilidad de salidas.
+- Equipo: directorio y tareas del equipo, con el alcance que permita el rol de quien pregunta.
+- Procesos: proveedores y su estado de vinculación, órdenes de compra, recepciones y liquidaciones.
+- Precios: histórico nacional por compañía y comparación contra el cacao internacional (ICE NY convertido a COP/kg con la TRM).
 
 Pautas:
 - Responde en español, de forma concisa y profesional. Usa cifras con separador de miles y unidades (kg, COP, USD, %).
 - Usa SIEMPRE las herramientas para obtener datos reales antes de afirmar números. Nunca inventes datos.
-- Consultas (leer leads, inventario, precios, actividad) son automáticas.
+- Si necesitas resolver el nombre de una persona antes de buscar sus tareas, usa get_team primero.
+- Las herramientas de tareas recortan el resultado según el rol. Si vienen tareas ocultas por permiso, dilo en una frase en vez de callarlo; no intentes rodear el límite.
+- Al comparar precios, di explícitamente cuál es la brecha y qué significa para la decisión de vender nacional o exportar.
+- Consultas (leer leads, inventario, precios, tareas, despachos, proveedores, actividad) son automáticas.
 - Para acciones de ESCRITURA usa las herramientas \`propose_*\` (cambiar estado de un lead, agregar nota a un lead, crear lead, crear cotización borrador, crear tarea, registrar movimiento de inventario). Estas NO ejecutan nada: solo PREPARAN la acción para que el usuario la confirme con un botón en la interfaz. Después de proponerla, dile al usuario que la confirme abajo y NUNCA afirmes que ya se hizo.
 - Para redactar correos/WhatsApp de seguimiento: primero consulta la actividad del lead con get_lead_activity y luego escribe el borrador directamente en tu respuesta (es solo texto, el usuario lo copia).
 - Las herramientas respetan los permisos del usuario; si una consulta vuelve vacía puede ser por permisos o porque no hay datos.
@@ -64,6 +80,8 @@ export async function POST(request: NextRequest) {
 
   const anthropic = new Anthropic({ apiKey: serverEnv.ANTHROPIC_API_KEY });
   const supabase = await createClient();
+  // Quién pregunta: las herramientas de tareas recortan por rol y área.
+  const agentCtx = await resolveAgentContext(supabase, session);
 
   const messages: Anthropic.MessageParam[] = parsed.messages.map((m) => ({
     role: m.role,
@@ -76,8 +94,9 @@ export async function POST(request: NextRequest) {
     {
       type: "text",
       text: systemPrompt(
-        session.profile?.full_name ?? session.email,
-        session.profile?.department ?? null,
+        agentCtx.fullName,
+        agentCtx.department,
+        agentCtx.isAdmin,
       ),
       cache_control: { type: "ephemeral" },
     },
@@ -127,7 +146,7 @@ export async function POST(request: NextRequest) {
         console.log(
           `[agent] ${session.userId} → ${block.name} ${JSON.stringify(input)}`,
         );
-        const result = await executeTool(supabase, block.name, input);
+        const result = await executeTool(supabase, block.name, input, agentCtx);
         if (result && typeof result === "object" && "proposal" in result) {
           proposals.push((result as { proposal: unknown }).proposal);
         }

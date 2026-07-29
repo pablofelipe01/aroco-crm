@@ -13,18 +13,10 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-/** AROCO departments (matches the Postgres `department` enum). */
-export const DEPARTMENTS = [
-  "Dirección",
-  "Comercial",
-  "Financiero",
-  "Administrativo",
-  "Bodega Central",
-  "Finca",
-  "Operaciones",
-] as const;
-
-export type Department = (typeof DEPARTMENTS)[number];
+// La lista canónica vive en `@/lib/departments` (módulo sin dependencias); se
+// reexporta aquí para no romper a quien ya la importaba desde nav.
+export { DEPARTMENTS, type Department } from "@/lib/departments";
+import type { Department } from "@/lib/departments";
 
 export interface NavItem {
   href: string;
