@@ -25,6 +25,9 @@ export function InventarioClient({
 }) {
   const router = useRouter();
   const [query, setQuery] = React.useState("");
+  // La referencia diaria de bodega es lo que queda en saldo: los lotes agotados
+  // se ocultan por defecto y se pueden traer de vuelta con el interruptor.
+  const [onlyAvailable, setOnlyAvailable] = React.useState(true);
   const [selected, setSelected] = React.useState<InventoryLot | null>(null);
   const [formOpen, setFormOpen] = React.useState(false);
   const [editing, setEditing] = React.useState<InventoryLot | null>(null);
@@ -54,13 +57,16 @@ export function InventarioClient({
 
   const filtered = React.useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return initialLots;
-    return initialLots.filter((l) =>
-      `${l.code} ${l.origin ?? ""} ${l.quality ?? ""} ${l.remision ?? ""}`
+    return initialLots.filter((l) => {
+      if (onlyAvailable && l.qty_available_kg <= 0) return false;
+      if (!q) return true;
+      return `${l.code} ${l.origin ?? ""} ${l.quality ?? ""} ${l.remision ?? ""} ${l.odc ?? ""}`
         .toLowerCase()
-        .includes(q),
-    );
-  }, [initialLots, query]);
+        .includes(q);
+    });
+  }, [initialLots, query, onlyAvailable]);
+
+  const hiddenByFilter = onlyAvailable ? totals.count - totals.withStock : 0;
 
   return (
     <div className="space-y-6">
@@ -94,18 +100,49 @@ export function InventarioClient({
         <StatCard label="Lotes totales" value={totals.count} icon={Layers} />
       </motion.div>
 
-      <div className="relative max-w-xs">
-        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-fg-subtle" />
-        <Input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Buscar código, procedencia…"
-          className="pl-9"
-        />
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="relative max-w-xs flex-1">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-fg-subtle" />
+          <Input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Buscar código, remisión, ODC…"
+            className="pl-9"
+          />
+        </div>
+        <label className="flex cursor-pointer items-center gap-2 text-sm text-fg-muted">
+          <input
+            type="checkbox"
+            checked={onlyAvailable}
+            onChange={(e) => setOnlyAvailable(e.target.checked)}
+            className="h-4 w-4 accent-[var(--accent)]"
+          />
+          Solo con saldo en bodega
+          {hiddenByFilter > 0 && (
+            <span className="text-xs text-fg-subtle">
+              ({hiddenByFilter} en cero {hiddenByFilter === 1 ? "oculto" : "ocultos"})
+            </span>
+          )}
+        </label>
       </div>
 
       {filtered.length === 0 ? (
-        <EmptyState icon={<Boxes className="h-6 w-6" />} title="Sin lotes" />
+        <EmptyState
+          icon={<Boxes className="h-6 w-6" />}
+          title={onlyAvailable ? "Sin lotes con saldo" : "Sin lotes"}
+          description={
+            onlyAvailable
+              ? "Ningún lote coincide y tiene saldo en bodega."
+              : undefined
+          }
+          action={
+            onlyAvailable ? (
+              <Button variant="secondary" size="sm" onClick={() => setOnlyAvailable(false)}>
+                Ver todos los lotes
+              </Button>
+            ) : undefined
+          }
+        />
       ) : (
         <>
         {/* Mobile: cards */}
@@ -151,10 +188,11 @@ export function InventarioClient({
               <tr className="border-b border-border text-xs uppercase tracking-wide text-fg-subtle">
                 <th className="px-4 py-3 text-left font-medium">Código</th>
                 <th className="px-4 py-3 text-left font-medium">Ingreso</th>
+                <th className="px-4 py-3 text-left font-medium">Remisión</th>
                 <th className="px-4 py-3 text-right font-medium">Ingresada</th>
                 <th className="px-4 py-3 text-right font-medium">Salida</th>
                 <th className="px-4 py-3 text-right font-medium">Disponible</th>
-                <th className="px-4 py-3 text-left font-medium">Calidad</th>
+                <th className="px-4 py-3 text-left font-medium">Clasificación</th>
               </tr>
             </thead>
             <tbody>
@@ -175,6 +213,9 @@ export function InventarioClient({
                   <td className="px-4 py-3 font-mono text-xs text-fg-subtle">
                     {l.entry_date ? formatDate(l.entry_date) : "—"}
                   </td>
+                  <td className="px-4 py-3 font-mono text-xs text-fg-subtle">
+                    {l.remision ?? "—"}
+                  </td>
                   <td className="px-4 py-3 text-right font-mono tnum text-fg-muted">
                     {formatNumber(l.qty_in_kg)}
                   </td>
@@ -184,7 +225,16 @@ export function InventarioClient({
                   <td className="px-4 py-3 text-right font-mono tnum font-semibold text-fg">
                     {formatNumber(l.qty_available_kg)}
                   </td>
-                  <td className="px-4 py-3 text-fg-muted">{l.quality ?? "—"}</td>
+                  <td className="px-4 py-3 text-fg-muted">
+                    <span className="inline-flex items-center gap-2">
+                      {l.quality ?? "—"}
+                      {l.cadmio && (
+                        <Badge tone={/alto/i.test(l.cadmio) ? "danger" : "neutral"}>
+                          Cd {l.cadmio.toLowerCase()}
+                        </Badge>
+                      )}
+                    </span>
+                  </td>
                 </tr>
               ))}
             </tbody>

@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Field, Input, Select } from "@/components/ui/input";
 import { useToast } from "@/components/ui/toast";
 import { createClient } from "@/lib/supabase/client";
-import { formatKg, formatDate, formatCOP } from "@/lib/utils";
+import { formatKg, formatDate, formatCOP, formatNumber } from "@/lib/utils";
 import type { InventoryLot, InventoryMovement } from "@/lib/types/database";
 import { addMovement, deleteMovement, deleteLot } from "./actions";
 
@@ -149,14 +149,35 @@ export function LotDetail({
         </div>
         <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
           {lot.remision && <Meta label="Remisión" value={lot.remision} />}
+          {lot.odc && <Meta label="ODC" value={lot.odc} />}
+          {lot.recepcion && <Meta label="Recepción" value={lot.recepcion} />}
           {lot.origin && <Meta label="Procedencia" value={lot.origin} />}
           {lot.purchase_price_cop_kg != null && (
             <Meta label="Precio compra" value={`${formatCOP(lot.purchase_price_cop_kg)}/kg`} />
           )}
-          {lot.samples_pasilla_merma_kg > 0 && (
-            <Meta label="Muestras/merma" value={formatKg(lot.samples_pasilla_merma_kg)} />
+          {lot.qty_requested_kg != null && (
+            <Meta label="Solicitada" value={formatKg(lot.qty_requested_kg)} />
+          )}
+          {lot.bultos_in > 0 && (
+            <Meta label="Bultos" value={formatNumber(lot.bultos_in)} />
+          )}
+          {lot.cadmio && <Meta label="Cadmio" value={lot.cadmio} />}
+          {lot.merma_kg > 0 && (
+            <Meta
+              label="Merma"
+              value={`${formatKg(lot.merma_kg)}${lot.merma_pct != null ? ` · ${lot.merma_pct}%` : ""}`}
+            />
+          )}
+          {lot.pasilla_kg > 0 && (
+            <Meta
+              label="Pasilla"
+              value={`${formatKg(lot.pasilla_kg)}${lot.pasilla_pct != null ? ` · ${lot.pasilla_pct}%` : ""}`}
+            />
           )}
         </dl>
+
+        <Classification lot={lot} />
+        <QualityMeasurement lot={lot} />
 
         {/* Add movement */}
         {canWrite && (
@@ -241,6 +262,80 @@ export function LotDetail({
         </div>
       </div>
     </Drawer>
+  );
+}
+
+/** Desglose por clasificación: qué entró y qué queda de cada tipo de cacao. */
+function Classification({ lot }: { lot: InventoryLot }) {
+  const rows = [
+    { label: "Premium", in: lot.qty_in_premium_kg, avail: lot.qty_avail_premium_kg },
+    { label: "Corriente", in: lot.qty_in_corriente_kg, avail: lot.qty_avail_corriente_kg },
+    { label: "Corriente C", in: lot.qty_in_corriente_c_kg, avail: lot.qty_avail_corriente_c_kg },
+    { label: "Orgánico", in: lot.qty_in_organico_kg, avail: lot.qty_avail_organico_kg },
+  ].filter((r) => r.in > 0 || r.avail > 0);
+
+  if (rows.length === 0) return null;
+
+  return (
+    <div>
+      <h3 className="mb-3 text-xs font-medium uppercase tracking-wide text-fg-subtle">
+        Clasificación
+      </h3>
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="text-[11px] uppercase tracking-wide text-fg-subtle">
+            <th className="pb-1.5 text-left font-medium">Tipo</th>
+            <th className="pb-1.5 text-right font-medium">Ingresada</th>
+            <th className="pb-1.5 text-right font-medium">En bodega</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr key={r.label} className="border-t border-border">
+              <td className="py-1.5 text-fg-muted">{r.label}</td>
+              <td className="py-1.5 text-right font-mono tnum text-fg-muted">
+                {formatNumber(r.in)}
+              </td>
+              <td className="py-1.5 text-right font-mono tnum font-semibold text-fg">
+                {formatNumber(r.avail)}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+/** Ítems de evaluación del laboratorio; solo se muestran si hay mediciones. */
+function QualityMeasurement({ lot }: { lot: InventoryLot }) {
+  const items = [
+    { label: "Bien fermentados", value: lot.pct_bien_fermentado },
+    { label: "Parcialmente ferm.", value: lot.pct_parcialmente_fermentado },
+    { label: "Pizarrosos", value: lot.pct_pizarroso },
+    { label: "Púrpuras", value: lot.pct_purpura },
+    { label: "Sobre fermentado", value: lot.pct_sobre_fermentado },
+    { label: "Grano con hongos", value: lot.pct_hongos },
+    { label: "Humedad", value: lot.pct_humedad },
+    { label: "Fermentación total", value: lot.pct_fermentacion_total },
+  ].filter((i) => i.value != null);
+
+  if (items.length === 0 && lot.indice_grano_100g == null) return null;
+
+  return (
+    <div>
+      <h3 className="mb-3 text-xs font-medium uppercase tracking-wide text-fg-subtle">
+        Medición de calidad
+      </h3>
+      <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm sm:grid-cols-3">
+        {items.map((i) => (
+          <Meta key={i.label} label={i.label} value={`${i.value}%`} />
+        ))}
+        {lot.indice_grano_100g != null && (
+          <Meta label="Índice de grano" value={`${lot.indice_grano_100g} / 100 g`} />
+        )}
+      </dl>
+    </div>
   );
 }
 
