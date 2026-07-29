@@ -3,7 +3,6 @@ import {
   Users,
   Calculator,
   Boxes,
-  Layers,
   Truck,
   Percent,
   LineChart,
@@ -51,12 +50,15 @@ export const NAV_ITEMS: NavItem[] = [
     icon: Boxes,
     departments: ["Dirección", "Bodega Central", "Administrativo", "Operaciones"],
   },
-  {
-    href: "/inventario-calidad",
-    label: "Inventario calidad",
-    icon: Layers,
-    departments: ["Dirección", "Bodega Central", "Administrativo", "Operaciones"],
-  },
+  // "Inventario calidad" (/inventario-calidad) se retiró del menú el 2026-07-29.
+  // Era la segunda pestaña de la misma hoja y quedó duplicando a Inventario, que
+  // desde 0041 ya trae clasificación, cadmio y valor de compra por lote. Peor:
+  // mostraba 12.198 kg en bodega contra los 2.500 kg reales, porque la hoja no
+  // descargó la fila DELEITE (9.698 kg ya despachados a Casa Luker el 21-jul).
+  // Lo único exclusivo que aportaba era la ubicación (licor / por llegar /
+  // Tolimax): 60,8 kg en dos filas.
+  // La ruta, la tabla y el sync diario siguen vivos — para reponerlo basta con
+  // devolver esta entrada al menú.
   {
     href: "/despachos",
     label: "Despachos",
