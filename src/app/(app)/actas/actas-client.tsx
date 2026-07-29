@@ -24,6 +24,7 @@ import { useToast } from "@/components/ui/toast";
 import { formatDate } from "@/lib/utils";
 import type { TeamMember } from "@/lib/types/database";
 import type { MeetingWithCount } from "./page";
+import { MeetingDetail } from "./meeting-detail";
 import {
   createActaTasks,
   deleteMeeting,
@@ -67,6 +68,7 @@ export function ActasClient({
   const [file, setFile] = React.useState<File | null>(null);
   const [busy, setBusy] = React.useState(false);
   const [review, setReview] = React.useState<Review | null>(null);
+  const [reading, setReading] = React.useState<MeetingWithCount | null>(null);
 
   function reset() {
     setPhase("upload");
@@ -230,19 +232,25 @@ export function ActasClient({
               key={m.id}
               className="flex items-center gap-3 rounded-[var(--radius-md)] border border-border bg-surface p-3 shadow-[var(--shadow-soft-sm)]"
             >
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--radius-md)] bg-accent-soft text-accent-soft-fg">
-                <ClipboardList className="h-5 w-5" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium text-fg">{m.title}</p>
-                <p className="truncate text-xs text-fg-muted">
-                  {m.meeting_date ? formatDate(m.meeting_date) : formatDate(m.created_at)}
-                  {m.file_name ? ` · ${m.file_name}` : ""}
-                  {m.meeting_attendees.length > 0
-                    ? ` · ${m.meeting_attendees.length} invitados`
-                    : ""}
-                </p>
-              </div>
+              <button
+                onClick={() => setReading(m)}
+                className="flex min-w-0 flex-1 items-center gap-3 text-left"
+                title="Abrir el acta"
+              >
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--radius-md)] bg-accent-soft text-accent-soft-fg">
+                  <ClipboardList className="h-5 w-5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium text-fg">{m.title}</p>
+                  <p className="truncate text-xs text-fg-muted">
+                    {m.meeting_date ? formatDate(m.meeting_date) : formatDate(m.created_at)}
+                    {m.file_name ? ` · ${m.file_name}` : ""}
+                    {m.meeting_attendees.length > 0
+                      ? ` · ${m.meeting_attendees.length} invitados`
+                      : ""}
+                  </p>
+                </div>
+              </button>
               {m.restricted && (
                 <Badge
                   tone="warn"
@@ -297,6 +305,15 @@ export function ActasClient({
           ))}
         </ul>
       )}
+
+      <MeetingDetail
+        // Remonta por acta: así el estado de carga se reinicia solo.
+        key={reading?.id ?? "ninguna"}
+        meeting={reading}
+        open={reading !== null}
+        onClose={() => setReading(null)}
+        onDownload={onDownload}
+      />
 
       <Modal
         open={open}
