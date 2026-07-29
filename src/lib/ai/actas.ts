@@ -16,6 +16,15 @@ export interface ExtractedTask {
   description: string | null;
 }
 
+export interface ExtractedActa {
+  tasks: ExtractedTask[];
+  /**
+   * Invitados a la reunión, como correo cuando el acta lo trae. Alimentan la
+   * lista de quién puede leer un acta restringida.
+   */
+  attendees: string[];
+}
+
 export type ActaContent =
   | { kind: "pdf"; base64: string }
   | { kind: "text"; text: string };
@@ -27,6 +36,12 @@ const EXTRACT_TOOL: Anthropic.Tool = {
   input_schema: {
     type: "object",
     properties: {
+      attendees: {
+        type: "array",
+        items: { type: "string" },
+        description:
+          "Personas que asistieron o fueron invitadas a la reunión, tal como aparecen en el encabezado del acta ('Invitados', 'Asistentes', 'Participantes'). Devuelve el correo cuando aparezca; si no, el nombre. Lista vacía si el acta no los indica.",
+      },
       tasks: {
         type: "array",
         description: "Lista de tareas/compromisos accionables del acta.",
@@ -67,7 +82,7 @@ const EXTRACT_TOOL: Anthropic.Tool = {
 export async function extractActaTasks(
   content: ActaContent,
   teamNames: string[],
-): Promise<ExtractedTask[]> {
+): Promise<ExtractedActa> {
   const anthropic = new Anthropic({ apiKey: serverEnv.ANTHROPIC_API_KEY });
 
   const instruction = `Analiza esta acta de reunión de AROCO (exportadora de cacao) y extrae TODOS los compromisos y tareas accionables (cosas que alguien debe hacer). Pueden ser muchas (20 o más); no omitas ninguna ni las agrupes.
@@ -75,6 +90,8 @@ export async function extractActaTasks(
 Presta especial atención a secciones como "Próximos pasos", "Compromisos", "Tareas", "Action items" o "Pendientes". Es común que cada tarea venga en el formato:
   [Responsable] Título de la tarea: descripción detallada.
 En ese caso, CADA renglón/viñeta es una tarea independiente: el texto entre corchetes es el responsable, el título es la acción, y el resto es la descripción. Extrae absolutamente todas, una por una, en el mismo orden del acta.
+
+Además, devuelve en "attendees" a los invitados/asistentes que aparezcan en el encabezado del acta (líneas como "Invitado", "Invitados", "Asistentes" o "Participantes"). Prefiere el correo electrónico cuando esté; si no, el nombre.
 
 Para cada tarea:
 - "name": la acción concreta y breve (imperativo).
@@ -107,9 +124,14 @@ No inventes tareas que no estén en el acta, pero tampoco descartes ninguna que 
   });
 
   const block = response.content.find((b) => b.type === "tool_use");
-  if (!block || block.type !== "tool_use") return [];
-  const tasks = (block.input as { tasks?: unknown[] })?.tasks ?? [];
-  return tasks
+  if (!block || block.type !== "tool_use") return { tasks: [], attendees: [] };
+  const out = block.input as { tasks?: unknown[]; attendees?: unknown };
+
+  const attendees = (Array.isArray(out.attendees) ? out.attendees : [])
+    .map((a) => String(a).trim())
+    .filter((a) => a.length > 0);
+
+  const tasks = (out.tasks ?? [])
     .filter((t): t is Record<string, unknown> => !!t && typeof t === "object")
     .map((t) => ({
       name: String(t.name ?? "").trim(),
@@ -126,4 +148,6 @@ No inventes tareas que no estén en el acta, pero tampoco descartes ninguna que 
       description: t.description ? String(t.description).trim() : null,
     }))
     .filter((t) => t.name.length > 0);
+
+  return { tasks, attendees };
 }

@@ -112,11 +112,49 @@ export async function ingestActasFromGmail(): Promise<IngestSummary> {
         throw new Error(meErr.message);
       }
 
-      // Extrae y distribuye las tareas.
-      const extracted = await extractActaTasks(
+      // Extrae tareas e invitados.
+      const { tasks: extracted, attendees } = await extractActaTasks(
         content,
         members.map((m) => m.name),
       );
+
+      // Invitados: se resuelven contra los perfiles por correo y contra el
+      // equipo por nombre. Alimentan quién puede leer el acta si alguien la
+      // marca como restringida.
+      if (attendees.length > 0) {
+        const { data: profiles } = await db.from("profiles").select("id, email, full_name");
+        const rows = attendees.map((raw) => {
+          const isEmail = raw.includes("@");
+          const value = raw.trim();
+          const byEmail = isEmail
+            ? (profiles ?? []).find((p) => p.email.toLowerCase() === value.toLowerCase())
+            : undefined;
+          const byName = !isEmail
+            ? (profiles ?? []).find((p) => norm(p.full_name) === norm(value))
+            : undefined;
+          const profile = byEmail ?? byName;
+          return {
+            meeting_id: meeting.id,
+            profile_id: profile?.id ?? null,
+            email: isEmail ? value.toLowerCase() : (profile?.email ?? null),
+            name: isEmail ? (profile?.full_name ?? null) : value,
+          };
+        });
+        // El acta acaba de crearse, así que no hay filas previas; basta con
+        // quitar los repetidos del propio acta antes de insertar.
+        const seen = new Set<string>();
+        const unique = rows.filter((r) => {
+          const key = (r.email ?? r.profile_id ?? r.name ?? "").toLowerCase();
+          if (!key || seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        });
+        if (unique.length > 0) {
+          const { error: atErr } = await db.from("meeting_attendees").insert(unique);
+          // Un fallo aquí no debe tumbar la ingesta del acta completa.
+          if (atErr) console.error("[actas] invitados:", atErr.message);
+        }
+      }
       // Cada tarea puede quedar en manos de varias personas. Se resuelven
       // contra el catálogo del equipo; los nombres que no coincidan se guardan
       // como texto en `person_name` para no perderlos.

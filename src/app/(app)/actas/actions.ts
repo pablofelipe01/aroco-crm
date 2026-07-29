@@ -95,11 +95,41 @@ export async function deleteMeeting(id: string): Promise<ActaResult> {
   return { ok: true };
 }
 
-/** Signed URL to download an acta file. */
+/**
+ * Signed URL to download an acta file.
+ *
+ * Se comprueba primero que el acta dueña del archivo sea visible para quien
+ * pide: la RLS de `meetings` esconde las actas restringidas, y sin este paso
+ * bastaría con conocer la ruta del archivo para saltársela. La política de
+ * storage (0044) lo bloquea también del lado de la base; esto es la segunda
+ * cerradura y da un error entendible en vez de uno de permisos.
+ */
 export async function getActaFileUrl(filePath: string): Promise<string | null> {
   const session = await getSessionContext();
   if (!session) return null;
   const supabase = await createClient();
+
+  const { data: meeting } = await supabase
+    .from("meetings")
+    .select("id")
+    .eq("file_path", filePath)
+    .maybeSingle();
+  if (!meeting) return null;
+
   const { data } = await supabase.storage.from("actas").createSignedUrl(filePath, 120);
   return data?.signedUrl ?? null;
+}
+
+/** Marca o desmarca un acta como restringida a sus invitados. */
+export async function setMeetingRestricted(
+  id: string,
+  restricted: boolean,
+): Promise<ActaResult> {
+  const session = await getSessionContext();
+  if (!session) return { ok: false, error: "Sesión expirada." };
+  const supabase = await createClient();
+  const { error } = await supabase.from("meetings").update({ restricted }).eq("id", id);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/actas");
+  return { ok: true };
 }

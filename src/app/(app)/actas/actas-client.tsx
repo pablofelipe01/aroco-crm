@@ -10,6 +10,8 @@ import {
   Loader2,
   Sparkles,
   Calendar,
+  Lock,
+  LockOpen,
 } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
@@ -22,7 +24,12 @@ import { useToast } from "@/components/ui/toast";
 import { formatDate } from "@/lib/utils";
 import type { TeamMember } from "@/lib/types/database";
 import type { MeetingWithCount } from "./page";
-import { createActaTasks, deleteMeeting, getActaFileUrl } from "./actions";
+import {
+  createActaTasks,
+  deleteMeeting,
+  getActaFileUrl,
+  setMeetingRestricted,
+} from "./actions";
 
 interface EditableTask {
   include: boolean;
@@ -44,9 +51,12 @@ interface Review {
 export function ActasClient({
   meetings,
   team,
+  canRestrict,
 }: {
   meetings: MeetingWithCount[];
   team: TeamMember[];
+  /** Solo Dirección puede abrir o cerrar un acta. */
+  canRestrict: boolean;
 }) {
   const router = useRouter();
   const { toast } = useToast();
@@ -149,6 +159,28 @@ export function ActasClient({
     else toast({ tone: "error", title: "No se pudo abrir el archivo" });
   }
 
+  async function onToggleRestricted(m: MeetingWithCount) {
+    if (!m.restricted && m.meeting_attendees.length === 0) {
+      const ok = confirm(
+        `"${m.title}" no tiene invitados registrados. Si la restringes, solo la verán Dirección y quien la subió. ¿Continuar?`,
+      );
+      if (!ok) return;
+    }
+    const res = await setMeetingRestricted(m.id, !m.restricted);
+    if (!res.ok) {
+      toast({ tone: "error", title: "No se pudo cambiar", description: res.error });
+      return;
+    }
+    toast({
+      tone: "success",
+      title: m.restricted ? "Acta abierta al equipo" : "Acta restringida",
+      description: m.restricted
+        ? undefined
+        : `La verán ${m.meeting_attendees.length} invitados, Dirección y quien la subió.`,
+    });
+    router.refresh();
+  }
+
   async function onDelete(m: MeetingWithCount) {
     if (!confirm(`¿Eliminar el acta "${m.title}"? Las tareas creadas se conservan.`)) return;
     const res = await deleteMeeting(m.id);
@@ -206,9 +238,45 @@ export function ActasClient({
                 <p className="truncate text-xs text-fg-muted">
                   {m.meeting_date ? formatDate(m.meeting_date) : formatDate(m.created_at)}
                   {m.file_name ? ` · ${m.file_name}` : ""}
+                  {m.meeting_attendees.length > 0
+                    ? ` · ${m.meeting_attendees.length} invitados`
+                    : ""}
                 </p>
               </div>
+              {m.restricted && (
+                <Badge
+                  tone="warn"
+                  title={
+                    m.meeting_attendees.length > 0
+                      ? `Solo la ven: ${m.meeting_attendees
+                          .map((a) => a.name ?? a.email)
+                          .filter(Boolean)
+                          .join(", ")}`
+                      : "Solo la ven Dirección y quien la subió — no hay invitados registrados"
+                  }
+                >
+                  <Lock className="h-3 w-3" />
+                  Restringida
+                </Badge>
+              )}
               <Badge tone="neutral">{m.tasks?.[0]?.count ?? 0} tareas</Badge>
+              {canRestrict && (
+                <button
+                  onClick={() => onToggleRestricted(m)}
+                  className="rounded p-1.5 text-fg-subtle hover:bg-bg-subtle hover:text-fg"
+                  title={
+                    m.restricted
+                      ? "Abrir a todo el equipo"
+                      : "Restringir a los invitados de la reunión"
+                  }
+                >
+                  {m.restricted ? (
+                    <LockOpen className="h-4 w-4" />
+                  ) : (
+                    <Lock className="h-4 w-4" />
+                  )}
+                </button>
+              )}
               {m.file_path && (
                 <button
                   onClick={() => onDownload(m.file_path!)}

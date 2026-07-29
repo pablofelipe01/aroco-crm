@@ -1710,6 +1710,33 @@ export type Database = {
         };
         Relationships: [];
       };
+      meeting_attendees: {
+        Row: {
+          id: string;
+          meeting_id: string;
+          profile_id: string | null;
+          email: string | null;
+          name: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          meeting_id: string;
+          profile_id?: string | null;
+          email?: string | null;
+          name?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          meeting_id?: string;
+          profile_id?: string | null;
+          email?: string | null;
+          name?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
       meetings: {
         Row: {
           id: string;
@@ -1722,6 +1749,7 @@ export type Database = {
           created_at: string;
           updated_at: string;
           source_email_id: string | null;
+          restricted: boolean;
         };
         Insert: {
           id?: string;
@@ -1734,6 +1762,7 @@ export type Database = {
           created_at?: string;
           updated_at?: string;
           source_email_id?: string | null;
+          restricted?: boolean;
         };
         Update: {
           id?: string;
@@ -1746,6 +1775,7 @@ export type Database = {
           created_at?: string;
           updated_at?: string;
           source_email_id?: string | null;
+          restricted?: boolean;
         };
         Relationships: [];
       };

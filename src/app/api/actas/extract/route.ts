@@ -101,8 +101,43 @@ export async function POST(request: NextRequest) {
       .replace(/[̀-ͯ]/g, "")
       .trim();
 
+  // Invitados detectados en el acta: alimentan quién puede leerla si luego se
+  // marca como restringida. Un fallo aquí no debe frustrar la extracción.
+  if (extracted.attendees.length > 0) {
+    const { data: profiles } = await supabase
+      .from("profiles")
+      .select("id, email, full_name");
+    const seen = new Set<string>();
+    const rows = extracted.attendees.flatMap((raw) => {
+      const value = raw.trim();
+      const isEmail = value.includes("@");
+      const profile = (profiles ?? []).find((p) =>
+        isEmail
+          ? p.email.toLowerCase() === value.toLowerCase()
+          : norm(p.full_name) === norm(value),
+      );
+      const key = (
+        isEmail ? value : (profile?.email ?? value)
+      ).toLowerCase();
+      if (seen.has(key)) return [];
+      seen.add(key);
+      return [
+        {
+          meeting_id: meeting.id,
+          profile_id: profile?.id ?? null,
+          email: isEmail ? value.toLowerCase() : (profile?.email ?? null),
+          name: isEmail ? (profile?.full_name ?? null) : value,
+        },
+      ];
+    });
+    if (rows.length > 0) {
+      const { error: atErr } = await supabase.from("meeting_attendees").insert(rows);
+      if (atErr) console.error("[actas] invitados:", atErr.message);
+    }
+  }
+
   // Resolve assignee names → team member ids. Una tarea puede traer varios.
-  const proposals = extracted.map((t) => {
+  const proposals = extracted.tasks.map((t) => {
     const assignee_ids: string[] = [];
     const unmatched: string[] = [];
     for (const raw of t.assignees) {
