@@ -117,41 +117,66 @@ export async function ingestActasFromGmail(): Promise<IngestSummary> {
         content,
         members.map((m) => m.name),
       );
-      const rows = extracted.map((t) => {
-        let person_id: string | null = null;
-        let person_name: string | null = t.assignee;
-        if (t.assignee) {
-          const a = norm(t.assignee);
+      // Cada tarea puede quedar en manos de varias personas. Se resuelven
+      // contra el catálogo del equipo; los nombres que no coincidan se guardan
+      // como texto en `person_name` para no perderlos.
+      const prepared = extracted.map((t) => {
+        const matched: string[] = [];
+        const unmatched: string[] = [];
+        for (const raw of t.assignees) {
+          const a = norm(raw);
           const m = members.find((x) => {
             const n = norm(x.name);
             return n === a || n.includes(a) || a.includes(n);
           });
           if (m) {
-            person_id = m.id;
-            person_name = m.name;
+            if (!matched.includes(m.id)) matched.push(m.id);
+          } else {
+            unmatched.push(raw);
           }
         }
         return {
-          name: t.name,
-          description: t.description,
-          due_date: t.due_date || null,
-          person_id,
-          person_name,
-          status: "pending" as const,
-          source: "Acta (email)",
-          meeting_id: meeting.id,
+          row: {
+            name: t.name,
+            description: t.description,
+            due_date: t.due_date || null,
+            // person_id / person_name los deriva el trigger a partir de los
+            // responsables; aquí solo se deja el texto suelto cuando nadie
+            // coincidió con el equipo.
+            person_name: matched.length === 0 ? (unmatched[0] ?? null) : null,
+            status: "pending" as const,
+            source: "Acta (email)",
+            meeting_id: meeting.id,
+          },
+          assignees: matched,
         };
       });
-      if (rows.length > 0) {
-        const { error: tErr } = await db.from("tasks").insert(rows);
+
+      if (prepared.length > 0) {
+        const { data: inserted, error: tErr } = await db
+          .from("tasks")
+          .insert(prepared.map((p) => p.row))
+          .select("id");
         if (tErr) throw new Error(tErr.message);
+
+        // `insert` conserva el orden de entrada, así que los ids casan 1:1.
+        const links = (inserted ?? []).flatMap((task, i) =>
+          (prepared[i]?.assignees ?? []).map((team_member_id) => ({
+            task_id: task.id,
+            team_member_id,
+          })),
+        );
+        if (links.length > 0) {
+          const { error: aErr } = await db.from("task_assignees").insert(links);
+          if (aErr) throw new Error(aErr.message);
+        }
       }
 
       summary.processed.push({
         emailId,
         title,
         meetingId: meeting.id,
-        tasks: rows.length,
+        tasks: prepared.length,
       });
     } catch (e) {
       summary.errors.push({

@@ -13,7 +13,8 @@ const tasksSchema = z.object({
     .array(
       z.object({
         name: z.string().trim().min(1),
-        person_id: z.string().uuid().nullable().optional(),
+        /** Una tarea del acta puede quedar en manos de varias personas. */
+        assignee_ids: z.array(z.string().uuid()).default([]),
         person_name: z.string().nullable().optional(),
         due_date: z.string().nullable().optional(),
         description: z.string().nullable().optional(),
@@ -34,8 +35,9 @@ export async function createActaTasks(input: unknown): Promise<ActaResult> {
   const supabase = await createClient();
   const rows = parsed.data.tasks.map((t) => ({
     name: t.name,
-    person_id: t.person_id ?? null,
-    person_name: t.person_name ?? null,
+    // person_id / person_name los deriva el trigger de task_assignees; el
+    // nombre suelto solo se conserva si nadie del equipo quedó asignado.
+    person_name: t.assignee_ids.length === 0 ? (t.person_name ?? null) : null,
     due_date: t.due_date || null,
     description: t.description ?? null,
     status: "pending" as const,
@@ -44,13 +46,29 @@ export async function createActaTasks(input: unknown): Promise<ActaResult> {
     created_by: session.userId,
   }));
 
-  const { error } = await supabase.from("tasks").insert(rows);
+  const { data: inserted, error } = await supabase
+    .from("tasks")
+    .insert(rows)
+    .select("id");
   if (error) {
     const msg = /row-level|policy|permission/i.test(error.message)
       ? "No tienes permiso para crear tareas."
       : error.message;
     return { ok: false, error: msg };
   }
+
+  // El insert conserva el orden, así que los ids casan con las tareas de entrada.
+  const links = (inserted ?? []).flatMap((task, i) =>
+    (parsed.data.tasks[i]?.assignee_ids ?? []).map((team_member_id) => ({
+      task_id: task.id,
+      team_member_id,
+    })),
+  );
+  if (links.length > 0) {
+    const { error: aErr } = await supabase.from("task_assignees").insert(links);
+    if (aErr) return { ok: false, error: aErr.message };
+  }
+
   revalidatePath("/tareas");
   revalidatePath("/actas");
   return { ok: true, count: rows.length };

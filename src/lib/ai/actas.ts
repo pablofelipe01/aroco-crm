@@ -6,7 +6,12 @@ const MODEL = serverEnv.ANTHROPIC_MODEL || "claude-opus-4-8";
 
 export interface ExtractedTask {
   name: string;
-  assignee: string | null; // name as written in the acta / matched to team
+  /**
+   * Responsables tal como aparecen en el acta. Un mismo compromiso suele
+   * quedar en manos de varias personas ("Pablo y Renata revisan…"), así que se
+   * extraen todos y el ingest los reparte.
+   */
+  assignees: string[];
   due_date: string | null; // YYYY-MM-DD or null
   description: string | null;
 }
@@ -32,10 +37,11 @@ const EXTRACT_TOOL: Anthropic.Tool = {
               type: "string",
               description: "Acción concreta a realizar (imperativo, breve).",
             },
-            assignee: {
-              type: ["string", "null"],
+            assignees: {
+              type: "array",
+              items: { type: "string" },
               description:
-                "Nombre del responsable. Debe coincidir EXACTAMENTE con uno de los nombres del equipo cuando sea posible; null si no se identifica.",
+                "Responsables de la tarea. Incluye a TODAS las personas mencionadas como encargadas: si el acta dice 'Pablo y Renata revisan el informe' o '[El grupo]', devuelve a todas. Cada nombre debe coincidir EXACTAMENTE con uno de los nombres del equipo cuando sea posible. Lista vacía si no se identifica a nadie.",
             },
             due_date: {
               type: ["string", "null"],
@@ -46,7 +52,7 @@ const EXTRACT_TOOL: Anthropic.Tool = {
               description: "Contexto o detalle adicional (opcional).",
             },
           },
-          required: ["name", "assignee", "due_date", "description"],
+          required: ["name", "assignees", "due_date", "description"],
         },
       },
     },
@@ -72,11 +78,11 @@ En ese caso, CADA renglón/viñeta es una tarea independiente: el texto entre co
 
 Para cada tarea:
 - "name": la acción concreta y breve (imperativo).
-- "assignee": el responsable. Asígnalo a uno de los nombres del equipo de abajo usando su ortografía EXACTA (incluyendo tildes), aunque en el acta aparezca sin tildes, mal escrito o solo con el nombre de pila. Si el responsable es "El grupo", "El equipo", "Todos" o similar (tarea colectiva sin dueño único), deja assignee en null. Si no hay responsable identificable, también null.
+- "assignees": los responsables, como lista. Asigna cada uno a un nombre del equipo de abajo usando su ortografía EXACTA (incluyendo tildes), aunque en el acta aparezca sin tildes, mal escrito o solo con el nombre de pila. Si la tarea menciona a varias personas ("Pablo y Renata revisan el informe", "[Pablo Acebedo] [Renata]"), inclúyelas a TODAS. Si el responsable es "El grupo", "El equipo", "Todos" o similar, devuelve la lista vacía: es un compromiso colectivo sin dueño. Si no hay responsable identificable, lista vacía también.
 - "due_date": fecha límite en YYYY-MM-DD si se menciona (interpreta relativas como "mañana", "el próximo martes", "en dos semanas"); null si no.
 - "description": el detalle/contexto de la tarea.
 
-Equipo (usa estos nombres EXACTOS para assignee):
+Equipo (usa estos nombres EXACTOS en assignees):
 ${teamNames.map((n) => `- ${n}`).join("\n")}
 
 No inventes tareas que no estén en el acta, pero tampoco descartes ninguna que sí esté. Hoy es ${new Date().toISOString().slice(0, 10)}.`;
@@ -107,7 +113,15 @@ No inventes tareas que no estén en el acta, pero tampoco descartes ninguna que 
     .filter((t): t is Record<string, unknown> => !!t && typeof t === "object")
     .map((t) => ({
       name: String(t.name ?? "").trim(),
-      assignee: t.assignee ? String(t.assignee).trim() : null,
+      // Se tolera que el modelo devuelva un string suelto en vez de la lista.
+      assignees: (Array.isArray(t.assignees)
+        ? t.assignees
+        : t.assignees
+          ? [t.assignees]
+          : []
+      )
+        .map((a) => String(a).trim())
+        .filter((a) => a.length > 0),
       due_date: t.due_date ? String(t.due_date).trim() : null,
       description: t.description ? String(t.description).trim() : null,
     }))

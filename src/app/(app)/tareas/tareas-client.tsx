@@ -44,6 +44,55 @@ import { TaskForm } from "./task-form";
 import { CalendarExport } from "./calendar-export";
 import { updateTaskStatus, deleteTask } from "./actions";
 
+/**
+ * Responsables de la tarea. Se usa la lista de la tabla puente; si la tarea es
+ * anterior a la asignación múltiple o el nombre vino suelto de un acta, se cae
+ * al responsable principal.
+ */
+function assigneesOf(t: TaskWithPerson) {
+  if (t.assignees.length > 0) return t.assignees;
+  return t.person ? [t.person] : [];
+}
+
+/** "Ana Ruiz y Luis Pérez" / "Ana Ruiz y 2 más" — para las listas. */
+function assigneeNames(t: TaskWithPerson): string {
+  const names = assigneesOf(t).map((a) => a.name);
+  if (names.length === 0) return t.person_name ?? "";
+  if (names.length === 1) return names[0];
+  if (names.length === 2) return `${names[0]} y ${names[1]}`;
+  return `${names[0]} y ${names.length - 1} más`;
+}
+
+/** Avatares apilados; a partir del cuarto se resume en un contador. */
+function AssigneeAvatars({ task }: { task: TaskWithPerson }) {
+  const people = assigneesOf(task);
+  if (people.length === 0) return null;
+  const shown = people.slice(0, 3);
+  const rest = people.length - shown.length;
+
+  return (
+    <span
+      className="flex shrink-0 -space-x-1.5"
+      title={people.map((p) => p.name).join(", ")}
+    >
+      {shown.map((p) => (
+        <span
+          key={p.id}
+          className="flex h-6 w-6 items-center justify-center rounded-full border border-surface font-mono text-[10px] text-white"
+          style={{ backgroundColor: p.color ?? "var(--accent)" }}
+        >
+          {initials(p.name)}
+        </span>
+      ))}
+      {rest > 0 && (
+        <span className="flex h-6 w-6 items-center justify-center rounded-full border border-surface bg-bg-muted font-mono text-[10px] text-fg-muted">
+          +{rest}
+        </span>
+      )}
+    </span>
+  );
+}
+
 const TODAY = new Date().toISOString().slice(0, 10);
 const isOverdue = (t: TaskWithPerson) =>
   !!t.due_date && t.due_date < TODAY && t.status !== "done";
@@ -71,15 +120,7 @@ function TaskCard({
     >
       <div className="flex items-start justify-between gap-2">
         <p className="line-clamp-2 text-sm font-medium text-fg">{task.name}</p>
-        {task.person && (
-          <span
-            title={task.person.name}
-            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full font-mono text-[10px] text-white"
-            style={{ backgroundColor: task.person.color ?? "var(--accent)" }}
-          >
-            {initials(task.person.name)}
-          </span>
-        )}
+        <AssigneeAvatars task={task} />
       </div>
       {task.description && (
         <p className="mt-1 line-clamp-2 text-xs text-fg-subtle">
@@ -266,7 +307,9 @@ export function TareasClient({
   const filtered = React.useMemo(() => {
     const q = query.trim().toLowerCase();
     return tasks.filter((t) => {
-      if (fPerson && t.person_id !== fPerson) return false;
+      // Filtra por cualquiera de los responsables, no solo el principal: una
+      // tarea compartida debe aparecer en la vista de las dos personas.
+      if (fPerson && !assigneesOf(t).some((a) => a.id === fPerson)) return false;
       if (q) {
         const hay = `${t.name} ${t.description ?? ""} ${t.source ?? ""}`.toLowerCase();
         if (!hay.includes(q)) return false;
@@ -445,9 +488,9 @@ export function TareasClient({
                 </Badge>
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium text-fg">{t.name}</p>
-                  {t.person?.name && (
+                  {assigneeNames(t) && (
                     <p className="truncate text-xs text-fg-muted">
-                      {t.person.name}
+                      {assigneeNames(t)}
                     </p>
                   )}
                 </div>

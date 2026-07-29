@@ -591,12 +591,13 @@ export async function executeTool(
         due_date: string | null;
         person_name: string | null;
         person: Person;
+        task_assignees: { team_members: Person }[] | null;
       };
 
       let q = db
         .from("tasks")
         .select(
-          "name, description, status, start_date, due_date, person_name, person:team_members!tasks_person_id_fkey(id,name,department,profile_id)",
+          "name, description, status, start_date, due_date, person_name, person:team_members!tasks_person_id_fkey(id,name,department,profile_id), task_assignees(team_members(id,name,department,profile_id))",
         )
         .order("due_date", { ascending: true, nullsFirst: false })
         .limit(300);
@@ -613,15 +614,26 @@ export async function executeTool(
       const person = str(input.person).toLowerCase();
       const dept = str(input.department);
 
+      /** Todos los responsables; con respaldo al principal para tareas viejas. */
+      const peopleOf = (t: Row): Person[] => {
+        const all = (t.task_assignees ?? [])
+          .map((a) => a.team_members)
+          .filter((m): m is NonNullable<Person> => m != null);
+        return all.length > 0 ? all : [t.person];
+      };
+
       // El recorte por jerarquía va primero: lo que no se puede ver no se
-      // cuenta ni siquiera en los totales.
-      const visible = rows.filter((t) => canSeeAssignee(ctx, t.person));
+      // cuenta ni siquiera en los totales. Basta con que UNO de los
+      // responsables sea visible para que la tarea compartida aparezca.
+      const visible = rows.filter((t) =>
+        peopleOf(t).some((p) => canSeeAssignee(ctx, p)),
+      );
       const filtered = visible.filter((t) => {
-        if (dept && t.person?.department !== dept) return false;
+        const people = peopleOf(t);
+        if (dept && !people.some((p) => p?.department === dept)) return false;
         if (!person) return true;
-        return `${t.person?.name ?? ""} ${t.person_name ?? ""}`
-          .toLowerCase()
-          .includes(person);
+        const names = `${people.map((p) => p?.name ?? "").join(" ")} ${t.person_name ?? ""}`;
+        return names.toLowerCase().includes(person);
       });
 
       // Lo abierto primero: quien pregunta "¿qué tiene fulano?" quiere lo
@@ -641,8 +653,12 @@ export async function executeTool(
         tareas: ordered.slice(0, 40).map((t) => ({
           nombre: t.name,
           estado: t.status,
-          responsable: t.person?.name ?? t.person_name ?? null,
-          area: t.person?.department ?? null,
+          responsables:
+            peopleOf(t)
+              .map((p) => p?.name)
+              .filter((n): n is string => !!n) ?? [],
+          responsable: peopleOf(t)[0]?.name ?? t.person_name ?? null,
+          area: peopleOf(t)[0]?.department ?? null,
           vence: t.due_date,
           inicia: t.start_date,
           detalle: t.description,

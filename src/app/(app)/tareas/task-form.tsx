@@ -5,6 +5,7 @@ import { useForm } from "react-hook-form";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
 import { Field, Input, Select, Textarea } from "@/components/ui/input";
+import { MultiSelect } from "@/components/ui/multi-select";
 import { useToast } from "@/components/ui/toast";
 import { TASK_STATUSES, TASK_STATUS_META } from "@/lib/status";
 import type { TeamMember } from "@/lib/types/database";
@@ -14,7 +15,6 @@ import { createTask, updateTask } from "./actions";
 interface FormValues {
   name: string;
   description: string;
-  person_id: string;
   source: string;
   start_date: string;
   due_date: string;
@@ -26,13 +26,19 @@ function toValues(t: TaskWithPerson | null): FormValues {
   return {
     name: t?.name ?? "",
     description: t?.description ?? "",
-    person_id: t?.person_id ?? "",
     source: t?.source ?? "",
     start_date: t?.start_date ?? "",
     due_date: t?.due_date ?? "",
     status: t?.status ?? "pending",
     notes: t?.notes ?? "",
   };
+}
+
+/** Ids de los responsables actuales, con el principal como respaldo. */
+function toAssignees(t: TaskWithPerson | null): string[] {
+  if (!t) return [];
+  if (t.assignees.length > 0) return t.assignees.map((a) => a.id);
+  return t.person_id ? [t.person_id] : [];
 }
 
 export function TaskForm({
@@ -52,19 +58,26 @@ export function TaskForm({
   const { register, handleSubmit, reset, formState } = useForm<FormValues>({
     defaultValues: toValues(initial),
   });
+  // La selección múltiple es controlada, así que vive fuera de react-hook-form.
+  const [assignees, setAssignees] = React.useState<string[]>(toAssignees(initial));
   const [prevKey, setPrevKey] = React.useState("");
   const key = `${open}:${initial?.id ?? "new"}`;
   if (key !== prevKey) {
     setPrevKey(key);
-    if (open) reset(toValues(initial));
+    if (open) {
+      reset(toValues(initial));
+      setAssignees(toAssignees(initial));
+    }
   }
 
   const onSubmit = handleSubmit(async (values) => {
-    const person = team.find((t) => t.id === values.person_id);
     const payload = {
       ...values,
-      person_id: values.person_id || null,
-      person_name: person?.name ?? null,
+      assignee_ids: assignees,
+      // Solo se conserva el nombre libre cuando el acta trajo a alguien que no
+      // está en el catálogo del equipo; con responsables reales lo deriva el
+      // trigger a partir del primero.
+      person_name: assignees.length === 0 ? (initial?.person_name ?? null) : null,
     };
     const res = initial
       ? await updateTask(initial.id, payload)
@@ -98,15 +111,20 @@ export function TaskForm({
         <Field label="Tarea *" className="sm:col-span-2">
           <Input {...register("name", { required: true })} placeholder="¿Qué hay que hacer?" />
         </Field>
-        <Field label="Responsable">
-          <Select {...register("person_id")} defaultValue="">
-            <option value="">Sin asignar</option>
-            {team.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name}
-              </option>
-            ))}
-          </Select>
+        <Field
+          label="Responsables"
+          hint={
+            assignees.length > 1
+              ? `${assignees.length} personas · la primera figura como principal`
+              : "Puedes asignar la tarea a varias personas"
+          }
+        >
+          <MultiSelect
+            label="Sin asignar"
+            options={team.map((t) => ({ value: t.id, label: t.name }))}
+            selected={assignees}
+            onChange={setAssignees}
+          />
         </Field>
         <Field label="Estado">
           <Select {...register("status")}>

@@ -101,27 +101,29 @@ export async function POST(request: NextRequest) {
       .replace(/[̀-ͯ]/g, "")
       .trim();
 
-  // Resolve assignee names → team member ids.
+  // Resolve assignee names → team member ids. Una tarea puede traer varios.
   const proposals = extracted.map((t) => {
-    let person_id: string | null = null;
-    let person_name: string | null = t.assignee;
-    if (t.assignee) {
-      const a = norm(t.assignee);
+    const assignee_ids: string[] = [];
+    const unmatched: string[] = [];
+    for (const raw of t.assignees) {
+      const a = norm(raw);
       const m = members.find((x) => {
         const n = norm(x.name);
         return n === a || n.includes(a) || a.includes(n);
       });
       if (m) {
-        person_id = m.id;
-        person_name = m.name;
+        if (!assignee_ids.includes(m.id)) assignee_ids.push(m.id);
+      } else {
+        unmatched.push(raw);
       }
     }
     return {
       name: t.name,
       description: t.description,
       due_date: t.due_date,
-      person_id,
-      person_name,
+      assignee_ids,
+      // Nombre sugerido cuando el acta menciona a alguien fuera del equipo.
+      person_name: assignee_ids.length === 0 ? (unmatched[0] ?? null) : null,
     };
   });
 

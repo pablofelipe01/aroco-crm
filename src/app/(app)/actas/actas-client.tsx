@@ -14,7 +14,8 @@ import {
 import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
-import { Field, Input, Select } from "@/components/ui/input";
+import { Field, Input } from "@/components/ui/input";
+import { MultiSelect } from "@/components/ui/multi-select";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { useToast } from "@/components/ui/toast";
@@ -26,7 +27,9 @@ import { createActaTasks, deleteMeeting, getActaFileUrl } from "./actions";
 interface EditableTask {
   include: boolean;
   name: string;
-  person_id: string;
+  /** Responsables: el acta puede repartir un mismo compromiso entre varios. */
+  assignee_ids: string[];
+  /** Nombre sugerido cuando el acta menciona a alguien fuera del equipo. */
   person_name: string | null;
   due_date: string;
   description: string | null;
@@ -81,14 +84,14 @@ export function ActasClient({
       const tasks: EditableTask[] = (data.tasks ?? []).map(
         (t: {
           name: string;
-          person_id: string | null;
+          assignee_ids: string[] | null;
           person_name: string | null;
           due_date: string | null;
           description: string | null;
         }) => ({
           include: true,
           name: t.name,
-          person_id: t.person_id ?? "",
+          assignee_ids: t.assignee_ids ?? [],
           person_name: t.person_name,
           due_date: t.due_date ?? "",
           description: t.description,
@@ -123,10 +126,8 @@ export function ActasClient({
       meeting_id: review.meetingId,
       tasks: chosen.map((t) => ({
         name: t.name.trim(),
-        person_id: t.person_id || null,
-        person_name: t.person_id
-          ? (team.find((m) => m.id === t.person_id)?.name ?? null)
-          : t.person_name,
+        assignee_ids: t.assignee_ids,
+        person_name: t.assignee_ids.length === 0 ? t.person_name : null,
         due_date: t.due_date || null,
         description: t.description,
       })),
@@ -314,18 +315,13 @@ export function ActasClient({
                       className="font-medium"
                     />
                     <div className="flex flex-wrap items-center gap-2">
-                      <Select
-                        value={t.person_id}
-                        onChange={(e) => patch(i, { person_id: e.target.value })}
-                        className="h-9 w-auto py-0 text-sm"
-                      >
-                        <option value="">Sin asignar</option>
-                        {team.map((m) => (
-                          <option key={m.id} value={m.id}>
-                            {m.name}
-                          </option>
-                        ))}
-                      </Select>
+                      <MultiSelect
+                        label="Sin asignar"
+                        options={team.map((m) => ({ value: m.id, label: m.name }))}
+                        selected={t.assignee_ids}
+                        onChange={(next) => patch(i, { assignee_ids: next })}
+                        className="w-auto"
+                      />
                       <div className="relative">
                         <Calendar className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-fg-subtle" />
                         <Input
@@ -335,8 +331,11 @@ export function ActasClient({
                           className="h-9 w-auto pl-7 text-sm"
                         />
                       </div>
-                      {!t.person_id && t.person_name && (
+                      {t.assignee_ids.length === 0 && t.person_name && (
                         <Badge tone="warn">Sugerido: {t.person_name}</Badge>
+                      )}
+                      {t.assignee_ids.length > 1 && (
+                        <Badge tone="info">{t.assignee_ids.length} responsables</Badge>
                       )}
                     </div>
                     {t.description && (

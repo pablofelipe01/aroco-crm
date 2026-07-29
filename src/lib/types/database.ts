@@ -1749,6 +1749,24 @@ export type Database = {
         };
         Relationships: [];
       };
+      task_assignees: {
+        Row: {
+          created_at: string;
+          task_id: string;
+          team_member_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          task_id: string;
+          team_member_id: string;
+        };
+        Update: {
+          created_at?: string;
+          task_id?: string;
+          team_member_id?: string;
+        };
+        Relationships: [];
+      };
       tasks: {
         Row: {
           created_at: string;
