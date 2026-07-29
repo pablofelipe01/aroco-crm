@@ -116,8 +116,32 @@ export function LeadDetail({
     router.refresh();
   }
 
-  const detailRows: [string, string | null][] = [
+  // El correo y el teléfono se muestran como enlaces: desde el celular abre
+  // el marcador o el cliente de correo sin copiar y pegar.
+  const detailRows: [string, React.ReactNode | null][] = [
     ["Contacto", lead.contact_name],
+    [
+      "Correo",
+      lead.contact_email ? (
+        <a
+          href={`mailto:${lead.contact_email}`}
+          className="break-all text-accent underline-offset-2 hover:underline"
+        >
+          {lead.contact_email}
+        </a>
+      ) : null,
+    ],
+    [
+      "Teléfono",
+      lead.contact_phone ? (
+        <a
+          href={`tel:${lead.contact_phone}`}
+          className="font-mono tnum text-accent underline-offset-2 hover:underline"
+        >
+          {lead.contact_phone}
+        </a>
+      ) : null,
+    ],
     ["Ubicación", [lead.country, lead.city].filter(Boolean).join(" · ") || null],
     ["Tipo", lead.type],
     ["Interés", lead.product_interest],

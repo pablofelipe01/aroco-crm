@@ -34,9 +34,40 @@ const optionalAmount = z
   .nullable()
   .optional();
 
+/** Correo opcional: vacío → null; si viene, debe ser un correo válido. */
+const optionalEmail = z
+  .string()
+  .trim()
+  .transform((v) => (v === "" ? null : v.toLowerCase()))
+  .nullable()
+  .refine(
+    (v) => v === null || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v),
+    "Correo inválido.",
+  );
+
+/**
+ * Teléfono opcional. Se conservan los dígitos y el `+` inicial: el equipo
+ * maneja celulares colombianos y también contactos del exterior, así que no se
+ * impone un formato — solo se limpia la puntuación para que quede consultable.
+ */
+const optionalPhone = z
+  .string()
+  .trim()
+  .transform((v) => {
+    const cleaned = v.replace(/[^\d+]/g, "");
+    return cleaned === "" || cleaned === "+" ? null : cleaned;
+  })
+  .nullable()
+  .refine(
+    (v) => v === null || v.replace(/\D/g, "").length >= 7,
+    "El teléfono es muy corto.",
+  );
+
 export const leadSchema = z.object({
   company: z.string().trim().min(1, "La empresa es obligatoria."),
   contact_name: optionalText,
+  contact_email: optionalEmail,
+  contact_phone: optionalPhone,
   country: optionalText,
   city: optionalText,
   market: z.enum(MARKETS).nullable().optional(),

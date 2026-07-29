@@ -22,6 +22,8 @@ import { createLead, updateLead } from "./actions";
 interface FormValues {
   company: string;
   contact_name: string;
+  contact_email: string;
+  contact_phone: string;
   country: string;
   city: string;
   market: string;
@@ -41,6 +43,8 @@ function toValues(lead: LeadWithOwner | null): FormValues {
   return {
     company: lead?.company ?? "",
     contact_name: lead?.contact_name ?? "",
+    contact_email: lead?.contact_email ?? "",
+    contact_phone: lead?.contact_phone ?? "",
     country: lead?.country ?? "",
     city: lead?.city ?? "",
     market: lead?.market ?? "",
@@ -145,7 +149,38 @@ export function LeadForm({
           <Input {...register("company", { required: true })} placeholder="Nombre de la empresa" />
         </Field>
         <Field label="Contacto">
-          <Input {...register("contact_name")} />
+          <Input {...register("contact_name")} placeholder="Nombre de la persona" />
+        </Field>
+        <Field label="Correo" error={formState.errors.contact_email?.message}>
+          <Input
+            type="email"
+            inputMode="email"
+            autoComplete="email"
+            placeholder="nombre@empresa.com"
+            {...register("contact_email", {
+              // Se valida en el navegador para no perder el viaje al servidor;
+              // el esquema de Zod vuelve a validarlo del otro lado.
+              pattern: {
+                value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+                message: "Correo inválido.",
+              },
+            })}
+          />
+        </Field>
+        <Field label="Teléfono" error={formState.errors.contact_phone?.message}>
+          <Input
+            type="tel"
+            inputMode="tel"
+            autoComplete="tel"
+            placeholder="3001234567"
+            className="font-mono tnum"
+            {...register("contact_phone", {
+              validate: (v) =>
+                !v ||
+                v.replace(/\D/g, "").length >= 7 ||
+                "El teléfono es muy corto.",
+            })}
+          />
         </Field>
         <Field label="Responsable">
           <Select {...register("commercial_owner")} defaultValue="">

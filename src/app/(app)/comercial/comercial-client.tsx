@@ -83,9 +83,9 @@ export function ComercialClient({
       if (fOwner.length && (!l.commercial_owner || !fOwner.includes(l.commercial_owner)))
         return false;
       if (q) {
-        const hay = `${l.company} ${l.contact_name ?? ""} ${l.country ?? ""} ${
-          l.product_interest ?? ""
-        }`.toLowerCase();
+        const hay = `${l.company} ${l.contact_name ?? ""} ${l.contact_email ?? ""} ${
+          l.contact_phone ?? ""
+        } ${l.country ?? ""} ${l.product_interest ?? ""}`.toLowerCase();
         if (!hay.includes(q)) return false;
       }
       return true;

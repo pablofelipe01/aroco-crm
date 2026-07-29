@@ -44,6 +44,8 @@ const proposalSchema = z.discriminatedUnion("kind", [
     kind: z.literal("create_lead"),
     company: z.string().min(1),
     contact_name: z.string().nullable().optional(),
+    contact_email: z.string().nullable().optional(),
+    contact_phone: z.string().nullable().optional(),
     country: z.string().nullable().optional(),
     market: z.enum(["Nacional", "Internacional"]).nullable().optional(),
     type: z
@@ -154,6 +156,8 @@ export async function executeAgentAction(input: unknown): Promise<ExecuteResult>
       .insert({
         company: p.company,
         contact_name: p.contact_name ?? null,
+        contact_email: p.contact_email ?? null,
+        contact_phone: p.contact_phone ?? null,
         country: p.country ?? null,
         market: p.market ?? null,
         type: p.type ?? null,

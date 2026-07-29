@@ -24,7 +24,7 @@ export const AI_TOOLS: Anthropic.Tool[] = [
   {
     name: "query_leads",
     description:
-      "Buscar leads del pipeline comercial. Útil para preguntas como '¿qué leads internacionales están en negociación?' o 'leads de John Muñoz'. Devuelve hasta 25 leads con su estado, mercado, tipo, país y responsable.",
+      "Buscar leads del pipeline comercial. Útil para preguntas como '¿qué leads internacionales están en negociación?', 'leads de John Muñoz' o '¿cuál es el correo de contacto de X?'. Devuelve hasta 25 leads con su estado, mercado, tipo, país, datos de contacto (correo y teléfono) y responsable.",
     input_schema: {
       type: "object",
       properties: {
@@ -356,6 +356,8 @@ export const AI_TOOLS: Anthropic.Tool[] = [
       properties: {
         company: { type: "string", description: "Nombre de la empresa o prospecto." },
         contact_name: { type: "string", description: "Persona de contacto (opcional)." },
+        contact_email: { type: "string", description: "Correo del contacto (opcional)." },
+        contact_phone: { type: "string", description: "Teléfono del contacto (opcional)." },
         country: { type: "string", description: "País / ciudad (opcional)." },
         market: {
           type: "string",
@@ -428,7 +430,7 @@ export async function executeTool(
       let q = db
         .from("leads")
         .select(
-          "company, contact_name, country, city, market, type, status, product_interest, next_action, owner:team_members!leads_commercial_owner_fkey(name)",
+          "company, contact_name, contact_email, contact_phone, country, city, market, type, status, product_interest, next_action, owner:team_members!leads_commercial_owner_fkey(name)",
         )
         .limit(25);
       if (typeof input.status === "string")
@@ -438,7 +440,7 @@ export async function executeTool(
       if (typeof input.search === "string" && input.search.trim()) {
         const s = `%${input.search.trim()}%`;
         q = q.or(
-          `company.ilike.${s},contact_name.ilike.${s},country.ilike.${s},product_interest.ilike.${s}`,
+          `company.ilike.${s},contact_name.ilike.${s},contact_email.ilike.${s},contact_phone.ilike.${s},country.ilike.${s},product_interest.ilike.${s}`,
         );
       }
       const { data, error } = await q;
@@ -1118,7 +1120,9 @@ export async function executeTool(
         proposal: {
           kind: "create_lead",
           company,
-          contact_name: String(input.contact_name ?? "").trim() || null,
+          contact_name: str(input.contact_name) || null,
+          contact_email: str(input.contact_email).toLowerCase() || null,
+          contact_phone: str(input.contact_phone).replace(/[^\d+]/g, "") || null,
           country: String(input.country ?? "").trim() || null,
           market: (input.market as string) || null,
           type: (input.type as string) || null,
