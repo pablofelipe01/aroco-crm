@@ -75,6 +75,77 @@ const EXTRACT_TOOL: Anthropic.Tool = {
   },
 };
 
+const ATTENDEES_TOOL: Anthropic.Tool = {
+  name: "extract_attendees",
+  description: "Devuelve quiénes asistieron realmente a la reunión.",
+  input_schema: {
+    type: "object",
+    properties: {
+      attendees: {
+        type: "array",
+        items: { type: "string" },
+        description:
+          "Nombres de quienes ASISTIERON. Usa la ortografía exacta de la lista de personas conocidas cuando haya correspondencia.",
+      },
+      mentioned_only: {
+        type: "array",
+        items: { type: "string" },
+        description:
+          "Nombres que aparecen en el encabezado pero NO asistieron (marcados como 'mencionado', 'referenciado' o similar).",
+      },
+    },
+    required: ["attendees", "mentioned_only"],
+  },
+};
+
+/**
+ * Quiénes asistieron a una reunión, leyendo el encabezado del acta.
+ *
+ * Se separa de la extracción de tareas porque el formato varía entre actas
+ * (unas listan "👥 Participantes" en líneas, otras "Invitado" seguido de
+ * correos y nombres) y porque hay que distinguir a quien asistió de quien solo
+ * fue nombrado — esa diferencia decide quién puede leer un acta restringida.
+ */
+export async function extractActaAttendees(
+  notes: string,
+  knownNames: string[],
+): Promise<{ attendees: string[]; mentionedOnly: string[] }> {
+  const anthropic = new Anthropic({ apiKey: serverEnv.ANTHROPIC_API_KEY });
+
+  const instruction = `Lee el encabezado de esta acta de reunión de AROCO y determina quiénes ASISTIERON.
+
+Reglas:
+- Busca secciones como "Participantes", "Asistentes", "Invitado(s)" o "Presentes".
+- Incluye en "attendees" solo a quienes estuvieron en la reunión. Alguien anotado como "no pudo conectarse al inicio" sí asistió.
+- Pon en "mentioned_only" a quien aparezca marcado como "mencionado", "referenciado" o de quien se hable sin haber estado.
+- No incluyas al asistente de IA que transcribe el acta (p. ej. "Renata") como participante humano.
+- Cuando un nombre corresponda a alguien de la lista de abajo, devuélvelo con esa ortografía EXACTA (con tildes).
+
+Personas conocidas:
+${knownNames.map((n) => `- ${n}`).join("\n")}
+
+--- ACTA ---
+${notes.slice(0, 6000)}`;
+
+  const response = await anthropic.messages.create({
+    model: MODEL,
+    max_tokens: 1000,
+    tools: [ATTENDEES_TOOL],
+    tool_choice: { type: "tool", name: "extract_attendees" },
+    messages: [{ role: "user", content: instruction }],
+  });
+
+  const block = response.content.find((b) => b.type === "tool_use");
+  if (!block || block.type !== "tool_use") return { attendees: [], mentionedOnly: [] };
+  const out = block.input as { attendees?: unknown; mentioned_only?: unknown };
+  const clean = (v: unknown) =>
+    (Array.isArray(v) ? v : []).map((x) => String(x).trim()).filter((x) => x.length > 0);
+  return {
+    attendees: clean(out.attendees),
+    mentionedOnly: clean(out.mentioned_only),
+  };
+}
+
 /**
  * Extract action items from a meeting acta using Claude (reads PDF natively).
  * `teamNames` lets the model assign responsibles to real team members.
