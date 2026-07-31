@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getSessionContext } from "@/lib/auth";
 import { LEAD_STAGES, LEAD_STAGE_WEIGHT, type LeadStage } from "@/lib/status";
 import { getMarketData, getInternationalSeries } from "@/lib/market";
+import { regionFromCode } from "@/lib/inventory/region";
 import { DashboardView, type DashboardData } from "./dashboard-view";
 import type { PriceSeriesPoint } from "@/components/charts/price-chart";
 
@@ -21,16 +22,6 @@ const ACTIVE_STAGES = ["Cotización", "Negociación", "Enviado"];
 
 /** Label for the international ICE line in the price chart. */
 const INTL = "Internacional (ICE)";
-
-/**
- * Group a quality-sheet procedencia name into a readable bucket.
- *   "Cauca-(Ruta Guachene)"   → "Cauca"
- *   "Uraba (Asopraur)"        → "Uraba"
- *   "Nilo finca"              → "Nilo finca"
- */
-function procedenciaGroup(name: string): string {
-  return name.split(/[-(]/)[0].trim() || "Otro";
-}
 
 function shortDate(iso: string): string {
   const d = new Date(iso);
@@ -61,7 +52,10 @@ export default async function DashboardPage() {
   const [leadsRes, stockRes, pricesRes, dispatchRes, market, tasksRes] =
     await Promise.all([
       supabase.from("leads").select("status, potential_value_cop"),
-      supabase.from("inventory_quality").select("procedencia, en_bodega_kg"),
+      // Inventario real, lote por lote. Antes esto salía de `inventory_quality`
+      // —la segunda pestaña de la hoja— que arrastraba filas ya despachadas y
+      // mostraba 12.198 kg contra los 2.500 kg que hay de verdad.
+      supabase.from("inventory_lots").select("code, qty_available_kg"),
       supabase
         .from("price_history")
         .select("company, date, price_cop_kg")
@@ -96,14 +90,18 @@ export default async function DashboardPage() {
     if (l.status !== "Descartado") pipelineTotal += v;
   }
 
-  // Inventory in bodega by procedencia (from the quality sheet — current stock).
+  // Inventario disponible por región. Solo cuentan los lotes con saldo: los
+  // agotados siguen en la tabla y sumarlos al conteo daría "89 lotes" para
+  // 2.500 kg, cuando en bodega solo quedan 9 con existencia.
   const regionKg = new Map<string, number>();
   let kgAvailable = 0;
+  let lotsWithStock = 0;
   for (const row of stock) {
-    const kg = Number(row.en_bodega_kg) || 0;
-    kgAvailable += kg;
+    const kg = Number(row.qty_available_kg) || 0;
     if (kg <= 0) continue;
-    const region = procedenciaGroup(row.procedencia);
+    kgAvailable += kg;
+    lotsWithStock++;
+    const region = regionFromCode(row.code);
     regionKg.set(region, (regionKg.get(region) ?? 0) + kg);
   }
   const sortedRegions = [...regionKg.entries()].sort((a, b) => b[1] - a[1]);
@@ -162,7 +160,7 @@ export default async function DashboardPage() {
       totalLeads: leads.length,
       activeLeads: leads.filter((l) => ACTIVE_STAGES.includes(l.status)).length,
       kgAvailable,
-      lotsCount: stock.length,
+      lotsCount: lotsWithStock,
       dispatchCount: dispatches.length,
       dispatchedKg: dispatches.reduce((s, d) => s + (Number(d.qty_kg) || 0), 0),
     },

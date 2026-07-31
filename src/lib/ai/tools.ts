@@ -7,6 +7,7 @@ import { quoteSchema, toCotizadorInput } from "@/lib/schemas/quote";
 import { getMarketData } from "@/lib/market";
 import { canSeeAssignee, scopeLabel, type AgentContext } from "@/lib/ai/context";
 import { DEPARTMENTS as DEPARTMENT_LIST } from "@/lib/departments";
+import { regionFromCode } from "@/lib/inventory/region";
 
 type DB = SupabaseClient<Database>;
 
@@ -397,15 +398,6 @@ export const AI_TOOLS: Anthropic.Tool[] = [
   },
 ];
 
-/**
- * Región del lote: el segundo segmento del código (CO-MET-…, COL-CUN-…).
- * Algunos códigos son texto libre ("CISCA ruta #3 (Guachene…)"), así que solo
- * se acepta el segmento cuando parece un código de departamento de 3 letras.
- */
-function regionFromCode(code: string): string {
-  const seg = code.split("-")[1]?.trim() ?? "";
-  return /^[A-Za-z]{3}$/.test(seg) ? seg.toUpperCase() : "Otro";
-}
 
 type ToolResult = Record<string, unknown> | { error: string };
 
