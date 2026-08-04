@@ -12,6 +12,7 @@ import {
   Calendar,
   Lock,
   LockOpen,
+  ChevronDown,
 } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
@@ -21,9 +22,10 @@ import { MultiSelect } from "@/components/ui/multi-select";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { useToast } from "@/components/ui/toast";
-import { formatDate } from "@/lib/utils";
+import { AnimatePresence, motion } from "framer-motion";
+import { cn, formatDate } from "@/lib/utils";
 import type { TeamMember } from "@/lib/types/database";
-import type { MeetingWithCount } from "./page";
+import type { MeetingWithCount, TaskLoad } from "./page";
 import { MeetingDetail } from "./meeting-detail";
 import {
   createActaTasks,
@@ -47,6 +49,82 @@ interface Review {
   meetingId: string;
   meetingTitle: string;
   tasks: EditableTask[];
+}
+
+/**
+ * Contador de tareas del acta que despliega el reparto por responsable.
+ *
+ * Se abre con clic en vez de con `title`: el globo nativo no llegó a
+ * mostrarse, y además el hover deja fuera a quien usa pantalla táctil — el
+ * mismo problema que tuvieron los botones del kanban.
+ */
+function TaskLoadBadge({ total, load }: { total: number; load: TaskLoad[] }) {
+  const [open, setOpen] = React.useState(false);
+  const ref = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    if (!open) return;
+    const fuera = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    const esc = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    document.addEventListener("mousedown", fuera);
+    document.addEventListener("keydown", esc);
+    return () => {
+      document.removeEventListener("mousedown", fuera);
+      document.removeEventListener("keydown", esc);
+    };
+  }, [open]);
+
+  if (load.length === 0) {
+    return <Badge tone="neutral">{total} tareas</Badge>;
+  }
+
+  return (
+    <div ref={ref} className="relative shrink-0">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        aria-label={`${total} tareas — ver reparto por responsable`}
+        className="inline-flex items-center gap-1.5 rounded-full border border-border-strong/60 bg-bg-muted px-2.5 py-0.5 text-xs font-medium whitespace-nowrap text-fg-muted transition-colors hover:border-accent hover:text-fg"
+      >
+        {total} tareas
+        <ChevronDown
+          className={cn("h-3 w-3 transition-transform", open && "rotate-180")}
+        />
+      </button>
+
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            transition={{ duration: 0.12 }}
+            className="absolute right-0 top-8 z-50 max-h-64 w-60 overflow-y-auto rounded-[var(--radius-md)] border border-border bg-surface-raised p-2 shadow-[var(--shadow-soft-lg)]"
+          >
+            <p className="mb-1.5 px-1 text-[11px] font-medium uppercase tracking-wide text-fg-subtle">
+              Reparto de tareas
+            </p>
+            <ul className="space-y-0.5">
+              {load.map((r) => (
+                <li
+                  key={r.name}
+                  className="flex items-center justify-between gap-3 rounded-[var(--radius-sm)] px-1 py-1 text-sm"
+                >
+                  <span className="min-w-0 truncate text-fg">{r.name}</span>
+                  <span className="shrink-0 font-mono text-xs tnum text-fg-muted">
+                    {r.count}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
 }
 
 export function ActasClient({
@@ -267,17 +345,7 @@ export function ActasClient({
                   Restringida
                 </Badge>
               )}
-              <Badge
-                tone="neutral"
-                title={
-                  m.taskLoad.length > 0
-                    ? m.taskLoad.map((r) => `${r.name}: ${r.count}`).join("\n")
-                    : "Esta acta no generó tareas"
-                }
-                className={m.taskLoad.length > 0 ? "cursor-help" : undefined}
-              >
-                {m.tasks?.[0]?.count ?? 0} tareas
-              </Badge>
+              <TaskLoadBadge total={m.tasks?.[0]?.count ?? 0} load={m.taskLoad} />
               {canRestrict && (
                 <button
                   onClick={() => onToggleRestricted(m)}
