@@ -142,7 +142,13 @@ function TaskCard({
           <span />
         )}
         {(onEdit || onDelete || onCalendar) && (
-          <span className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+          // Visibles siempre, como en la vista de lista. Estaban detrás de
+          // `group-hover`, y en Tailwind v4 esa variante va envuelta en
+          // `@media (hover: hover)`: en una tableta o pantalla táctil no se
+          // activa nunca, así que los botones quedaban inalcanzables. Con el
+          // teclado era peor — seguían en el orden de tabulación pero
+          // invisibles.
+          <span className="flex items-center gap-1">
             {onCalendar && (
               <button
                 onClick={onCalendar}
