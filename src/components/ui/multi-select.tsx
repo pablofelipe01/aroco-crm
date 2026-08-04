@@ -87,6 +87,10 @@ export function MultiSelect({
           >
             {count > 0 && (
               <button
+                // Sin `type`, un <button> dentro de un <form> es submit: al
+                // marcar una opción se enviaba el formulario y la ventana se
+                // cerraba guardando a medias.
+                type="button"
                 onClick={() => onChange([])}
                 className="mb-1 w-full rounded-[var(--radius-sm)] px-2 py-1.5 text-left text-xs text-fg-subtle hover:bg-bg-subtle"
               >
@@ -98,6 +102,7 @@ export function MultiSelect({
               return (
                 <button
                   key={o.value}
+                  type="button"
                   onClick={() => toggle(o.value)}
                   className="flex w-full items-center gap-2 rounded-[var(--radius-sm)] px-2 py-1.5 text-left text-sm text-fg hover:bg-bg-subtle"
                 >
