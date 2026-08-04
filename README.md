@@ -13,7 +13,7 @@ Plataforma interna de **AROCO S.A.S** (exportadora/comercializadora de cacao col
 
 ## Módulos
 
-Dashboard · Comercial (CRM de leads, Kanban) · Cotizaciones (cotizador NACIONAL/FOB/CIF + PDF) · Inventario · Despachos · Comisiones · Histórico de precios · Tareas · Equipo/Ajustes · Asistente IA (⌘K + panel).
+Dashboard · Comercial (CRM de leads, Kanban) · Cotizaciones (cotizador NACIONAL/FOB/CIF + PDF) · Inventario · Despachos · Comisiones · Histórico de precios · Tareas · Actas (ingesta desde correo + extracción de tareas con IA) · Equipo/Ajustes · Asistente IA (⌘K + panel).
 
 ## Puesta en marcha
 
