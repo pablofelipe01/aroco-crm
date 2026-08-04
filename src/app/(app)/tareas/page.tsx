@@ -5,7 +5,10 @@ import type { Task, TeamMember } from "@/lib/types/database";
 
 export const dynamic = "force-dynamic";
 
-export type TaskAssignee = Pick<TeamMember, "id" | "name" | "color">;
+export type TaskAssignee = Pick<
+  TeamMember,
+  "id" | "name" | "color" | "department"
+>;
 
 export type TaskWithPerson = Task & {
   /** Responsable principal (derivado del primero de `assignees`). */
@@ -22,7 +25,7 @@ export default async function TareasPage() {
     supabase
       .from("tasks")
       .select(
-        "*, person:team_members!tasks_person_id_fkey(id,name,color), task_assignees(team_members(id,name,color))",
+        "*, person:team_members!tasks_person_id_fkey(id,name,color,department), task_assignees(team_members(id,name,color,department))",
       )
       .order("due_date", { ascending: true, nullsFirst: false }),
     supabase.from("team_members").select("*").eq("active", true).order("name"),

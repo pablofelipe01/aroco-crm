@@ -28,6 +28,7 @@ import {
 import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
 import { Input, Select } from "@/components/ui/input";
+import { MultiSelect } from "@/components/ui/multi-select";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { useToast } from "@/components/ui/toast";
@@ -43,6 +44,61 @@ import type { TaskWithPerson } from "./page";
 import { TaskForm } from "./task-form";
 import { CalendarExport } from "./calendar-export";
 import { updateTaskStatus, deleteTask } from "./actions";
+
+/** Etiqueta para las tareas que no traen origen, para poder filtrarlas. */
+const SIN_ORIGEN = "Sin origen";
+
+/** Opción para encontrar lo que está sin asignar — hoy 61 tareas. */
+const SIN_RESPONSABLE = "__sin_responsable__";
+
+/**
+ * Mínimo de tareas para que un origen aparezca en el filtro. El campo `source`
+ * es texto libre y varias tareas traen ahí su descripción en vez de su origen
+ * ("Entregar el polígono de la finca…"), así que sin este umbral el
+ * desplegable se llenaría de valores de una sola tarea.
+ */
+const MIN_POR_ORIGEN = 3;
+
+type DueFilter = "" | "overdue" | "today" | "week" | "month" | "none";
+
+const DUE_LABELS: { value: DueFilter; label: string }[] = [
+  { value: "", label: "Cualquier fecha" },
+  { value: "overdue", label: "Vencidas" },
+  { value: "today", label: "Vencen hoy" },
+  { value: "week", label: "Próximos 7 días" },
+  { value: "month", label: "Próximos 30 días" },
+  { value: "none", label: "Sin fecha" },
+];
+
+const hoyISO = () => new Date().toISOString().slice(0, 10);
+
+/** Fecha de hoy + n días, en ISO. */
+function enDias(n: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+
+/** ¿La tarea encaja en el filtro de vencimiento? */
+function matchesDue(t: TaskWithPerson, f: DueFilter): boolean {
+  if (!f) return true;
+  const due = t.due_date;
+  if (f === "none") return due == null;
+  if (due == null) return false;
+  const hoy = hoyISO();
+  switch (f) {
+    // Vencida solo si además sigue abierta: una tarea hecha tarde ya no es un
+    // pendiente atrasado.
+    case "overdue":
+      return due < hoy && t.status !== "done";
+    case "today":
+      return due === hoy;
+    case "week":
+      return due >= hoy && due <= enDias(7);
+    case "month":
+      return due >= hoy && due <= enDias(30);
+  }
+}
 
 /**
  * Responsables de la tarea. Se usa la lista de la tabla puente; si la tarea es
@@ -286,7 +342,13 @@ export function TareasClient({
   const [view, setView] = React.useState<"kanban" | "list">("kanban");
   const [query, setQuery] = React.useState("");
   // Por defecto muestra las tareas del usuario conectado (si es del equipo).
-  const [fPerson, setFPerson] = React.useState(currentPersonId);
+  const [fPeople, setFPeople] = React.useState<string[]>(
+    currentPersonId ? [currentPersonId] : [],
+  );
+  const [fStatus, setFStatus] = React.useState<string[]>([]);
+  const [fDepts, setFDepts] = React.useState<string[]>([]);
+  const [fSources, setFSources] = React.useState<string[]>([]);
+  const [fDue, setFDue] = React.useState<DueFilter>("");
   const [formOpen, setFormOpen] = React.useState(false);
   const [editing, setEditing] = React.useState<TaskWithPerson | null>(null);
   const [calTask, setCalTask] = React.useState<TaskWithPerson | null>(null);
@@ -313,16 +375,47 @@ export function TareasClient({
   const filtered = React.useMemo(() => {
     const q = query.trim().toLowerCase();
     return tasks.filter((t) => {
-      // Filtra por cualquiera de los responsables, no solo el principal: una
-      // tarea compartida debe aparecer en la vista de las dos personas.
-      if (fPerson && !assigneesOf(t).some((a) => a.id === fPerson)) return false;
+      const gente = assigneesOf(t);
+      if (fPeople.length) {
+        // Basta con que UNO de los responsables coincida: una tarea compartida
+        // debe aparecer en la vista de las dos personas.
+        const porPersona = gente.some((a) => fPeople.includes(a.id));
+        const porSinAsignar = fPeople.includes(SIN_RESPONSABLE) && gente.length === 0;
+        if (!porPersona && !porSinAsignar) return false;
+      }
+      if (fStatus.length && !fStatus.includes(t.status)) return false;
+      if (fDepts.length && !gente.some((a) => a.department && fDepts.includes(a.department)))
+        return false;
+      if (fSources.length && !fSources.includes(t.source ?? SIN_ORIGEN)) return false;
+      if (!matchesDue(t, fDue)) return false;
       if (q) {
-        const hay = `${t.name} ${t.description ?? ""} ${t.source ?? ""}`.toLowerCase();
+        const hay = `${t.name} ${t.description ?? ""} ${t.source ?? ""} ${gente
+          .map((a) => a.name)
+          .join(" ")} ${t.person_name ?? ""}`.toLowerCase();
         if (!hay.includes(q)) return false;
       }
       return true;
     });
-  }, [tasks, query, fPerson]);
+  }, [tasks, query, fPeople, fStatus, fDepts, fSources, fDue]);
+
+  /** Áreas y orígenes que existen de verdad en los datos, no la lista teórica. */
+  const areasDisponibles = React.useMemo(() => {
+    const s = new Set<string>();
+    for (const t of tasks) for (const a of assigneesOf(t)) if (a.department) s.add(a.department);
+    return [...s].sort();
+  }, [tasks]);
+
+  const origenesDisponibles = React.useMemo(() => {
+    const conteo = new Map<string, number>();
+    for (const t of tasks) {
+      const o = t.source ?? SIN_ORIGEN;
+      conteo.set(o, (conteo.get(o) ?? 0) + 1);
+    }
+    return [...conteo.entries()]
+      .filter(([, n]) => n >= MIN_POR_ORIGEN)
+      .sort((a, b) => b[1] - a[1])
+      .map(([o, n]) => ({ value: o, label: `${o} (${n})` }));
+  }, [tasks]);
 
   const byStatus = React.useMemo(() => {
     const map = new Map<TaskStatus, TaskWithPerson[]>();
@@ -362,7 +455,22 @@ export function TareasClient({
   }
 
   const activeTask = activeId ? tasks.find((t) => t.id === activeId) ?? null : null;
-  const hasFilters = query || fPerson;
+  const hasFilters =
+    !!query ||
+    fPeople.length > 0 ||
+    fStatus.length > 0 ||
+    fDepts.length > 0 ||
+    fSources.length > 0 ||
+    fDue !== "";
+
+  function limpiarFiltros() {
+    setQuery("");
+    setFPeople([]);
+    setFStatus([]);
+    setFDepts([]);
+    setFSources([]);
+    setFDue("");
+  }
 
   return (
     <div className="space-y-6">
@@ -396,27 +504,57 @@ export function TareasClient({
               className="pl-9"
             />
           </div>
+          <MultiSelect
+            label="Responsable"
+            options={[
+              ...team.map((t) => ({ value: t.id, label: t.name })),
+              { value: SIN_RESPONSABLE, label: "— Sin responsable —" },
+            ]}
+            selected={fPeople}
+            onChange={setFPeople}
+            className="w-auto"
+          />
+          <MultiSelect
+            label="Estado"
+            options={TASK_STATUSES.map((s) => ({
+              value: s,
+              label: TASK_STATUS_META[s].label,
+            }))}
+            selected={fStatus}
+            onChange={setFStatus}
+            className="w-auto"
+          />
           <Select
-            value={fPerson}
-            onChange={(e) => setFPerson(e.target.value)}
+            value={fDue}
+            onChange={(e) => setFDue(e.target.value as DueFilter)}
             className="w-auto"
           >
-            <option value="">Toda persona</option>
-            {team.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name}
+            {DUE_LABELS.map((d) => (
+              <option key={d.value} value={d.value}>
+                {d.label}
               </option>
             ))}
           </Select>
+          {areasDisponibles.length > 1 && (
+            <MultiSelect
+              label="Área"
+              options={areasDisponibles.map((d) => ({ value: d, label: d }))}
+              selected={fDepts}
+              onChange={setFDepts}
+              className="w-auto"
+            />
+          )}
+          {origenesDisponibles.length > 1 && (
+            <MultiSelect
+              label="Origen"
+              options={origenesDisponibles}
+              selected={fSources}
+              onChange={setFSources}
+              className="w-auto"
+            />
+          )}
           {hasFilters && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                setQuery("");
-                setFPerson("");
-              }}
-            >
+            <Button variant="ghost" size="sm" onClick={limpiarFiltros}>
               <X className="h-3.5 w-3.5" />
               Limpiar
             </Button>
