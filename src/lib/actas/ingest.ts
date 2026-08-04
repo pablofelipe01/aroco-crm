@@ -93,12 +93,17 @@ export async function ingestActasFromGmail(): Promise<IngestSummary> {
       const title = titleFromSubject(email.subject);
 
       // Crea el acta (source_email_id dedup — unique parcial).
+      //
+      // El cuerpo del correo se guarda SIEMPRE que tenga sustancia, también
+      // cuando viene PDF: antes se dejaba en null y, si algo fallaba con el
+      // adjunto, el acta quedaba sin nada que leer.
+      const cuerpo = email.bodyText.trim();
       const { data: meeting, error: meErr } = await db
         .from("meetings")
         .insert({
           title,
           meeting_date: email.date,
-          notes: email.pdf ? null : email.bodyText.slice(0, 20000),
+          notes: cuerpo.length >= 20 ? cuerpo.slice(0, 20000) : null,
           file_name: email.pdf?.filename ?? null,
           source_email_id: emailId,
         })
@@ -110,6 +115,38 @@ export async function ingestActasFromGmail(): Promise<IngestSummary> {
           continue;
         }
         throw new Error(meErr.message);
+      }
+
+      // Guarda el PDF adjunto. Sin esto el acta quedaba con `file_name` pero
+      // sin archivo: ni el texto ni el documento estaban disponibles, y el
+      // único sitio donde existía el acta era el correo.
+      //
+      // Va después de crear el acta para no dejar archivos huérfanos cuando el
+      // correo ya se había procesado. La ruta lleva el id del mensaje, así que
+      // reprocesarlo sobrescribe en vez de acumular copias.
+      if (email.pdf) {
+        try {
+          const safe = email.pdf.filename.replace(/[^\w.\-]+/g, "_").slice(-80);
+          const path = `gmail/${emailId}-${safe}`;
+          const { error: upErr } = await db.storage
+            .from("actas")
+            .upload(path, Buffer.from(email.pdf.base64, "base64"), {
+              contentType: "application/pdf",
+              upsert: true,
+            });
+          if (upErr) throw new Error(upErr.message);
+          const { error: pathErr } = await db
+            .from("meetings")
+            .update({ file_path: path })
+            .eq("id", meeting.id);
+          if (pathErr) throw new Error(pathErr.message);
+        } catch (e) {
+          // Que no se pueda guardar el PDF no debe tumbar el acta ni sus
+          // tareas; queda registrado y el acta conserva el cuerpo del correo.
+          const msg = e instanceof Error ? e.message : String(e);
+          summary.errors.push({ emailId, error: `No se pudo guardar el PDF: ${msg}` });
+          console.error("[actas] PDF", emailId, msg);
+        }
       }
 
       // Extrae tareas e invitados.
