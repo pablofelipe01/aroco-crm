@@ -7,20 +7,26 @@ import type { Department } from "@/lib/departments";
 type DB = SupabaseClient<Database>;
 
 /**
- * Quién está preguntando. Las herramientas del asistente ya corren con el
- * cliente Supabase del usuario (así que RLS aplica), pero la RLS de `tasks`
- * todavía deja que cualquier miembro activo lea todas las tareas — el bug que
- * se reportó en el dashboard. Hasta que la jerarquía definitiva baje a RLS,
- * el alcance se recorta aquí, en la capa de aplicación, igual que lo hace el
- * dashboard.
+ * Quién está preguntando.
+ *
+ * El recorte de lo que puede ver ya NO vive aquí: desde 0048 lo aplica la RLS
+ * de `tasks` siguiendo el organigrama (cada jefe ve su rama). Este contexto
+ * solo sirve para que el asistente sepa a quién le habla y pueda explicar su
+ * alcance; filtrar otra vez en la aplicación duplicaría el criterio y, peor,
+ * usaría uno distinto al de la base.
  */
 export type AgentContext = {
   userId: string;
   fullName: string;
+  /** SuperAdmin: acceso total. */
   isAdmin: boolean;
+  /** Ve las tareas de todas las áreas, pero no administra. */
+  isAdminView: boolean;
   department: Department | null;
-  /** Ficha en `team_members`, si la persona tiene una. Las tareas apuntan ahí. */
+  /** Ficha en `team_members`, la raíz de su rama del organigrama. */
   teamMemberId: string | null;
+  /** Cargo según el organigrama, para dar contexto en las respuestas. */
+  roleTitle: string | null;
 };
 
 /** Resuelve el contexto del asistente para la sesión actual. */
@@ -30,47 +36,28 @@ export async function resolveAgentContext(
 ): Promise<AgentContext> {
   const { data: member } = await db
     .from("team_members")
-    .select("id")
+    .select("id, role_title")
     .eq("profile_id", session.userId)
     .maybeSingle();
 
+  const role = session.profile?.role;
   return {
     userId: session.userId,
     fullName: session.profile?.full_name ?? session.email,
-    isAdmin: session.profile?.role === "admin",
+    isAdmin: role === "admin",
+    isAdminView: role === "admin_view",
     department: (session.profile?.department as Department | null) ?? null,
     teamMemberId: member?.id ?? null,
+    roleTitle: member?.role_title ?? null,
   };
 }
 
-/** Forma mínima de un responsable para decidir visibilidad. */
-type Assignee = {
-  id?: string | null;
-  profile_id?: string | null;
-  department?: string | null;
-} | null;
-
-/**
- * ¿Puede esta persona ver una tarea de este responsable?
- *
- * · admin (Dirección) → todo.
- * · resto → lo propio y lo de su departamento.
- * · sin responsable → visible para todos: una tarea sin dueño no es dato
- *   privado de nadie, y ocultarla dejaría fuera los pendientes generales.
- */
-export function canSeeAssignee(ctx: AgentContext, person: Assignee): boolean {
-  if (ctx.isAdmin) return true;
-  if (!person) return true;
-  if (person.profile_id && person.profile_id === ctx.userId) return true;
-  if (person.id && person.id === ctx.teamMemberId) return true;
-  return Boolean(
-    ctx.department && person.department && person.department === ctx.department,
-  );
-}
-
-/** Etiqueta del alcance aplicado, para que el modelo pueda explicarlo. */
+/** Alcance aplicado, para que el modelo pueda explicarlo sin adivinar. */
 export function scopeLabel(ctx: AgentContext): string {
-  return ctx.isAdmin
-    ? "acceso total (Dirección)"
-    : `solo ${ctx.fullName} y el área ${ctx.department ?? "sin asignar"}`;
+  if (ctx.isAdmin) return "acceso total";
+  if (ctx.isAdminView) return "ve las tareas de todas las áreas";
+  if (!ctx.teamMemberId) {
+    return "sin ficha en el equipo — solo ve las tareas sin responsable";
+  }
+  return "ve lo suyo y lo de las personas a su cargo";
 }

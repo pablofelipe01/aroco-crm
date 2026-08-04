@@ -4,6 +4,7 @@ import { Menu, Search, Sparkles, Command } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { useCommandPalette } from "@/components/layout/command-palette";
 import { UserMenu } from "@/components/layout/user-menu";
+import type { UserRole } from "@/lib/types/database";
 import { NotificationsBell } from "@/components/layout/notifications-bell";
 import { useAssistant } from "@/components/assistant/assistant-panel";
 
@@ -21,7 +22,7 @@ export function Topbar({
   user?: {
     name: string;
     department?: string;
-    role?: "admin" | "member";
+    role?: UserRole;
   } | null;
 }) {
   const palette = useCommandPalette();

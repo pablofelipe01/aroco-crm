@@ -4,6 +4,7 @@ import * as React from "react";
 import { usePathname } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { Sidebar } from "@/components/layout/sidebar";
+import type { UserRole } from "@/lib/types/database";
 import { Topbar } from "@/components/layout/topbar";
 import { CommandPaletteProvider } from "@/components/layout/command-palette";
 import { AssistantProvider } from "@/components/assistant/assistant-panel";
@@ -13,7 +14,7 @@ import { ease } from "@/lib/motion";
 export interface ShellUser {
   name: string;
   department: Department | null;
-  role?: "admin" | "member";
+  role?: UserRole;
 }
 
 /** Resolve the page title/subtitle from the current route. */

@@ -1855,6 +1855,7 @@ export type Database = {
           created_at: string;
           department: Database["public"]["Enums"]["department"] | null;
           id: string;
+          manager_id: string | null;
           name: string;
           profile_id: string | null;
           role_title: string | null;
@@ -1866,6 +1867,7 @@ export type Database = {
           created_at?: string;
           department?: Database["public"]["Enums"]["department"] | null;
           id?: string;
+          manager_id?: string | null;
           name: string;
           profile_id?: string | null;
           role_title?: string | null;
@@ -1877,6 +1879,7 @@ export type Database = {
           created_at?: string;
           department?: Database["public"]["Enums"]["department"] | null;
           id?: string;
+          manager_id?: string | null;
           name?: string;
           profile_id?: string | null;
           role_title?: string | null;
@@ -1955,7 +1958,7 @@ export type Database = {
       recepcion_envio: "Cauca" | "Finca" | "Otros";
       liquidacion_estado: "Por revisión" | "Aprobada";
       liquidacion_pago: "general" | "roc";
-      user_role: "admin" | "member";
+      user_role: "admin" | "admin_view" | "member";
     };
     CompositeTypes: {
       [_ in never]: never;

@@ -5,7 +5,7 @@ import type { Database } from "@/lib/types/database";
 import { cotizar } from "@/lib/calc/cotizador";
 import { quoteSchema, toCotizadorInput } from "@/lib/schemas/quote";
 import { getMarketData } from "@/lib/market";
-import { canSeeAssignee, scopeLabel, type AgentContext } from "@/lib/ai/context";
+import { scopeLabel, type AgentContext } from "@/lib/ai/context";
 import { DEPARTMENTS as DEPARTMENT_LIST } from "@/lib/departments";
 import { regionFromCode } from "@/lib/inventory/region";
 
@@ -614,13 +614,10 @@ export async function executeTool(
         return all.length > 0 ? all : [t.person];
       };
 
-      // El recorte por jerarquía va primero: lo que no se puede ver no se
-      // cuenta ni siquiera en los totales. Basta con que UNO de los
-      // responsables sea visible para que la tarea compartida aparezca.
-      const visible = rows.filter((t) =>
-        peopleOf(t).some((p) => canSeeAssignee(ctx, p)),
-      );
-      const filtered = visible.filter((t) => {
+      // Lo que este usuario no puede ver ya no llegó hasta aquí: la RLS de
+      // `tasks` (0048) recorta por rama del organigrama. Lo de abajo son
+      // filtros que pidió quien pregunta, no permisos.
+      const filtered = rows.filter((t) => {
         const people = peopleOf(t);
         if (dept && !people.some((p) => p?.department === dept)) return false;
         if (!person) return true;
@@ -641,7 +638,6 @@ export async function executeTool(
         alcance: scopeLabel(ctx),
         total: filtered.length,
         pendientes: filtered.filter((t) => t.status !== "done").length,
-        ocultas_por_permiso: rows.length - visible.length,
         tareas: ordered.slice(0, 40).map((t) => ({
           nombre: t.name,
           estado: t.status,

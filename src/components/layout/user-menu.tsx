@@ -4,6 +4,7 @@ import * as React from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { LogOut, ChevronDown } from "lucide-react";
 import { initials } from "@/lib/utils";
+import type { UserRole } from "@/lib/types/database";
 import { ease } from "@/lib/motion";
 
 export function UserMenu({
@@ -13,7 +14,7 @@ export function UserMenu({
 }: {
   name: string;
   department?: string;
-  role?: "admin" | "member";
+  role?: UserRole;
 }) {
   const [open, setOpen] = React.useState(false);
   const ref = React.useRef<HTMLDivElement>(null);

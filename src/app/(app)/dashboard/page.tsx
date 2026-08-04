@@ -35,19 +35,18 @@ export default async function DashboardPage() {
   const isAdmin = session?.profile?.role === "admin";
   const dept = session?.profile?.department ?? null;
 
-  // Upcoming pending tasks (next 5 by due date). For admins, scoped to the
-  // people of their own department.
-  let tasksQuery = supabase
+  // Próximas tareas pendientes. Ya no se filtra por departamento aquí: desde
+  // 0048 la RLS recorta por rama del organigrama, así que un SuperAdmin ve
+  // todo y un jefe ve lo suyo y lo de su gente. Filtrar además por área haría
+  // que Dirección dejara de ver el resto de la empresa.
+  const tasksQuery = supabase
     .from("tasks")
     .select(
-      "id, name, status, due_date, person_name, person:team_members!tasks_person_id_fkey" +
-        (isAdmin && dept ? "!inner" : "") +
-        "(name, department)",
+      "id, name, status, due_date, person_name, person:team_members!tasks_person_id_fkey(name, department)",
     )
     .neq("status", "done")
     .order("due_date", { ascending: true, nullsFirst: false })
     .limit(5);
-  if (isAdmin && dept) tasksQuery = tasksQuery.eq("person.department", dept);
 
   const [leadsRes, stockRes, pricesRes, dispatchRes, market, tasksRes] =
     await Promise.all([
