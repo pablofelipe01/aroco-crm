@@ -267,7 +267,17 @@ export function ActasClient({
                   Restringida
                 </Badge>
               )}
-              <Badge tone="neutral">{m.tasks?.[0]?.count ?? 0} tareas</Badge>
+              <Badge
+                tone="neutral"
+                title={
+                  m.taskLoad.length > 0
+                    ? m.taskLoad.map((r) => `${r.name}: ${r.count}`).join("\n")
+                    : "Esta acta no generó tareas"
+                }
+                className={m.taskLoad.length > 0 ? "cursor-help" : undefined}
+              >
+                {m.tasks?.[0]?.count ?? 0} tareas
+              </Badge>
               {canRestrict && (
                 <button
                   onClick={() => onToggleRestricted(m)}

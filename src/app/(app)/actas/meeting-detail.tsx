@@ -155,6 +155,17 @@ export function MeetingDetail({
             <ClipboardList className="h-3.5 w-3.5" />
             Tareas generadas
           </h3>
+          {/* El mismo reparto que el globo de la lista, pero visible sin
+              depender del hover. */}
+          {meeting.taskLoad.length > 0 && (
+            <div className="mb-3 flex flex-wrap gap-1.5">
+              {meeting.taskLoad.map((r) => (
+                <Badge key={r.name} tone="neutral">
+                  {r.name} · {r.count}
+                </Badge>
+              ))}
+            </div>
+          )}
           {loading ? (
             <p className="text-sm text-fg-subtle">Cargando…</p>
           ) : tasks!.length === 0 ? (
