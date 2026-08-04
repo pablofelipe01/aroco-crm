@@ -29,6 +29,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
 import { Input, Select } from "@/components/ui/input";
 import { MultiSelect } from "@/components/ui/multi-select";
+import { isKnownSource } from "@/lib/task-sources";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { useToast } from "@/components/ui/toast";
@@ -412,7 +413,10 @@ export function TareasClient({
       conteo.set(o, (conteo.get(o) ?? 0) + 1);
     }
     return [...conteo.entries()]
-      .filter(([, n]) => n >= MIN_POR_ORIGEN)
+      // Un origen de la lista canónica entra aunque tenga una sola tarea: es
+      // una opción del formulario, no ruido. El umbral solo frena el texto
+      // libre heredado.
+      .filter(([o, n]) => isKnownSource(o) || o === SIN_ORIGEN || n >= MIN_POR_ORIGEN)
       .sort((a, b) => b[1] - a[1])
       .map(([o, n]) => ({ value: o, label: `${o} (${n})` }));
   }, [tasks]);
