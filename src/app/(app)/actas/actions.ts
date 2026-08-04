@@ -169,6 +169,32 @@ export async function setAttendeeAccess(
   return { ok: true };
 }
 
+/**
+ * Delega —o retira— la administración del acta a otra persona.
+ *
+ * Solo surte efecto en quien tenga acceso total: la delegación reparte entre
+ * SuperAdmins, no convierte a un miembro en administrador (ver 0050).
+ */
+export async function setAttendeeManage(
+  attendeeId: string,
+  canManage: boolean,
+): Promise<ActaResult> {
+  const session = await getSessionContext();
+  if (!session) return { ok: false, error: "Sesión expirada." };
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("meeting_attendees")
+    .update({ can_manage: canManage })
+    .eq("id", attendeeId)
+    .select("id");
+  if (error) return { ok: false, error: error.message };
+  if (!data || data.length === 0) {
+    return { ok: false, error: "No administras esta acta." };
+  }
+  revalidatePath("/actas");
+  return { ok: true };
+}
+
 /** Suma a alguien del equipo a la lista de acceso de un acta. */
 export async function addMeetingViewer(
   meetingId: string,
@@ -191,6 +217,9 @@ export async function addMeetingViewer(
     email: perfil.email,
     name: perfil.full_name,
     can_view: true,
+    // No estuvo en la reunión: se le da acceso, pero el registro de asistencia
+    // no se falsea.
+    attended: false,
   });
   if (error) {
     return {

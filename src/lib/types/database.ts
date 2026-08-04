@@ -1719,6 +1719,8 @@ export type Database = {
           name: string | null;
           created_at: string;
           can_view: boolean;
+          attended: boolean;
+          can_manage: boolean;
         };
         Insert: {
           id?: string;
@@ -1728,6 +1730,8 @@ export type Database = {
           name?: string | null;
           created_at?: string;
           can_view?: boolean;
+          attended?: boolean;
+          can_manage?: boolean;
         };
         Update: {
           id?: string;
@@ -1737,6 +1741,8 @@ export type Database = {
           name?: string | null;
           created_at?: string;
           can_view?: boolean;
+          attended?: boolean;
+          can_manage?: boolean;
         };
         Relationships: [];
       };

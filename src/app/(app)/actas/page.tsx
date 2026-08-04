@@ -3,6 +3,9 @@ import { getSessionContext } from "@/lib/auth";
 import { ActasClient } from "./actas-client";
 import type { Meeting, TeamMember, Profile } from "@/lib/types/database";
 
+/** Lo mínimo del perfil para repartir accesos. */
+export type ProfileLite = Pick<Profile, "id" | "full_name" | "email" | "role">;
+
 export const dynamic = "force-dynamic";
 
 /** Cuántas tareas del acta lleva cada persona. */
@@ -13,7 +16,12 @@ export type MeetingAttendee = {
   profile_id: string | null;
   name: string | null;
   email: string | null;
+  /** Permiso de lectura cuando el acta está restringida. */
   can_view: boolean;
+  /** Permiso para repartir el acceso. Solo surte efecto en SuperAdmins. */
+  can_manage: boolean;
+  /** Hecho: estuvo en la reunión. No cambia al quitarle el acceso. */
+  attended: boolean;
 };
 
 export type MeetingWithCount = Meeting & {
@@ -41,11 +49,11 @@ export default async function ActasPage() {
     supabase
       .from("meetings")
       .select(
-        "*, tasks(id, person_name, task_assignees(team_members(name))), meeting_attendees(id, profile_id, name, email, can_view)",
+        "*, tasks(id, person_name, task_assignees(team_members(name))), meeting_attendees(id, profile_id, name, email, can_view, can_manage, attended)",
       )
       .order("created_at", { ascending: false }),
     supabase.from("team_members").select("*").eq("active", true).order("name"),
-    supabase.from("profiles").select("id, full_name, email").eq("active", true).order("full_name"),
+    supabase.from("profiles").select("id, full_name, email, role").eq("active", true).order("full_name"),
   ]);
 
   // Quién administra cada acta: un SuperAdmin que asistió, o el Gerente
@@ -85,12 +93,14 @@ export default async function ActasPage() {
       for (const n of destinos) conteo.set(n, (conteo.get(n) ?? 0) + 1);
     }
 
-    const asistio =
+    // Administra quien asistió o quien recibió el rol por delegación (0050).
+    const enLaLista =
       session != null &&
       m.meeting_attendees.some(
         (a) =>
-          a.profile_id === session.userId ||
-          (a.email && a.email.toLowerCase() === session.email.toLowerCase()),
+          (a.attended || a.can_manage) &&
+          (a.profile_id === session.userId ||
+            (a.email && a.email.toLowerCase() === session.email.toLowerCase())),
       );
 
     return {
@@ -99,7 +109,7 @@ export default async function ActasPage() {
       taskLoad: [...conteo.entries()]
         .map(([name, count]) => ({ name, count }))
         .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name)),
-      canManage: esAdmin && (esRaiz || asistio),
+      canManage: esAdmin && (esRaiz || enLaLista),
     };
   });
 
@@ -107,7 +117,7 @@ export default async function ActasPage() {
     <ActasClient
       meetings={preparadas}
       team={(team ?? []) as TeamMember[]}
-      profiles={(profiles ?? []) as Pick<Profile, "id" | "full_name" | "email">[]}
+      profiles={(profiles ?? []) as ProfileLite[]}
     />
   );
 }

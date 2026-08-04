@@ -24,8 +24,8 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { useToast } from "@/components/ui/toast";
 import { AnimatePresence, motion } from "framer-motion";
 import { cn, formatDate } from "@/lib/utils";
-import type { TeamMember, Profile } from "@/lib/types/database";
-import type { MeetingWithCount, TaskLoad } from "./page";
+import type { TeamMember } from "@/lib/types/database";
+import type { MeetingWithCount, TaskLoad, ProfileLite } from "./page";
 import { MeetingDetail } from "./meeting-detail";
 import {
   createActaTasks,
@@ -135,7 +135,7 @@ export function ActasClient({
   meetings: MeetingWithCount[];
   team: TeamMember[];
   /** Para poder dar acceso a alguien que no asistió. */
-  profiles: Pick<Profile, "id" | "full_name" | "email">[];
+  profiles: ProfileLite[];
 }) {
   const router = useRouter();
   const { toast } = useToast();

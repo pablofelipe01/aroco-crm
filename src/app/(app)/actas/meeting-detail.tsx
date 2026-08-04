@@ -10,10 +10,10 @@ import { Badge } from "@/components/ui/badge";
 import { createClient } from "@/lib/supabase/client";
 import { formatDate } from "@/lib/utils";
 import { TASK_STATUS_META, type TaskStatus } from "@/lib/status";
-import type { MeetingWithCount } from "./page";
-import type { Profile } from "@/lib/types/database";
+import type { MeetingWithCount, ProfileLite } from "./page";
 import {
   setAttendeeAccess,
+  setAttendeeManage,
   addMeetingViewer,
   removeMeetingViewer,
 } from "./actions";
@@ -48,7 +48,7 @@ function AccessPanel({
   onChanged,
 }: {
   meeting: MeetingWithCount;
-  profiles: Pick<Profile, "id" | "full_name" | "email">[];
+  profiles: ProfileLite[];
   onChanged: () => void;
 }) {
   const { toast } = useToast();
@@ -58,6 +58,11 @@ function AccessPanel({
   const invitados = meeting.meeting_attendees;
   const yaEstan = new Set(invitados.map((a) => a.profile_id).filter(Boolean));
   const disponibles = profiles.filter((p) => !yaEstan.has(p.id));
+  /** La delegación solo surte efecto en quien tiene acceso total (0050). */
+  const superAdmins = new Set(
+    profiles.filter((p) => p.role === "admin").map((p) => p.id),
+  );
+  const esSuperAdmin = (id: string | null) => id != null && superAdmins.has(id);
 
   async function correr(id: string, fn: () => Promise<{ ok: boolean; error?: string }>) {
     setBusy(id);
@@ -107,10 +112,27 @@ function AccessPanel({
                 <span className="min-w-0 flex-1 truncate text-sm text-fg">
                   {a.name ?? a.email}
                 </span>
+                {!a.attended && <Badge tone="neutral">no asistió</Badge>}
                 {sinCuenta && (
                   // Sin cuenta en el CRM no hay a quién dar acceso: la marca
                   // no haría nada y confundiría.
                   <Badge tone="neutral">sin cuenta</Badge>
+                )}
+                {esSuperAdmin(a.profile_id) && (
+                  <label className="flex shrink-0 items-center gap-1 text-xs text-fg-subtle">
+                    <input
+                      type="checkbox"
+                      checked={a.can_manage || a.attended}
+                      // Quien asistió ya administra por regla; la casilla solo
+                      // sirve para dárselo a quien no estuvo.
+                      disabled={a.attended || busy === a.id}
+                      onChange={(e) =>
+                        correr(a.id, () => setAttendeeManage(a.id, e.target.checked))
+                      }
+                      className="h-3.5 w-3.5 accent-[var(--accent)]"
+                    />
+                    administra
+                  </label>
                 )}
                 <button
                   type="button"
@@ -180,7 +202,7 @@ export function MeetingDetail({
   open: boolean;
   onClose: () => void;
   onDownload: (filePath: string) => void;
-  profiles: Pick<Profile, "id" | "full_name" | "email">[];
+  profiles: ProfileLite[];
   onChanged: () => void;
 }) {
   // `null` = todavía sin cargar. El componente se remonta por acta (key en el
