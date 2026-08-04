@@ -1,14 +1,22 @@
 "use client";
 
 import * as React from "react";
-import { ClipboardList, FileDown, Lock, Users } from "lucide-react";
+import { ClipboardList, FileDown, Lock, Users, X } from "lucide-react";
 import { Drawer } from "@/components/ui/drawer";
 import { Button } from "@/components/ui/button";
+import { Select } from "@/components/ui/input";
+import { useToast } from "@/components/ui/toast";
 import { Badge } from "@/components/ui/badge";
 import { createClient } from "@/lib/supabase/client";
 import { formatDate } from "@/lib/utils";
 import { TASK_STATUS_META, type TaskStatus } from "@/lib/status";
 import type { MeetingWithCount } from "./page";
+import type { Profile } from "@/lib/types/database";
+import {
+  setAttendeeAccess,
+  addMeetingViewer,
+  removeMeetingViewer,
+} from "./actions";
 
 type MeetingTask = {
   id: string;
@@ -30,23 +38,150 @@ function responsables(t: MeetingTask): string {
 }
 
 /**
- * Lectura del acta dentro del CRM. Hasta ahora el contenido se guardaba pero no
- * había dónde verlo: las actas del correo traen el cuerpo completo en `notes` y
- * solo las subidas a mano tenían botón de descarga.
+ * Reparto del acceso al acta. Solo lo ve quien la administra: un SuperAdmin
+ * que asistió, o el Gerente General. La base vuelve a comprobarlo al escribir
+ * (0049), así que esconderlo aquí es comodidad, no la seguridad.
+ */
+function AccessPanel({
+  meeting,
+  profiles,
+  onChanged,
+}: {
+  meeting: MeetingWithCount;
+  profiles: Pick<Profile, "id" | "full_name" | "email">[];
+  onChanged: () => void;
+}) {
+  const { toast } = useToast();
+  const [busy, setBusy] = React.useState<string | null>(null);
+  const [añadir, setAñadir] = React.useState("");
+
+  const invitados = meeting.meeting_attendees;
+  const yaEstan = new Set(invitados.map((a) => a.profile_id).filter(Boolean));
+  const disponibles = profiles.filter((p) => !yaEstan.has(p.id));
+
+  async function correr(id: string, fn: () => Promise<{ ok: boolean; error?: string }>) {
+    setBusy(id);
+    const res = await fn();
+    setBusy(null);
+    if (!res.ok) {
+      toast({ tone: "error", title: "No se pudo cambiar", description: res.error });
+      return;
+    }
+    onChanged();
+  }
+
+  return (
+    <div className="rounded-[var(--radius-md)] border border-border bg-bg-subtle/40 p-3">
+      <h3 className="mb-1 flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-fg-subtle">
+        <Users className="h-3.5 w-3.5" />
+        Quién puede ver esta acta
+      </h3>
+      <p className="mb-3 text-xs text-fg-subtle">
+        {meeting.restricted
+          ? "El acta está restringida: solo la ven los marcados, más quienes la administran."
+          : "El acta está abierta a todo el equipo. Estas marcas empiezan a aplicar cuando la restrinjas."}
+      </p>
+
+      {invitados.length === 0 ? (
+        <p className="text-sm text-fg-subtle">
+          No hay nadie en la lista. Si la restringes, solo la verán quienes la administran.
+        </p>
+      ) : (
+        <ul className="space-y-1">
+          {invitados.map((a) => {
+            const sinCuenta = !a.profile_id;
+            return (
+              <li
+                key={a.id}
+                className="flex items-center gap-2 rounded-[var(--radius-sm)] px-1 py-1"
+              >
+                <input
+                  type="checkbox"
+                  checked={a.can_view && !sinCuenta}
+                  disabled={sinCuenta || busy === a.id}
+                  onChange={(e) =>
+                    correr(a.id, () => setAttendeeAccess(a.id, e.target.checked))
+                  }
+                  className="h-4 w-4 accent-[var(--accent)]"
+                />
+                <span className="min-w-0 flex-1 truncate text-sm text-fg">
+                  {a.name ?? a.email}
+                </span>
+                {sinCuenta && (
+                  // Sin cuenta en el CRM no hay a quién dar acceso: la marca
+                  // no haría nada y confundiría.
+                  <Badge tone="neutral">sin cuenta</Badge>
+                )}
+                <button
+                  type="button"
+                  onClick={() => correr(a.id, () => removeMeetingViewer(a.id))}
+                  disabled={busy === a.id}
+                  className="rounded p-1 text-fg-subtle hover:bg-danger-soft hover:text-danger"
+                  aria-label={`Quitar a ${a.name ?? a.email} de la lista`}
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+
+      {disponibles.length > 0 && (
+        <div className="mt-3 flex items-center gap-2">
+          <Select
+            value={añadir}
+            onChange={(e) => setAñadir(e.target.value)}
+            className="h-9 flex-1 py-0 text-sm"
+          >
+            <option value="">Dar acceso a alguien más…</option>
+            {disponibles.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.full_name}
+              </option>
+            ))}
+          </Select>
+          <Button
+            size="sm"
+            variant="secondary"
+            disabled={!añadir || busy === "add"}
+            onClick={() =>
+              correr("add", async () => {
+                const res = await addMeetingViewer(meeting.id, añadir);
+                if (res.ok) setAñadir("");
+                return res;
+              })
+            }
+          >
+            Añadir
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Lectura del acta dentro del CRM. Las actas del correo traen el cuerpo
+ * completo en `notes`; las subidas a mano, el archivo.
  *
- * No hace falta comprobar permisos aquí: si el acta llegó a la lista es porque
- * la RLS la dejó pasar (0044/0045).
+ * No hace falta comprobar permisos de lectura aquí: si el acta llegó a la
+ * lista es porque la RLS la dejó pasar (0044/0045/0049).
  */
 export function MeetingDetail({
   meeting,
   open,
   onClose,
   onDownload,
+  profiles,
+  onChanged,
 }: {
   meeting: MeetingWithCount | null;
   open: boolean;
   onClose: () => void;
   onDownload: (filePath: string) => void;
+  profiles: Pick<Profile, "id" | "full_name" | "email">[];
+  onChanged: () => void;
 }) {
   // `null` = todavía sin cargar. El componente se remonta por acta (key en el
   // padre), así que no hace falta reiniciar el estado dentro del efecto.
@@ -113,20 +248,24 @@ export function MeetingDetail({
       }
     >
       <div className="space-y-6">
-        {invitados.length > 0 && (
+        {invitados.length > 0 && !meeting.canManage && (
           <div>
             <h3 className="mb-2 flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-fg-subtle">
               <Users className="h-3.5 w-3.5" />
               Invitados
             </h3>
             <div className="flex flex-wrap gap-1.5">
-              {invitados.map((a, i) => (
-                <Badge key={i} tone="neutral">
+              {invitados.map((a) => (
+                <Badge key={a.id} tone="neutral">
                   {a.name ?? a.email}
                 </Badge>
               ))}
             </div>
           </div>
+        )}
+
+        {meeting.canManage && (
+          <AccessPanel meeting={meeting} profiles={profiles} onChanged={onChanged} />
         )}
 
         <div>

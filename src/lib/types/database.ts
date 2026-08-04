@@ -1718,6 +1718,7 @@ export type Database = {
           email: string | null;
           name: string | null;
           created_at: string;
+          can_view: boolean;
         };
         Insert: {
           id?: string;
@@ -1726,6 +1727,7 @@ export type Database = {
           email?: string | null;
           name?: string | null;
           created_at?: string;
+          can_view?: boolean;
         };
         Update: {
           id?: string;
@@ -1734,6 +1736,7 @@ export type Database = {
           email?: string | null;
           name?: string | null;
           created_at?: string;
+          can_view?: boolean;
         };
         Relationships: [];
       };

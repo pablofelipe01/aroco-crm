@@ -24,7 +24,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { useToast } from "@/components/ui/toast";
 import { AnimatePresence, motion } from "framer-motion";
 import { cn, formatDate } from "@/lib/utils";
-import type { TeamMember } from "@/lib/types/database";
+import type { TeamMember, Profile } from "@/lib/types/database";
 import type { MeetingWithCount, TaskLoad } from "./page";
 import { MeetingDetail } from "./meeting-detail";
 import {
@@ -130,12 +130,12 @@ function TaskLoadBadge({ total, load }: { total: number; load: TaskLoad[] }) {
 export function ActasClient({
   meetings,
   team,
-  canRestrict,
+  profiles,
 }: {
   meetings: MeetingWithCount[];
   team: TeamMember[];
-  /** Solo Dirección puede abrir o cerrar un acta. */
-  canRestrict: boolean;
+  /** Para poder dar acceso a alguien que no asistió. */
+  profiles: Pick<Profile, "id" | "full_name" | "email">[];
 }) {
   const router = useRouter();
   const { toast } = useToast();
@@ -346,7 +346,7 @@ export function ActasClient({
                 </Badge>
               )}
               <TaskLoadBadge total={m.tasks?.[0]?.count ?? 0} load={m.taskLoad} />
-              {canRestrict && (
+              {m.canManage && (
                 <button
                   onClick={() => onToggleRestricted(m)}
                   className="rounded p-1.5 text-fg-subtle hover:bg-bg-subtle hover:text-fg"
@@ -391,6 +391,8 @@ export function ActasClient({
         open={reading !== null}
         onClose={() => setReading(null)}
         onDownload={onDownload}
+        profiles={profiles}
+        onChanged={() => router.refresh()}
       />
 
       <Modal

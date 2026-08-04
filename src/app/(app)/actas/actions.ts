@@ -120,7 +120,13 @@ export async function getActaFileUrl(filePath: string): Promise<string | null> {
   return data?.signedUrl ?? null;
 }
 
-/** Marca o desmarca un acta como restringida a sus invitados. */
+/**
+ * Marca o desmarca un acta como restringida.
+ *
+ * Quién puede hacerlo lo decide la base (0049): un SuperAdmin que asistió a esa
+ * reunión, o el Gerente General. Si no, el trigger la rechaza y aquí solo se
+ * traduce el error a algo legible.
+ */
 export async function setMeetingRestricted(
   id: string,
   restricted: boolean,
@@ -129,7 +135,89 @@ export async function setMeetingRestricted(
   if (!session) return { ok: false, error: "Sesión expirada." };
   const supabase = await createClient();
   const { error } = await supabase.from("meetings").update({ restricted }).eq("id", id);
+  if (error) {
+    return {
+      ok: false,
+      error: /42501|permiso|policy/i.test(error.message)
+        ? "No administras esta acta: solo pueden hacerlo quienes asistieron y tienen acceso total."
+        : error.message,
+    };
+  }
+  revalidatePath("/actas");
+  return { ok: true };
+}
+
+/** Da o quita a una persona el acceso a un acta restringida. */
+export async function setAttendeeAccess(
+  attendeeId: string,
+  canView: boolean,
+): Promise<ActaResult> {
+  const session = await getSessionContext();
+  if (!session) return { ok: false, error: "Sesión expirada." };
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("meeting_attendees")
+    .update({ can_view: canView })
+    .eq("id", attendeeId)
+    .select("id");
   if (error) return { ok: false, error: error.message };
+  // La RLS no falla al filtrar: si no se actualizó nada, es que no manda aquí.
+  if (!data || data.length === 0) {
+    return { ok: false, error: "No administras esta acta." };
+  }
+  revalidatePath("/actas");
+  return { ok: true };
+}
+
+/** Suma a alguien del equipo a la lista de acceso de un acta. */
+export async function addMeetingViewer(
+  meetingId: string,
+  profileId: string,
+): Promise<ActaResult> {
+  const session = await getSessionContext();
+  if (!session) return { ok: false, error: "Sesión expirada." };
+  const supabase = await createClient();
+
+  const { data: perfil } = await supabase
+    .from("profiles")
+    .select("full_name, email")
+    .eq("id", profileId)
+    .maybeSingle();
+  if (!perfil) return { ok: false, error: "No se encontró esa persona." };
+
+  const { error } = await supabase.from("meeting_attendees").insert({
+    meeting_id: meetingId,
+    profile_id: profileId,
+    email: perfil.email,
+    name: perfil.full_name,
+    can_view: true,
+  });
+  if (error) {
+    return {
+      ok: false,
+      error: /duplicate|unique/i.test(error.message)
+        ? "Esa persona ya está en la lista."
+        : error.message,
+    };
+  }
+  revalidatePath("/actas");
+  return { ok: true };
+}
+
+/** Quita a alguien de la lista de acceso. */
+export async function removeMeetingViewer(attendeeId: string): Promise<ActaResult> {
+  const session = await getSessionContext();
+  if (!session) return { ok: false, error: "Sesión expirada." };
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("meeting_attendees")
+    .delete()
+    .eq("id", attendeeId)
+    .select("id");
+  if (error) return { ok: false, error: error.message };
+  if (!data || data.length === 0) {
+    return { ok: false, error: "No administras esta acta." };
+  }
   revalidatePath("/actas");
   return { ok: true };
 }
