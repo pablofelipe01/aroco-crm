@@ -1,5 +1,6 @@
 import {
   ShoppingCart,
+  TrendingUp,
   LayoutDashboard,
   Users,
   Calculator,
@@ -73,6 +74,12 @@ export const NAV_ITEMS: NavItem[] = [
     label: "Despachos",
     icon: Truck,
     departments: ["Dirección", "Bodega Central", "Comercial", "Operaciones"],
+  },
+  {
+    href: "/ventas",
+    label: "Ventas",
+    icon: TrendingUp,
+    departments: ["Dirección", "Comercial", "Financiero"],
   },
   {
     href: "/comisiones",
