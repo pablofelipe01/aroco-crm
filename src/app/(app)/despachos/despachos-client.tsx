@@ -12,6 +12,7 @@ import { Modal } from "@/components/ui/modal";
 import { EmptyState } from "@/components/ui/empty-state";
 import { useToast } from "@/components/ui/toast";
 import { formatKg, formatDate, formatCOP } from "@/lib/utils";
+import { CLASIFICACIONES } from "@/lib/schemas/inventory";
 import type { DispatchWithLinks } from "./page";
 import { DispatchTrace } from "./dispatch-trace";
 import { createDispatch, deleteDispatch } from "./actions";
@@ -25,6 +26,7 @@ interface FormValues {
   lead_id: string;
   origin: string;
   qty_kg: string;
+  clasificacion: string;
   purchase_price_cop_kg: string;
   remision_entrada: string;
 }
@@ -38,6 +40,7 @@ const EMPTY: FormValues = {
   lead_id: "",
   origin: "",
   qty_kg: "",
+  clasificacion: "Premium",
   purchase_price_cop_kg: "",
   remision_entrada: "",
 };
@@ -365,6 +368,16 @@ export function DespachosClient({
           </Field>
           <Field label="Cantidad (kg) *">
             <Input type="number" step="any" {...register("qty_kg", { required: true })} className="font-mono tnum" />
+          </Field>
+          <Field label="Clasificación">
+            <Select {...register("clasificacion")}>
+              <option value="">— Sin clasificar —</option>
+              {CLASIFICACIONES.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </Select>
           </Field>
           <Field label="OC">
             <Input {...register("oc")} />

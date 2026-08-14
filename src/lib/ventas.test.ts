@@ -98,6 +98,41 @@ test("las dos proyecciones difieren cuando el arranque del año fue flojo", () =
   assert.equal(v.mesesUsadosEnProyeccion, 3);
 });
 
+test("los cuatro grados se reportan aunque den cero", () => {
+  const v = agregarVentas(
+    [d("2026-04-10", "CASA LUKER", 100, { qty_premium_kg: 100 })],
+    2026,
+    new Date(Date.UTC(2026, 5, 30)),
+  );
+  // Ocultar los ceros hacía leer «Premium 100 %» como si la app no conociera
+  // los otros grados. Aparecen los cuatro.
+  assert.deepEqual(
+    v.porClasificacion.map((c) => c.tipo),
+    ["Premium", "Corriente", "Corriente C", "Orgánico"],
+  );
+});
+
+test("los kilos sin grado se nombran en vez de desaparecer", () => {
+  // Un despacho creado a mano en el CRM sin elegir clasificación: kilos en
+  // qty_kg y las cuatro columnas de grado en cero.
+  const v = agregarVentas(
+    [
+      d("2026-04-10", "CASA LUKER", 100, { qty_premium_kg: 100 }),
+      d("2026-04-11", "UNICONF", 40),
+    ],
+    2026,
+    new Date(Date.UTC(2026, 5, 30)),
+  );
+  assert.equal(v.kgAnio, 140);
+  const sinClasificar = v.porClasificacion.find((c) => c.tipo === "Sin clasificar");
+  assert.equal(sinClasificar?.kg, 40, "los 40 kg sin grado deben quedar visibles");
+  // El desglose tiene que cuadrar con el total del año, no con un subtotal.
+  assert.equal(
+    v.porClasificacion.reduce((s, c) => s + c.kg, 0),
+    v.kgAnio,
+  );
+});
+
 test("el avance se mide contra la meta", () => {
   const v = agregarVentas(
     [d("2026-04-10", "CASA LUKER", 250_000)],

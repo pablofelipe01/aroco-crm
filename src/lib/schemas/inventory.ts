@@ -14,6 +14,23 @@ const optDate = z
   .transform((v) => (v == null || v === "" ? undefined : v));
 const num = z.coerce.number();
 
+/**
+ * Los cuatro grados de la hoja maestra, con la columna en la que van los kilos.
+ * Un despacho creado en el CRM solo escribía qty_kg, así que quedaba sin grado
+ * para siempre y desaparecía del desglose por clasificación.
+ */
+export const CLASIFICACION_COLUMNA = {
+  Premium: "qty_premium_kg",
+  Corriente: "qty_corriente_kg",
+  "Corriente C": "qty_corriente_c_kg",
+  Orgánico: "qty_organico_kg",
+} as const;
+
+export const CLASIFICACIONES = Object.keys(CLASIFICACION_COLUMNA) as [
+  keyof typeof CLASIFICACION_COLUMNA,
+  ...(keyof typeof CLASIFICACION_COLUMNA)[],
+];
+
 export const lotSchema = z.object({
   code: z.string().trim().min(1, "El código es obligatorio."),
   entry_date: optText,
@@ -47,6 +64,7 @@ export const dispatchSchema = z.object({
   lead_id: z.string().uuid().nullable().optional(),
   origin: optText,
   qty_kg: num,
+  clasificacion: z.enum(CLASIFICACIONES).optional().or(z.literal("")),
   purchase_price_cop_kg: z.coerce.number().nullable().optional(),
 });
 

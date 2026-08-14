@@ -192,15 +192,17 @@ export function VentasClient({
             <CardTitle>Por clasificación</CardTitle>
           </CardHeader>
           <CardBody>
-            {v.porClasificacion.length === 0 ? (
+            {v.kgAnio === 0 ? (
               <EmptyState title="Sin datos de clasificación" />
             ) : (
               <ul className="space-y-2">
                 {v.porClasificacion.map((c) => {
-                  const total = v.porClasificacion.reduce((s, x) => s + x.kg, 0) || 1;
-                  const pct = (c.kg / total) * 100;
+                  // Sobre el total del año, no sobre la suma de los grados: si
+                  // quedan kilos sin clasificar los porcentajes tienen que
+                  // sumar menos de 100, no repartirse el hueco.
+                  const pct = v.kgAnio > 0 ? (c.kg / v.kgAnio) * 100 : 0;
                   return (
-                    <li key={c.tipo}>
+                    <li key={c.tipo} className={c.kg === 0 ? "opacity-50" : undefined}>
                       <div className="flex items-baseline justify-between gap-3 text-sm">
                         <span className="text-fg">{c.tipo}</span>
                         <span className="shrink-0 font-mono tnum text-fg-muted">

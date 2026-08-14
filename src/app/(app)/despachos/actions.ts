@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getSessionContext } from "@/lib/auth";
-import { dispatchSchema } from "@/lib/schemas/inventory";
+import { CLASIFICACION_COLUMNA, dispatchSchema } from "@/lib/schemas/inventory";
 
 export type ActionResult = { ok: boolean; error?: string; id?: string };
 
@@ -20,10 +20,18 @@ export async function createDispatch(input: unknown): Promise<ActionResult> {
   const session = await requireSession();
   const supabase = await createClient();
 
+  // El grado se guarda en su propia columna de kilos, igual que hace el sync
+  // de la hoja: así un despacho hecho a mano aparece en el desglose por
+  // clasificación en vez de quedar como «sin clasificar».
+  const { clasificacion, ...campos } = parsed.data;
+  const grado = clasificacion
+    ? { [CLASIFICACION_COLUMNA[clasificacion]]: campos.qty_kg }
+    : {};
+
   // The dispatch→movement trigger discounts the linked lot automatically.
   const { data, error } = await supabase
     .from("dispatches")
-    .insert({ ...parsed.data, created_by: session.userId })
+    .insert({ ...campos, ...grado, created_by: session.userId })
     .select("id")
     .single();
   if (error) return { ok: false, error: error.message };

@@ -134,12 +134,23 @@ export function agregarVentas(
     clientes.set(c, (clientes.get(c) ?? 0) + (Number(d.qty_kg) || 0));
   }
 
-  const clasif = [
+  // Los cuatro grados van SIEMPRE, aunque den cero. Filtrar los vacíos hacía
+  // que la vista mostrara «Premium 100 %» a secas, que se lee como si la app
+  // solo conociera un grado; con los ceros a la vista se lee lo que de verdad
+  // pasa, que es que AROCO vende premium y deja el resto en bodega.
+  const clasif: [string, number][] = [
     ["Premium", suma(ventasAnio.map((d) => Number(d.qty_premium_kg) || 0))],
     ["Corriente", suma(ventasAnio.map((d) => Number(d.qty_corriente_kg) || 0))],
     ["Corriente C", suma(ventasAnio.map((d) => Number(d.qty_corriente_c_kg) || 0))],
     ["Orgánico", suma(ventasAnio.map((d) => Number(d.qty_organico_kg) || 0))],
-  ] as [string, number][];
+  ];
+
+  // Un despacho creado a mano en el CRM solo trae qty_kg: si nadie eligió
+  // grado, esos kilos no están en ninguna de las cuatro columnas. Antes se
+  // perdían del desglose mientras seguían contando en el total, así que los
+  // porcentajes cuadraban con una cifra que no era la del año. Ahora se
+  // nombran.
+  const kgSinClasificar = Math.max(0, kgAnio - suma(clasif.map(([, kg]) => kg)));
 
   // ── Proyecciones ──────────────────────────────────────────────────────────
   const inicio = new Date(Date.UTC(anio, 0, 1));
@@ -167,9 +178,12 @@ export function agregarVentas(
     porCliente: [...clientes.entries()]
       .map(([cliente, kg]) => ({ cliente, kg }))
       .sort((a, b) => b.kg - a.kg),
-    porClasificacion: clasif
-      .filter(([, kg]) => kg > 0)
-      .map(([tipo, kg]) => ({ tipo, kg })),
+    porClasificacion: [
+      ...clasif,
+      ...(kgSinClasificar > 0
+        ? ([["Sin clasificar", kgSinClasificar]] as [string, number][])
+        : []),
+    ].map(([tipo, kg]) => ({ tipo, kg })),
     kgAnio,
     kgHistorico: suma(ventas.map((d) => Number(d.qty_kg) || 0)),
     kgNoVenta,
