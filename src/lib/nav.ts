@@ -1,4 +1,5 @@
 import {
+  ShoppingCart,
   LayoutDashboard,
   Users,
   Calculator,
@@ -59,6 +60,14 @@ export const NAV_ITEMS: NavItem[] = [
   // Tolimax): 60,8 kg en dos filas.
   // La ruta, la tabla y el sync diario siguen vivos — para reponerlo basta con
   // devolver esta entrada al menú.
+  {
+    href: "/compras",
+    label: "Compras",
+    icon: ShoppingCart,
+    // Cualquiera puede pedir insumos; aprobar es otra cosa y lo decide
+    // `profiles.aprueba_compras`, no el área.
+    departments: "all",
+  },
   {
     href: "/despachos",
     label: "Despachos",

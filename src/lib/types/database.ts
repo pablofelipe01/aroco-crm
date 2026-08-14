@@ -98,6 +98,135 @@ export type Database = {
         };
         Relationships: [];
       };
+      compra_cotizaciones: {
+        Row: {
+          archivo_nombre: string | null;
+          archivo_path: string | null;
+          created_at: string;
+          created_by: string | null;
+          descripcion: string | null;
+          id: string;
+          incluye_iva: boolean;
+          moneda: string;
+          monto: number;
+          nit: string | null;
+          notas: string | null;
+          proveedor: string;
+          solicitud_id: string;
+          tiempo_entrega: string | null;
+          valida_hasta: string | null;
+        };
+        Insert: {
+          archivo_nombre?: string | null;
+          archivo_path?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          descripcion?: string | null;
+          id?: string;
+          incluye_iva?: boolean;
+          moneda?: string;
+          monto: number;
+          nit?: string | null;
+          notas?: string | null;
+          proveedor: string;
+          solicitud_id: string;
+          tiempo_entrega?: string | null;
+          valida_hasta?: string | null;
+        };
+        Update: {
+          archivo_nombre?: string | null;
+          archivo_path?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          descripcion?: string | null;
+          id?: string;
+          incluye_iva?: boolean;
+          moneda?: string;
+          monto?: number;
+          nit?: string | null;
+          notas?: string | null;
+          proveedor?: string;
+          solicitud_id?: string;
+          tiempo_entrega?: string | null;
+          valida_hasta?: string | null;
+        };
+        Relationships: [];
+      };
+      compra_solicitudes: {
+        Row: {
+          aprobada_en: string | null;
+          aprobada_por: string | null;
+          area: Database["public"]["Enums"]["department"] | null;
+          categoria: Database["public"]["Enums"]["compra_categoria"];
+          consecutivo: string;
+          cotizacion_elegida_id: string | null;
+          created_at: string;
+          created_by: string | null;
+          descripcion: string | null;
+          entrega_notas: string | null;
+          estado: Database["public"]["Enums"]["compra_estado"];
+          id: string;
+          justificacion: string | null;
+          motivo_rechazo: string | null;
+          pagada_en: string | null;
+          pagada_por: string | null;
+          pago_medio: string | null;
+          pago_referencia: string | null;
+          recibida_en: string | null;
+          recibida_por: string | null;
+          titulo: string;
+          updated_at: string;
+        };
+        Insert: {
+          aprobada_en?: string | null;
+          aprobada_por?: string | null;
+          area?: Database["public"]["Enums"]["department"] | null;
+          categoria?: Database["public"]["Enums"]["compra_categoria"];
+          consecutivo?: string;
+          cotizacion_elegida_id?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          descripcion?: string | null;
+          entrega_notas?: string | null;
+          estado?: Database["public"]["Enums"]["compra_estado"];
+          id?: string;
+          justificacion?: string | null;
+          motivo_rechazo?: string | null;
+          pagada_en?: string | null;
+          pagada_por?: string | null;
+          pago_medio?: string | null;
+          pago_referencia?: string | null;
+          recibida_en?: string | null;
+          recibida_por?: string | null;
+          titulo: string;
+          updated_at?: string;
+        };
+        Update: {
+          aprobada_en?: string | null;
+          aprobada_por?: string | null;
+          area?: Database["public"]["Enums"]["department"] | null;
+          categoria?: Database["public"]["Enums"]["compra_categoria"];
+          consecutivo?: string;
+          cotizacion_elegida_id?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          descripcion?: string | null;
+          entrega_notas?: string | null;
+          estado?: Database["public"]["Enums"]["compra_estado"];
+          id?: string;
+          justificacion?: string | null;
+          motivo_rechazo?: string | null;
+          pagada_en?: string | null;
+          pagada_por?: string | null;
+          pago_medio?: string | null;
+          pago_referencia?: string | null;
+          recibida_en?: string | null;
+          recibida_por?: string | null;
+          titulo?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       dispatches: {
         Row: {
           bultos: number | null;
@@ -1557,6 +1686,7 @@ export type Database = {
       profiles: {
         Row: {
           active: boolean;
+          aprueba_compras: boolean;
           created_at: string;
           department: Database["public"]["Enums"]["department"] | null;
           email: string;
@@ -1568,6 +1698,7 @@ export type Database = {
         };
         Insert: {
           active?: boolean;
+          aprueba_compras?: boolean;
           created_at?: string;
           department?: Database["public"]["Enums"]["department"] | null;
           email: string;
@@ -1579,6 +1710,7 @@ export type Database = {
         };
         Update: {
           active?: boolean;
+          aprueba_compras?: boolean;
           created_at?: string;
           department?: Database["public"]["Enums"]["department"] | null;
           email?: string;
@@ -1917,6 +2049,16 @@ export type Database = {
       is_admin: { Args: Record<string, never>; Returns: boolean };
     };
     Enums: {
+      compra_categoria:
+        | "Oficina"
+        | "Finca"
+        | "Plantación"
+        | "Bodega"
+        | "Transporte"
+        | "Mantenimiento"
+        | "Tecnología"
+        | "Otro";
+      compra_estado: "Borrador" | "Pendiente" | "Aprobada" | "Rechazada";
       activity_type:
         | "Nota"
         | "Llamada"
@@ -1996,6 +2138,8 @@ export type InventoryLot = Tables<"inventory_lots">;
 export type InventoryMovement = Tables<"inventory_movements">;
 export type InventoryQuality = Tables<"inventory_quality">;
 export type Dispatch = Tables<"dispatches">;
+export type CompraSolicitud = Tables<"compra_solicitudes">;
+export type CompraCotizacion = Tables<"compra_cotizaciones">;
 export type PriceHistory = Tables<"price_history">;
 export type Notification = Tables<"notifications">;
 export type CommissionRule = Tables<"commission_rules">;
