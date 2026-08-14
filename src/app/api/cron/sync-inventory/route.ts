@@ -47,7 +47,16 @@ export async function GET(request: NextRequest) {
   }
 
   // 2) Parse to lot + dispatch rows.
-  const { lots, dispatches, rowsRead } = parseInventorySheet(csv);
+  //
+  // El parser lanza si a la hoja le falta una columna esperada. Se atrapa aquí
+  // para que quede registrada la corrida en rojo: si el error se escapara, la
+  // ejecución moriría con un 500 y nadie sabría por qué dejó de actualizarse.
+  let lots, dispatches, rowsRead;
+  try {
+    ({ lots, dispatches, rowsRead } = parseInventorySheet(csv));
+  } catch (e) {
+    return await fail(db, startedAt, 0, e);
+  }
   if (rowsRead === 0) {
     return await fail(
       db,
