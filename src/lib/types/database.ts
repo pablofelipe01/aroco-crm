@@ -152,6 +152,60 @@ export type Database = {
         };
         Relationships: [];
       };
+      preguntas: {
+        Row: {
+          area: Database["public"]["Enums"]["department"] | null;
+          bloquea: string | null;
+          contexto: string | null;
+          created_at: string;
+          created_by: string | null;
+          estado: Database["public"]["Enums"]["pregunta_estado"];
+          id: string;
+          meeting_id: string | null;
+          para_quien: string | null;
+          pregunta: string;
+          prioridad: Database["public"]["Enums"]["pregunta_prioridad"];
+          respondida_en: string | null;
+          respondida_por: string | null;
+          respuesta: string | null;
+          updated_at: string;
+        };
+        Insert: {
+          area?: Database["public"]["Enums"]["department"] | null;
+          bloquea?: string | null;
+          contexto?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          estado?: Database["public"]["Enums"]["pregunta_estado"];
+          id?: string;
+          meeting_id?: string | null;
+          para_quien?: string | null;
+          pregunta: string;
+          prioridad?: Database["public"]["Enums"]["pregunta_prioridad"];
+          respondida_en?: string | null;
+          respondida_por?: string | null;
+          respuesta?: string | null;
+          updated_at?: string;
+        };
+        Update: {
+          area?: Database["public"]["Enums"]["department"] | null;
+          bloquea?: string | null;
+          contexto?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          estado?: Database["public"]["Enums"]["pregunta_estado"];
+          id?: string;
+          meeting_id?: string | null;
+          para_quien?: string | null;
+          pregunta?: string;
+          prioridad?: Database["public"]["Enums"]["pregunta_prioridad"];
+          respondida_en?: string | null;
+          respondida_por?: string | null;
+          respuesta?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       compra_solicitudes: {
         Row: {
           aprobada_en: string | null;
@@ -2059,6 +2113,8 @@ export type Database = {
         | "Tecnología"
         | "Otro";
       compra_estado: "Borrador" | "Pendiente" | "Aprobada" | "Rechazada";
+      pregunta_estado: "Pendiente" | "Respondida" | "Descartada";
+      pregunta_prioridad: "Alta" | "Media" | "Baja";
       activity_type:
         | "Nota"
         | "Llamada"
@@ -2139,6 +2195,7 @@ export type InventoryMovement = Tables<"inventory_movements">;
 export type InventoryQuality = Tables<"inventory_quality">;
 export type Dispatch = Tables<"dispatches">;
 export type CompraSolicitud = Tables<"compra_solicitudes">;
+export type Pregunta = Tables<"preguntas">;
 export type CompraCotizacion = Tables<"compra_cotizaciones">;
 export type PriceHistory = Tables<"price_history">;
 export type Notification = Tables<"notifications">;

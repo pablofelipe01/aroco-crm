@@ -1,6 +1,7 @@
 import {
   ShoppingCart,
   TrendingUp,
+  HelpCircle,
   LayoutDashboard,
   Users,
   Calculator,
@@ -74,6 +75,12 @@ export const NAV_ITEMS: NavItem[] = [
     label: "Despachos",
     icon: Truck,
     departments: ["Dirección", "Bodega Central", "Comercial", "Operaciones"],
+  },
+  {
+    href: "/preguntas",
+    label: "Preguntas",
+    icon: HelpCircle,
+    departments: "all",
   },
   {
     href: "/ventas",
