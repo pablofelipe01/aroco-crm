@@ -3,7 +3,15 @@
 import * as React from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import Link from "next/link";
-import { Bell, AlertTriangle, Clock, TrendingUp, Check, ShoppingCart } from "lucide-react";
+import {
+  Bell,
+  AlertTriangle,
+  Clock,
+  TrendingUp,
+  Check,
+  ShoppingCart,
+  ClipboardCheck,
+} from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { hasSupabaseEnv } from "@/lib/env";
 import { cn, formatDate } from "@/lib/utils";
@@ -15,6 +23,7 @@ const ICON: Record<string, React.ElementType> = {
   task_overdue: AlertTriangle,
   price_alert: TrendingUp,
   compra_aprobacion: ShoppingCart,
+  compra_decision: ClipboardCheck,
 };
 
 /**
