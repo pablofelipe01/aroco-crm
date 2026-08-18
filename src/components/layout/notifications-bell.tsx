@@ -2,7 +2,8 @@
 
 import * as React from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Bell, AlertTriangle, Clock, TrendingUp, Check } from "lucide-react";
+import Link from "next/link";
+import { Bell, AlertTriangle, Clock, TrendingUp, Check, ShoppingCart } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { hasSupabaseEnv } from "@/lib/env";
 import { cn, formatDate } from "@/lib/utils";
@@ -13,6 +14,19 @@ const ICON: Record<string, React.ElementType> = {
   lead_followup: Clock,
   task_overdue: AlertTriangle,
   price_alert: TrendingUp,
+  compra_aprobacion: ShoppingCart,
+};
+
+/**
+ * A dónde lleva cada aviso. Una notificación que no se puede abrir obliga a
+ * buscar a mano lo que acaba de avisar, y entonces avisa a medias.
+ */
+const RUTA: Record<string, string> = {
+  compra_solicitudes: "/compras",
+  leads: "/comercial",
+  tasks: "/tareas",
+  meetings: "/actas",
+  price_history: "/precios",
 };
 
 const SEV_COLOR: Record<string, string> = {
@@ -116,11 +130,10 @@ export function NotificationsBell() {
               ) : (
                 items.map((n) => {
                   const Icon = ICON[n.type] ?? Bell;
-                  return (
-                    <div
-                      key={n.id}
-                      className="flex gap-3 border-b border-border px-4 py-3 last:border-0"
-                    >
+                  const href = n.related_table ? RUTA[n.related_table] : undefined;
+                  const fila = "flex gap-3 border-b border-border px-4 py-3 last:border-0";
+                  const contenido = (
+                    <>
                       <Icon
                         className={cn(
                           "mt-0.5 h-4 w-4 shrink-0",
@@ -136,6 +149,23 @@ export function NotificationsBell() {
                           {formatDate(n.created_at)}
                         </p>
                       </div>
+                    </>
+                  );
+
+                  // Sin ruta conocida se queda como estaba: mandar a una página
+                  // equivocada es peor que no ser clicable.
+                  return href ? (
+                    <Link
+                      key={n.id}
+                      href={href}
+                      onClick={() => setOpen(false)}
+                      className={cn(fila, "transition-colors hover:bg-bg-subtle")}
+                    >
+                      {contenido}
+                    </Link>
+                  ) : (
+                    <div key={n.id} className={fila}>
+                      {contenido}
                     </div>
                   );
                 })
