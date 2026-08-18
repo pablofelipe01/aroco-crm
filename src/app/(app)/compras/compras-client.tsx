@@ -3,7 +3,7 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
-import { Plus, Search, ShoppingCart, Clock, CheckCircle2, X } from "lucide-react";
+import { Plus, Search, ShoppingCart, Clock, CheckCircle2, X, AlertTriangle } from "lucide-react";
 import { motion } from "framer-motion";
 import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
@@ -42,10 +42,13 @@ function montoReferencia(s: SolicitudConCotizaciones) {
 
 export function ComprasClient({
   solicitudes,
+  error,
   puedeAprobar,
   userId,
 }: {
   solicitudes: SolicitudConCotizaciones[];
+  /** Falla de la consulta. Sin esto, una lista rota se ve como una lista vacía. */
+  error?: string | null;
   /** Álvaro, Nicolás y Luis Ernesto. */
   puedeAprobar: boolean;
   userId: string;
@@ -124,6 +127,25 @@ export function ComprasClient({
           </Button>
         }
       />
+
+      {error && (
+        <div
+          role="alert"
+          className="flex items-start gap-3 rounded-[var(--radius-md)] border border-danger/40 bg-danger-soft p-4"
+        >
+          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-danger" />
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-danger">
+              No se pudieron cargar las solicitudes
+            </p>
+            <p className="mt-1 text-sm text-fg-muted">
+              La lista de abajo está incompleta o vacía por una falla al consultar, no
+              porque no haya solicitudes. Lo que hayas guardado sigue ahí.
+            </p>
+            <p className="mt-1 font-mono text-xs text-fg-subtle">{error}</p>
+          </div>
+        </div>
+      )}
 
       <motion.div
         variants={staggerContainer}

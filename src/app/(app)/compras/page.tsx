@@ -16,10 +16,14 @@ export default async function ComprasPage() {
   const supabase = await createClient();
   const session = await getSessionContext();
 
-  const [{ data: solicitudes }, { data: perfiles }] = await Promise.all([
+  const [{ data: solicitudes, error }, { data: perfiles }] = await Promise.all([
+    // El `!solicitud_id` no es adorno: hay DOS llaves foráneas entre estas dos
+    // tablas —la cotización apunta a su solicitud, y la solicitud apunta a la
+    // cotización elegida— y sin decirle cuál seguir, PostgREST no adivina y
+    // rechaza la consulta entera.
     supabase
       .from("compra_solicitudes")
-      .select("*, compra_cotizaciones(*)")
+      .select("*, compra_cotizaciones!solicitud_id(*)")
       .order("created_at", { ascending: false }),
     supabase.from("profiles").select("id, full_name").eq("active", true),
   ]);
@@ -44,6 +48,10 @@ export default async function ComprasPage() {
   return (
     <ComprasClient
       solicitudes={filas}
+      // Si la consulta falla, la lista llega vacía y se ve idéntica a «no hay
+      // solicitudes». Así fue como una consulta rota pasó por «se guardan pero
+      // no se ven»: el error hay que mostrarlo, no tragárselo.
+      error={error?.message ?? null}
       puedeAprobar={session?.profile?.aprueba_compras ?? false}
       userId={session?.userId ?? ""}
     />
