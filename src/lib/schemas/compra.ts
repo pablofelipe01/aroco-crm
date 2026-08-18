@@ -63,5 +63,11 @@ export const cotizacionSchema = z.object({
   notas: optionalText,
 });
 
+/** Al editar no se toca a qué solicitud pertenece: mover una cotización de
+ *  solicitud dejaría la elegida colgando de otra. */
+export const cotizacionEditSchema = cotizacionSchema
+  .omit({ solicitud_id: true })
+  .extend({ id: z.string().uuid() });
+
 export type SolicitudInput = z.input<typeof solicitudSchema>;
 export type CotizacionInput = z.input<typeof cotizacionSchema>;

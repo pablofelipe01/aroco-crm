@@ -3,7 +3,11 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getSessionContext } from "@/lib/auth";
-import { solicitudSchema, cotizacionSchema } from "@/lib/schemas/compra";
+import {
+  solicitudSchema,
+  cotizacionSchema,
+  cotizacionEditSchema,
+} from "@/lib/schemas/compra";
 import type { Database } from "@/lib/types/database";
 
 export type CompraResult = { ok: boolean; error?: string; id?: string };
@@ -28,6 +32,27 @@ function legible(mensaje: string): string {
     return "No tienes permiso para esta acción.";
   }
   return mensaje;
+}
+
+/**
+ * Una solicitud ya decidida no se edita: lo aprobado tiene que seguir diciendo
+ * lo que se aprobó. El candado va aquí y no solo en los botones, porque la
+ * interfaz se puede saltar.
+ */
+async function editable(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  solicitudId: string,
+): Promise<string | null> {
+  const { data } = await supabase
+    .from("compra_solicitudes")
+    .select("estado")
+    .eq("id", solicitudId)
+    .maybeSingle();
+  if (!data) return "No se encontró la solicitud.";
+  if (data.estado === "Aprobada" || data.estado === "Rechazada") {
+    return `Esta solicitud ya está ${data.estado.toLowerCase()} y no se puede modificar.`;
+  }
+  return null;
 }
 
 export async function crearSolicitud(input: unknown): Promise<CompraResult> {
@@ -55,6 +80,9 @@ export async function editarSolicitud(id: string, input: unknown): Promise<Compr
   }
   await requireSession();
   const supabase = await createClient();
+  const cerrada = await editable(supabase, id);
+  if (cerrada) return { ok: false, error: cerrada };
+
   const { area, ...resto } = parsed.data;
   const { error } = await supabase
     .from("compra_solicitudes")
@@ -114,6 +142,74 @@ export async function subirCotizacion(formData: FormData): Promise<CompraResult>
   if (error) return { ok: false, error: legible(error.message) };
   revalidatePath("/compras");
   return { ok: true };
+}
+
+/**
+ * Corrige una cotización ya cargada. El archivo es opcional: si viene uno
+ * nuevo reemplaza al anterior, y `quitar_archivo` lo deja sin soporte.
+ */
+export async function editarCotizacion(formData: FormData): Promise<CompraResult> {
+  await requireSession();
+  const supabase = await createClient();
+
+  const parsed = cotizacionEditSchema.safeParse({
+    id: formData.get("id"),
+    proveedor: formData.get("proveedor"),
+    nit: formData.get("nit") ?? "",
+    descripcion: formData.get("descripcion") ?? "",
+    monto: formData.get("monto") ?? "",
+    moneda: formData.get("moneda") ?? "COP",
+    incluye_iva: formData.get("incluye_iva") === "on",
+    valida_hasta: formData.get("valida_hasta") ?? "",
+    tiempo_entrega: formData.get("tiempo_entrega") ?? "",
+    notas: formData.get("notas") ?? "",
+  });
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues[0]?.message ?? "Datos inválidos." };
+  }
+  const { id, ...campos } = parsed.data;
+
+  const { data: actual } = await supabase
+    .from("compra_cotizaciones")
+    .select("solicitud_id, archivo_path")
+    .eq("id", id)
+    .maybeSingle();
+  if (!actual) return { ok: false, error: "No se encontró la cotización." };
+
+  const cerrada = await editable(supabase, actual.solicitud_id);
+  if (cerrada) return { ok: false, error: cerrada };
+
+  // El archivo se resuelve antes del update por la misma razón que al crear:
+  // que no quede una cotización afirmando tener un soporte que no subió.
+  let archivo: { archivo_path: string | null; archivo_nombre: string | null } | null = null;
+  const file = formData.get("archivo");
+  if (file instanceof File && file.size > 0) {
+    const safe = file.name.replace(/[^\w.\-]+/g, "_").slice(-80);
+    const path = `${actual.solicitud_id}/${Date.now()}-${safe}`;
+    const { error: upErr } = await supabase.storage
+      .from("compras")
+      .upload(path, file, { contentType: file.type || "application/octet-stream" });
+    if (upErr) return { ok: false, error: `No se pudo subir el archivo: ${upErr.message}` };
+    archivo = { archivo_path: path, archivo_nombre: file.name };
+  } else if (formData.get("quitar_archivo") === "on") {
+    archivo = { archivo_path: null, archivo_nombre: null };
+  }
+
+  const { error } = await supabase
+    .from("compra_cotizaciones")
+    .update({ ...campos, ...(archivo ?? {}) })
+    .eq("id", id);
+  if (error) return { ok: false, error: legible(error.message) };
+
+  // El anterior se borra solo después de que el update pasó: si se borrara
+  // antes y el update fallara, la cotización quedaría apuntando a un archivo
+  // que ya no existe.
+  if (archivo && actual.archivo_path && actual.archivo_path !== archivo.archivo_path) {
+    await supabase.storage.from("compras").remove([actual.archivo_path]);
+  }
+
+  revalidatePath("/compras");
+  return { ok: true, id };
 }
 
 export async function borrarCotizacion(id: string): Promise<CompraResult> {

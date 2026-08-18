@@ -11,6 +11,7 @@ import {
   Wallet,
   PackageCheck,
   Plus,
+  Pencil,
 } from "lucide-react";
 import { Drawer } from "@/components/ui/drawer";
 import { Button } from "@/components/ui/button";
@@ -18,9 +19,12 @@ import { Badge, type BadgeTone } from "@/components/ui/badge";
 import { Field, Input, Select, Textarea } from "@/components/ui/input";
 import { useToast } from "@/components/ui/toast";
 import { formatCOP, formatDate, formatNumber } from "@/lib/utils";
-import { MONEDAS } from "@/lib/schemas/compra";
+import { MONEDAS, COMPRA_CATEGORIAS } from "@/lib/schemas/compra";
+import { DEPARTMENTS } from "@/lib/departments";
 import type { SolicitudConCotizaciones } from "./page";
 import {
+  editarSolicitud,
+  editarCotizacion,
   subirCotizacion,
   borrarCotizacion,
   urlCotizacion,
@@ -62,6 +66,8 @@ export function SolicitudDetail({
   const { toast } = useToast();
   const [busy, setBusy] = React.useState(false);
   const [nuevaOpen, setNuevaOpen] = React.useState(false);
+  const [editandoCot, setEditandoCot] = React.useState<string | null>(null);
+  const [editandoSol, setEditandoSol] = React.useState(false);
   const [motivo, setMotivo] = React.useState("");
   const [pagoMedio, setPagoMedio] = React.useState("");
   const [pagoRef, setPagoRef] = React.useState("");
@@ -72,7 +78,12 @@ export function SolicitudDetail({
   const s = solicitud;
   const cotizaciones = s.compra_cotizaciones;
   const esAutor = s.created_by === userId;
-  const editable = s.estado === "Borrador" && (esAutor || puedeAprobar);
+  const esBorrador = s.estado === "Borrador";
+  // Se puede corregir mientras no esté decidida. Antes solo en Borrador, y eso
+  // dejaba encerrado a quien detectaba un error después de pedir aprobación:
+  // la única salida era que se la rechazaran. Una vez aprobada o rechazada sí
+  // se congela, porque el registro debe seguir diciendo qué se decidió.
+  const editable = !["Aprobada", "Rechazada"].includes(s.estado) && (esAutor || puedeAprobar);
   const elegida = cotizaciones.find((c) => c.id === s.cotizacion_elegida_id) ?? null;
 
   async function correr(fn: () => Promise<{ ok: boolean; error?: string }>, exito: string) {
@@ -116,7 +127,7 @@ export function SolicitudDetail({
         </div>
       }
       footer={
-        editable && (
+        esBorrador && (esAutor || puedeAprobar) && (
           <Button
             size="sm"
             loading={busy}
@@ -131,7 +142,26 @@ export function SolicitudDetail({
       }
     >
       <div className="space-y-6">
-        {(s.descripcion || s.justificacion) && (
+        {editable && (
+          <div className="flex justify-end">
+            <Button variant="ghost" size="sm" onClick={() => setEditandoSol((v) => !v)}>
+              <Pencil className="h-3.5 w-3.5" />
+              {editandoSol ? "Cancelar" : "Editar solicitud"}
+            </Button>
+          </div>
+        )}
+
+        {editandoSol && editable && (
+          <FormSolicitud
+            solicitud={s}
+            onDone={() => {
+              setEditandoSol(false);
+              router.refresh();
+            }}
+          />
+        )}
+
+        {!editandoSol && (s.descripcion || s.justificacion) && (
           <dl className="space-y-3 text-sm">
             {s.descripcion && (
               <div>
@@ -203,6 +233,13 @@ export function SolicitudDetail({
                             <Badge tone="info">más económica</Badge>
                           )}
                           {esElegida && <Badge tone="success">elegida</Badge>}
+                          {/* Si alguien corrigió el monto después de que el
+                              aprobador lo leyó, tiene que verse. */}
+                          {c.updated_at && c.updated_at !== c.created_at && (
+                            <span className="text-[11px] text-fg-subtle">
+                              editada {formatDate(c.updated_at)}
+                            </span>
+                          )}
                         </p>
                         {c.descripcion && (
                           <p className="mt-0.5 text-xs text-fg-subtle">{c.descripcion}</p>
@@ -248,6 +285,18 @@ export function SolicitudDetail({
                         <button
                           type="button"
                           onClick={() =>
+                            setEditandoCot((v) => (v === c.id ? null : c.id))
+                          }
+                          className="rounded p-1 text-fg-subtle hover:bg-bg-subtle hover:text-fg"
+                          aria-label="Editar cotización"
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                      {editable && (
+                        <button
+                          type="button"
+                          onClick={() =>
                             correr(() => borrarCotizacion(c.id), "Cotización eliminada")
                           }
                           className="ml-auto rounded p-1 text-fg-subtle hover:bg-danger-soft hover:text-danger"
@@ -257,6 +306,16 @@ export function SolicitudDetail({
                         </button>
                       )}
                     </div>
+
+                    {editandoCot === c.id && editable && (
+                      <FormCotizacion
+                        cotizacion={c}
+                        onDone={() => {
+                          setEditandoCot(null);
+                          router.refresh();
+                        }}
+                      />
+                    )}
                   </li>
                 );
               })}
@@ -264,7 +323,7 @@ export function SolicitudDetail({
           )}
 
           {nuevaOpen && editable && (
-            <NuevaCotizacion
+            <FormCotizacion
               solicitudId={s.id}
               onDone={() => {
                 setNuevaOpen(false);
@@ -400,29 +459,42 @@ export function SolicitudDetail({
   );
 }
 
-/** Alta de una cotización, con su archivo. */
-function NuevaCotizacion({
+/**
+ * Alta y corrección de una cotización. Es el mismo formulario en los dos casos
+ * a propósito: si fueran dos, un campo añadido en uno se olvida en el otro y
+ * la cotización editada deja de poder decir lo que la nueva sí dice.
+ */
+function FormCotizacion({
   solicitudId,
+  cotizacion,
   onDone,
 }: {
-  solicitudId: string;
+  solicitudId?: string;
+  cotizacion?: SolicitudConCotizaciones["compra_cotizaciones"][number];
   onDone: () => void;
 }) {
   const { toast } = useToast();
   const [busy, setBusy] = React.useState(false);
+  const editando = !!cotizacion;
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
-    fd.set("solicitud_id", solicitudId);
     setBusy(true);
-    const res = await subirCotizacion(fd);
+    let res;
+    if (cotizacion) {
+      fd.set("id", cotizacion.id);
+      res = await editarCotizacion(fd);
+    } else {
+      fd.set("solicitud_id", solicitudId!);
+      res = await subirCotizacion(fd);
+    }
     setBusy(false);
     if (!res.ok) {
       toast({ tone: "error", title: "No se pudo guardar", description: res.error });
       return;
     }
-    toast({ tone: "success", title: "Cotización añadida" });
+    toast({ tone: "success", title: editando ? "Cotización actualizada" : "Cotización añadida" });
     onDone();
   }
 
@@ -432,13 +504,25 @@ function NuevaCotizacion({
       className="mt-3 grid grid-cols-1 gap-3 rounded-[var(--radius-md)] border border-border bg-bg-subtle/40 p-3 sm:grid-cols-2"
     >
       <Field label="Proveedor *" className="sm:col-span-2">
-        <Input name="proveedor" required placeholder="Nombre del proveedor" />
+        <Input
+          name="proveedor"
+          required
+          defaultValue={cotizacion?.proveedor ?? ""}
+          placeholder="Nombre del proveedor"
+        />
       </Field>
       <Field label="Monto *">
-        <Input name="monto" required inputMode="decimal" placeholder="1.250.000" className="font-mono tnum" />
+        <Input
+          name="monto"
+          required
+          inputMode="decimal"
+          defaultValue={cotizacion ? String(cotizacion.monto) : ""}
+          placeholder="1.250.000"
+          className="font-mono tnum"
+        />
       </Field>
       <Field label="Moneda">
-        <Select name="moneda" defaultValue="COP">
+        <Select name="moneda" defaultValue={cotizacion?.moneda ?? "COP"}>
           {MONEDAS.map((m) => (
             <option key={m} value={m}>
               {m}
@@ -447,24 +531,131 @@ function NuevaCotizacion({
         </Select>
       </Field>
       <Field label="Tiempo de entrega">
-        <Input name="tiempo_entrega" placeholder="8 días hábiles" />
+        <Input
+          name="tiempo_entrega"
+          defaultValue={cotizacion?.tiempo_entrega ?? ""}
+          placeholder="8 días hábiles"
+        />
       </Field>
       <Field label="Válida hasta">
-        <Input type="date" name="valida_hasta" />
+        <Input type="date" name="valida_hasta" defaultValue={cotizacion?.valida_hasta ?? ""} />
       </Field>
       <Field label="Qué incluye" className="sm:col-span-2">
-        <Input name="descripcion" placeholder="Detalle de lo cotizado" />
+        <Input
+          name="descripcion"
+          defaultValue={cotizacion?.descripcion ?? ""}
+          placeholder="Detalle de lo cotizado"
+        />
       </Field>
-      <Field label="Archivo (PDF o foto)" className="sm:col-span-2">
+      <Field
+        label={
+          cotizacion?.archivo_path
+            ? "Reemplazar archivo (PDF o foto)"
+            : "Archivo (PDF o foto)"
+        }
+        className="sm:col-span-2"
+      >
         <Input type="file" name="archivo" accept=".pdf,image/*" />
       </Field>
+      {/* Al editar, no elegir archivo deja el que ya estaba: subir uno nuevo no
+          puede ser el único modo de quitar el viejo. */}
+      {cotizacion?.archivo_path && (
+        <label className="flex items-center gap-2 text-sm text-fg-muted sm:col-span-2">
+          <input type="checkbox" name="quitar_archivo" className="h-4 w-4 accent-[var(--accent)]" />
+          Quitar el archivo actual ({cotizacion.archivo_nombre ?? "archivo"})
+        </label>
+      )}
       <label className="flex items-center gap-2 text-sm text-fg-muted sm:col-span-2">
-        <input type="checkbox" name="incluye_iva" defaultChecked className="h-4 w-4 accent-[var(--accent)]" />
+        <input
+          type="checkbox"
+          name="incluye_iva"
+          defaultChecked={cotizacion ? cotizacion.incluye_iva : true}
+          className="h-4 w-4 accent-[var(--accent)]"
+        />
         El monto incluye IVA
       </label>
-      <div className="sm:col-span-2">
+      <div className="flex gap-2 sm:col-span-2">
         <Button type="submit" size="sm" loading={busy}>
-          Guardar cotización
+          {editando ? "Guardar cambios" : "Guardar cotización"}
+        </Button>
+        <Button type="button" variant="ghost" size="sm" onClick={onDone}>
+          Cancelar
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+/** Corrección de los datos de la solicitud. */
+function FormSolicitud({
+  solicitud,
+  onDone,
+}: {
+  solicitud: SolicitudConCotizaciones;
+  onDone: () => void;
+}) {
+  const { toast } = useToast();
+  const [busy, setBusy] = React.useState(false);
+
+  async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const fd = new FormData(e.currentTarget);
+    setBusy(true);
+    const res = await editarSolicitud(solicitud.id, {
+      titulo: fd.get("titulo"),
+      descripcion: fd.get("descripcion") ?? "",
+      categoria: fd.get("categoria"),
+      area: fd.get("area") ?? "",
+      justificacion: fd.get("justificacion") ?? "",
+    });
+    setBusy(false);
+    if (!res.ok) {
+      toast({ tone: "error", title: "No se pudo guardar", description: res.error });
+      return;
+    }
+    toast({ tone: "success", title: "Solicitud actualizada" });
+    onDone();
+  }
+
+  return (
+    <form
+      onSubmit={onSubmit}
+      className="grid grid-cols-1 gap-3 rounded-[var(--radius-md)] border border-border bg-bg-subtle/40 p-3 sm:grid-cols-2"
+    >
+      <Field label="Qué se necesita *" className="sm:col-span-2">
+        <Input name="titulo" required defaultValue={solicitud.titulo} />
+      </Field>
+      <Field label="Categoría">
+        <Select name="categoria" defaultValue={solicitud.categoria}>
+          {COMPRA_CATEGORIAS.map((c) => (
+            <option key={c} value={c}>
+              {c}
+            </option>
+          ))}
+        </Select>
+      </Field>
+      <Field label="Área">
+        <Select name="area" defaultValue={solicitud.area ?? ""}>
+          <option value="">— Sin área —</option>
+          {DEPARTMENTS.map((d) => (
+            <option key={d} value={d}>
+              {d}
+            </option>
+          ))}
+        </Select>
+      </Field>
+      <Field label="Detalle" className="sm:col-span-2">
+        <Textarea name="descripcion" rows={3} defaultValue={solicitud.descripcion ?? ""} />
+      </Field>
+      <Field label="Por qué" className="sm:col-span-2">
+        <Textarea name="justificacion" rows={2} defaultValue={solicitud.justificacion ?? ""} />
+      </Field>
+      <div className="flex gap-2 sm:col-span-2">
+        <Button type="submit" size="sm" loading={busy}>
+          Guardar cambios
+        </Button>
+        <Button type="button" variant="ghost" size="sm" onClick={onDone}>
+          Cancelar
         </Button>
       </div>
     </form>
