@@ -92,6 +92,19 @@ export const serverEnv = {
     );
   },
   /**
+   * Pestaña `Dashboard_Data` de la hoja de ventas, en CSV.
+   *
+   * Se pide por NOMBRE de pestaña (endpoint gviz) y no por gid: el gid es un
+   * número opaco que nadie puede verificar de un vistazo y cambia si alguien
+   * recrea la pestaña.
+   */
+  get VENTAS_SHEET_CSV_URL() {
+    return (
+      process.env.VENTAS_SHEET_CSV_URL ??
+      "https://docs.google.com/spreadsheets/d/1dAMXDTKStJCwUOcMF1mCY4g1pQ43NPF6RJyfRRxxzYM/gviz/tq?tqx=out:csv&sheet=Dashboard_Data"
+    );
+  },
+  /**
    * Published CSV export of the daily prices Google Sheet (company × date
    * matrix). Override per-environment if it ever moves.
    */

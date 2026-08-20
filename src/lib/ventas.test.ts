@@ -1,144 +1,138 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { agregarVentas, clienteCanonico, esVenta, type DespachoVenta } from "./ventas";
+import { agregarVentas, type VentaRow } from "./ventas";
+import { numero, parseVentasSheet } from "./ventas/sheet";
 
-const d = (
-  fecha: string | null,
-  destino: string | null,
+const v = (
+  fecha: string,
+  cliente: string,
   kg: number,
-  clasif: Partial<DespachoVenta> = {},
-): DespachoVenta => ({
-  dispatch_date: fecha,
-  destination: destino,
-  qty_kg: kg,
-  qty_premium_kg: 0,
-  qty_corriente_kg: 0,
-  qty_corriente_c_kg: 0,
-  qty_organico_kg: 0,
-  ...clasif,
+  valor = 0,
+  extra: Partial<VentaRow> = {},
+): VentaRow => ({
+  fecha,
+  cliente,
+  odc: null,
+  kg,
+  valor_total: valor,
+  bonificacion: 0,
+  valor_pagar: valor,
+  mercado: "Nacional",
+  ...extra,
 });
 
-test("las salidas de merma y muestras no son ventas", () => {
-  assert.equal(esVenta("CASA LUKER"), true);
-  assert.equal(esVenta("MUESTRAS"), false);
-  assert.equal(esVenta("MERMA POR MOVIMIENTO"), false);
-  assert.equal(esVenta("MERMA POR MOVOMIENTO"), false); // errata real de la hoja
-  assert.equal(esVenta("SELECCION PASILLA"), false);
-  assert.equal(esVenta(null), false);
+const HOY = new Date(Date.UTC(2026, 5, 30));
+
+test("los montos en formato colombiano se leen bien", () => {
+  // La hoja escribe el punto como separador de miles y la coma como decimal,
+  // al revés de JavaScript. Leerlos con Number() daría 104 en vez de 104 millones.
+  assert.equal(numero("$ 104.868.000"), 104_868_000);
+  assert.equal(numero("8739,0"), 8739);
+  assert.equal(numero("11863,3"), 11863.3);
+  assert.equal(numero("$ 0"), 0);
+  assert.equal(numero(""), 0);
 });
 
-test("clienteCanonico unifica las variantes del mismo cliente", () => {
-  for (const v of ["CASA LUKER", "CASALUKER", "CASA  LUKER", "CASA LIKER", "LUKER"]) {
-    assert.equal(clienteCanonico(v), "Casa Luker", v);
-  }
-  assert.equal(clienteCanonico("NAL. CHOCOLATES"), "Nacional de Chocolates");
-  assert.equal(clienteCanonico("NACIONAL"), "Nacional de Chocolates");
-  assert.equal(clienteCanonico("TIEMPO CHICOLATE"), "Tiempo de Chocolate");
-  // Un cliente que no está en la lista se respeta tal cual.
-  assert.equal(clienteCanonico("UNICONF"), "UNICONF");
+test("la hoja se lee por nombre de columna, no por posición", () => {
+  // Una columna nueva al principio no debe corromper nada.
+  const csv = [
+    '"Nota","Fecha","Cliente","ODC","KG Vendidos","Valor Total","Bonificación","Valor a Pagar","Mercado"',
+    '"x","2026-04-08","LUKER","ODC-32","8939,6","$ 84.926.200","$ 9.511.734","$ 94.437.934","Nacional"',
+  ].join("\n");
+  const { filas } = parseVentasSheet(csv);
+  assert.equal(filas.length, 1);
+  assert.equal(filas[0].cliente, "LUKER");
+  assert.equal(filas[0].kg, 8939.6);
+  assert.equal(filas[0].valor_pagar, 94_437_934);
 });
 
-test("agregarVentas separa ventas, merma y despachos sin fecha", () => {
-  const v = agregarVentas(
+test("las filas sin fecha usable se descartan y se dicen", () => {
+  const csv = [
+    '"Fecha","Cliente","KG Vendidos","Valor Total","Bonificación","Valor a Pagar"',
+    '"2026-04-08","LUKER","100","$ 1.000","$ 0","$ 1.000"',
+    '"EMPRESA","","","","",""',
+    '"2026-05-08","","50","$ 500","$ 0","$ 500"',
+  ].join("\n");
+  const { filas, descartadas } = parseVentasSheet(csv);
+  assert.equal(filas.length, 1);
+  assert.equal(descartadas.length, 2, "la fila basura y la que no tiene cliente");
+  assert.match(descartadas[0].motivo, /fecha ilegible/);
+});
+
+test("falta una columna obligatoria: la corrida falla en vez de guardar basura", () => {
+  const csv = '"Fecha","Cliente"\n"2026-04-08","LUKER"';
+  assert.throws(() => parseVentasSheet(csv), /KG Vendidos/);
+});
+
+test("agregarVentas separa el año y suma kilos y plata", () => {
+  const r = agregarVentas(
     [
-      d("2026-04-10", "CASA LUKER", 100),
-      d("2026-04-20", "CASALUKER", 50),
-      d("2026-05-05", "UNICONF", 30),
-      d("2026-05-06", "MUESTRAS", 5),
-      d(null, "CASA LUKER", 7),
-      d("2025-12-01", "CASA LUKER", 999), // otro año
+      v("2026-04-10", "LUKER", 100, 1_000_000),
+      v("2026-05-05", "COCOAWISE", 50, 600_000, { mercado: "Internacional" }),
+      v("2025-12-01", "LUKER", 999, 9_000_000),
     ],
     2026,
-    new Date(Date.UTC(2026, 5, 30)),
+    HOY,
   );
-
-  assert.equal(v.kgAnio, 180, "solo 2026 y solo ventas con fecha");
-  assert.equal(v.kgNoVenta, 5);
-  assert.equal(v.kgSinFecha, 7);
-  // Las dos grafías de Casa Luker suman en una sola fila.
-  assert.deepEqual(v.porCliente, [
-    { cliente: "Casa Luker", kg: 150 },
-    { cliente: "UNICONF", kg: 30 },
+  assert.equal(r.kgAnio, 150);
+  assert.equal(r.valorAnio, 1_600_000);
+  assert.deepEqual(r.porCliente, [
+    { cliente: "LUKER", kg: 100, valor: 1_000_000 },
+    { cliente: "COCOAWISE", kg: 50, valor: 600_000 },
   ]);
+  assert.deepEqual(r.porMercado, [
+    { mercado: "Nacional", kg: 100, valor: 1_000_000 },
+    { mercado: "Internacional", kg: 50, valor: 600_000 },
+  ]);
+  // El histórico sí incluye el año anterior.
+  assert.equal(r.kgHistorico, 1149);
+});
+
+test("los envíos sin precio no hunden el precio promedio", () => {
+  const r = agregarVentas(
+    [
+      v("2026-04-10", "LUKER", 100, 1_200_000), // $12.000/kg
+      v("2026-04-20", "LUKER", 100, 0), // todavía sin valorar
+    ],
+    2026,
+    HOY,
+  );
+  assert.equal(r.kgAnio, 200);
+  assert.equal(r.kgSinValor, 100);
+  assert.equal(r.operacionesSinValor, 1);
+  // Sobre los 100 kg que sí tienen precio, no sobre los 200.
+  assert.equal(r.precioPromedioKg, 12_000);
 });
 
 test("la serie trae los doce meses, con los vacíos incluidos", () => {
-  const v = agregarVentas(
-    [d("2026-04-10", "CASA LUKER", 100), d("2026-06-01", "UNICONF", 40)],
+  const r = agregarVentas(
+    [v("2026-04-10", "LUKER", 100, 1_000), v("2026-06-01", "LUKER", 40, 400)],
     2026,
-    new Date(Date.UTC(2026, 5, 30)),
+    HOY,
   );
-  assert.equal(v.meses.length, 12);
-  // Un mes sin despachos es información: en 2026 no hubo salidas en marzo.
-  assert.equal(v.meses[2].kg, 0);
-  assert.equal(v.meses[3].kg, 100);
-  assert.equal(v.meses[4].acumulado, 100, "el acumulado se arrastra en los meses vacíos");
-  assert.equal(v.meses[11].acumulado, 140);
+  assert.equal(r.meses.length, 12);
+  assert.equal(r.meses[4].kg, 0, "mayo sin ventas");
+  assert.equal(r.meses[4].acumulado, 100, "el acumulado se arrastra");
+  assert.equal(r.meses[11].acumulado, 140);
 });
 
 test("las dos proyecciones difieren cuando el arranque del año fue flojo", () => {
-  // Enero y febrero casi en cero, luego tres meses fuertes: el ritmo del año
-  // castiga por el arranque; el promedio reciente refleja la capacidad actual.
-  const v = agregarVentas(
+  const r = agregarVentas(
     [
-      d("2026-01-15", "CASA LUKER", 10),
-      d("2026-02-15", "CASA LUKER", 10),
-      d("2026-04-15", "CASA LUKER", 60_000),
-      d("2026-05-15", "CASA LUKER", 60_000),
-      d("2026-06-15", "CASA LUKER", 60_000),
+      v("2026-01-15", "LUKER", 10),
+      v("2026-02-15", "LUKER", 10),
+      v("2026-04-15", "LUKER", 60_000),
+      v("2026-05-15", "LUKER", 60_000),
+      v("2026-06-15", "LUKER", 60_000),
     ],
     2026,
-    new Date(Date.UTC(2026, 5, 30)),
+    HOY,
   );
-  assert.equal(v.kgAnio, 180_020);
-  assert.ok(
-    v.proyeccionUltimosMeses > v.proyeccionRitmoAnual,
-    "el promedio reciente debe proyectar más que el ritmo del año",
-  );
-  assert.equal(v.mesesUsadosEnProyeccion, 3);
-});
-
-test("los cuatro grados se reportan aunque den cero", () => {
-  const v = agregarVentas(
-    [d("2026-04-10", "CASA LUKER", 100, { qty_premium_kg: 100 })],
-    2026,
-    new Date(Date.UTC(2026, 5, 30)),
-  );
-  // Ocultar los ceros hacía leer «Premium 100 %» como si la app no conociera
-  // los otros grados. Aparecen los cuatro.
-  assert.deepEqual(
-    v.porClasificacion.map((c) => c.tipo),
-    ["Premium", "Corriente", "Corriente C", "Orgánico"],
-  );
-});
-
-test("los kilos sin grado se nombran en vez de desaparecer", () => {
-  // Un despacho creado a mano en el CRM sin elegir clasificación: kilos en
-  // qty_kg y las cuatro columnas de grado en cero.
-  const v = agregarVentas(
-    [
-      d("2026-04-10", "CASA LUKER", 100, { qty_premium_kg: 100 }),
-      d("2026-04-11", "UNICONF", 40),
-    ],
-    2026,
-    new Date(Date.UTC(2026, 5, 30)),
-  );
-  assert.equal(v.kgAnio, 140);
-  const sinClasificar = v.porClasificacion.find((c) => c.tipo === "Sin clasificar");
-  assert.equal(sinClasificar?.kg, 40, "los 40 kg sin grado deben quedar visibles");
-  // El desglose tiene que cuadrar con el total del año, no con un subtotal.
-  assert.equal(
-    v.porClasificacion.reduce((s, c) => s + c.kg, 0),
-    v.kgAnio,
-  );
+  assert.ok(r.proyeccionUltimosMeses > r.proyeccionRitmoAnual);
+  assert.equal(r.mesesUsadosEnProyeccion, 3);
 });
 
 test("el avance se mide contra la meta", () => {
-  const v = agregarVentas(
-    [d("2026-04-10", "CASA LUKER", 250_000)],
-    2026,
-    new Date(Date.UTC(2026, 5, 30)),
-    500_000,
-  );
-  assert.equal(v.avancePct, 50);
+  const r = agregarVentas([v("2026-04-10", "LUKER", 250_000)], 2026, HOY, 500_000);
+  assert.equal(r.avancePct, 50);
 });

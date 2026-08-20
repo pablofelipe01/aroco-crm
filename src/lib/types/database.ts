@@ -155,6 +155,54 @@ export type Database = {
         };
         Relationships: [];
       };
+      ventas: {
+        Row: {
+          bonificacion: number;
+          bultos: number | null;
+          cliente: string;
+          fecha: string;
+          fila: number;
+          id: string;
+          kg: number;
+          mercado: string | null;
+          odc: string | null;
+          origen: string | null;
+          synced_at: string;
+          valor_pagar: number;
+          valor_total: number;
+        };
+        Insert: {
+          bonificacion?: number;
+          bultos?: number | null;
+          cliente: string;
+          fecha: string;
+          fila: number;
+          id?: string;
+          kg?: number;
+          mercado?: string | null;
+          odc?: string | null;
+          origen?: string | null;
+          synced_at?: string;
+          valor_pagar?: number;
+          valor_total?: number;
+        };
+        Update: {
+          bonificacion?: number;
+          bultos?: number | null;
+          cliente?: string;
+          fecha?: string;
+          fila?: number;
+          id?: string;
+          kg?: number;
+          mercado?: string | null;
+          odc?: string | null;
+          origen?: string | null;
+          synced_at?: string;
+          valor_pagar?: number;
+          valor_total?: number;
+        };
+        Relationships: [];
+      };
       preguntas: {
         Row: {
           area: Database["public"]["Enums"]["department"] | null;
@@ -2098,6 +2146,10 @@ export type Database = {
         Args: { p_lots: Json; p_dispatches: Json };
         Returns: Json;
       };
+      import_ventas_sheet: {
+        Args: { filas: Json };
+        Returns: number;
+      };
       replace_inventory_quality: {
         Args: { p_rows: Json };
         Returns: number;
@@ -2199,6 +2251,7 @@ export type InventoryQuality = Tables<"inventory_quality">;
 export type Dispatch = Tables<"dispatches">;
 export type CompraSolicitud = Tables<"compra_solicitudes">;
 export type Pregunta = Tables<"preguntas">;
+export type Venta = Tables<"ventas">;
 export type CompraCotizacion = Tables<"compra_cotizaciones">;
 export type PriceHistory = Tables<"price_history">;
 export type Notification = Tables<"notifications">;

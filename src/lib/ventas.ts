@@ -1,156 +1,117 @@
 /**
- * Agregación de ventas a partir de los despachos.
+ * Agregación de ventas.
  *
- * Los despachos son el único registro fiable de lo vendido: no guardan precio
- * de venta, así que todo aquí es en kilos. Dos cosas hay que limpiar antes de
- * contar, y ninguna es cosmética:
+ * La fuente es la hoja de ventas (tabla `ventas`), no los despachos. Los
+ * despachos solo saben de kilos —no hay precio de venta en ninguna parte del
+ * inventario— así que este módulo solo podía hablar de toneladas. La hoja de
+ * ventas trae el valor negociado, la bonificación por calidad y el valor a
+ * pagar de cada envío, y además separa mercado nacional de exportación.
  *
- *   · No todo despacho es una venta. Muestras, merma y selección de pasilla
- *     salen de bodega igual, pero contarlas infla la cifra.
- *   · El mismo cliente está escrito de seis formas ("CASA LUKER", "CASALUKER",
- *     "CASA LIKER", "LUKER"…). Sin unificarlos, el ranking por cliente miente.
+ * `valor_total + bonificacion = valor_pagar`. Los tres se llevan aparte porque
+ * la bonificación es plata que se negocia por calidad del grano, y verla suelta
+ * es lo que permite saber si negociar calidad rinde.
  */
 
 /** Meta anual acordada en el Comité Financiero del 21-jul-2026: ~500 toneladas. */
 export const META_ANUAL_KG = 500_000;
 
-/** Salidas de bodega que no son ventas. */
-const NO_ES_VENTA = /merma|muestra|pasilla|selecc?ion|movi?miento/i;
-
-export function esVenta(destino: string | null): boolean {
-  if (!destino) return false;
-  return !NO_ES_VENTA.test(destino);
-}
-
-const clave = (s: string) =>
-  s
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .replace(/[^a-z0-9]/g, "");
-
-/**
- * Variantes vistas en la hoja. Se comparan sobre la clave sin espacios ni
- * signos, así que "CASA  LUKER" y "CASALUKER" caen en el mismo patrón.
- */
-const CANONICOS: [RegExp, string][] = [
-  [/^casa?l[iu]ker$|^luker$/, "Casa Luker"],
-  [/^nal?chocolates?$|^nacional(dechocolates)?$/, "Nacional de Chocolates"],
-  [/^tiempo(de)?ch[oi]c?olate$/, "Tiempo de Chocolate"],
-];
-
-/** Unifica las variantes de un mismo cliente. */
-export function clienteCanonico(destino: string): string {
-  const k = clave(destino);
-  for (const [re, nombre] of CANONICOS) if (re.test(k)) return nombre;
-  return destino.trim();
-}
-
-export type DespachoVenta = {
-  dispatch_date: string | null;
-  destination: string | null;
-  qty_kg: number;
-  qty_premium_kg: number;
-  qty_corriente_kg: number;
-  qty_corriente_c_kg: number;
-  qty_organico_kg: number;
+export type VentaRow = {
+  fecha: string;
+  cliente: string;
+  odc: string | null;
+  kg: number;
+  valor_total: number;
+  bonificacion: number;
+  valor_pagar: number;
+  mercado: string | null;
 };
 
 export type PuntoMes = {
   mes: string; // "2026-07"
   kg: number;
   acumulado: number;
+  valor: number;
 };
 
 export type Ventas = {
-  /** Serie mensual del año pedido, con acumulado corrido. */
   meses: PuntoMes[];
-  porCliente: { cliente: string; kg: number }[];
-  porClasificacion: { tipo: string; kg: number }[];
-  /** Kilos vendidos en el año. */
+  porCliente: { cliente: string; kg: number; valor: number }[];
+  porMercado: { mercado: string; kg: number; valor: number }[];
+
   kgAnio: number;
-  /** Kilos de todo el histórico, para dar contexto. */
+  valorAnio: number;
+  bonificacionAnio: number;
+  /** Precio promedio efectivo por kilo, incluyendo bonificación. */
+  precioPromedioKg: number;
+
+  /** Kilos facturados sin valor todavía: se declaran, no se esconden. */
+  kgSinValor: number;
+  operacionesSinValor: number;
+
   kgHistorico: number;
-  /** Salidas que no son venta (merma, muestras): se reportan, no se ocultan. */
-  kgNoVenta: number;
-  /** Ventas sin fecha: no caben en ningún mes y hay que decirlo. */
-  kgSinFecha: number;
+  valorHistorico: number;
+
   meta: number;
   avancePct: number;
-  /** Proyección por el ritmo del año: acumulado ÷ días transcurridos × 365. */
   proyeccionRitmoAnual: number;
-  /** Proyección por el promedio de los últimos meses con actividad. */
   proyeccionUltimosMeses: number;
   mesesUsadosEnProyeccion: number;
 };
 
 const suma = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
+const num = (v: number | string | null) => Number(v) || 0;
 
 /**
  * @param hoy fecha de referencia — se recibe en vez de leerla del reloj para
  *   que el cálculo sea determinista y testeable.
  */
 export function agregarVentas(
-  despachos: DespachoVenta[],
+  ventas: VentaRow[],
   anio: number,
   hoy: Date,
   meta = META_ANUAL_KG,
 ): Ventas {
-  const ventas = despachos.filter((d) => esVenta(d.destination));
-  const kgNoVenta = suma(
-    despachos.filter((d) => !esVenta(d.destination)).map((d) => Number(d.qty_kg) || 0),
-  );
+  const delAnio = ventas.filter((v) => v.fecha?.startsWith(String(anio)));
 
-  const porMes = new Map<string, number>();
-  let kgSinFecha = 0;
-  for (const d of ventas) {
-    const kg = Number(d.qty_kg) || 0;
-    if (!d.dispatch_date) {
-      kgSinFecha += kg;
-      continue;
-    }
-    const m = d.dispatch_date.slice(0, 7);
-    porMes.set(m, (porMes.get(m) ?? 0) + kg);
+  const kgAnio = suma(delAnio.map((v) => num(v.kg)));
+  const valorAnio = suma(delAnio.map((v) => num(v.valor_pagar)));
+  const bonificacionAnio = suma(delAnio.map((v) => num(v.bonificacion)));
+
+  // Envíos ya despachados a los que todavía no se les puso precio. Contarlos
+  // en los kilos y no decirlo haría que el precio promedio saliera bajo sin
+  // explicación visible.
+  const sinValor = delAnio.filter((v) => num(v.valor_pagar) === 0 && num(v.kg) > 0);
+
+  const porMes = new Map<string, { kg: number; valor: number }>();
+  for (const v of delAnio) {
+    const m = v.fecha.slice(0, 7);
+    const acc = porMes.get(m) ?? { kg: 0, valor: 0 };
+    acc.kg += num(v.kg);
+    acc.valor += num(v.valor_pagar);
+    porMes.set(m, acc);
   }
 
-  // Los doce meses del año, aunque estén vacíos: un hueco en la serie es
-  // información (en 2026 no hubo despachos en marzo).
+  // Los doce meses, aunque estén vacíos: un hueco en la serie es información.
   const meses: PuntoMes[] = [];
   let acumulado = 0;
   for (let m = 1; m <= 12; m++) {
     const key = `${anio}-${String(m).padStart(2, "0")}`;
-    const kg = porMes.get(key) ?? 0;
-    acumulado += kg;
-    meses.push({ mes: key, kg, acumulado });
+    const d = porMes.get(key) ?? { kg: 0, valor: 0 };
+    acumulado += d.kg;
+    meses.push({ mes: key, kg: d.kg, acumulado, valor: d.valor });
   }
 
-  const delAnio = (d: DespachoVenta) => d.dispatch_date?.startsWith(String(anio));
-  const ventasAnio = ventas.filter(delAnio);
-  const kgAnio = suma(ventasAnio.map((d) => Number(d.qty_kg) || 0));
-
-  const clientes = new Map<string, number>();
-  for (const d of ventasAnio) {
-    const c = clienteCanonico(d.destination!);
-    clientes.set(c, (clientes.get(c) ?? 0) + (Number(d.qty_kg) || 0));
-  }
-
-  // Los cuatro grados van SIEMPRE, aunque den cero. Filtrar los vacíos hacía
-  // que la vista mostrara «Premium 100 %» a secas, que se lee como si la app
-  // solo conociera un grado; con los ceros a la vista se lee lo que de verdad
-  // pasa, que es que AROCO vende premium y deja el resto en bodega.
-  const clasif: [string, number][] = [
-    ["Premium", suma(ventasAnio.map((d) => Number(d.qty_premium_kg) || 0))],
-    ["Corriente", suma(ventasAnio.map((d) => Number(d.qty_corriente_kg) || 0))],
-    ["Corriente C", suma(ventasAnio.map((d) => Number(d.qty_corriente_c_kg) || 0))],
-    ["Orgánico", suma(ventasAnio.map((d) => Number(d.qty_organico_kg) || 0))],
-  ];
-
-  // Un despacho creado a mano en el CRM solo trae qty_kg: si nadie eligió
-  // grado, esos kilos no están en ninguna de las cuatro columnas. Antes se
-  // perdían del desglose mientras seguían contando en el total, así que los
-  // porcentajes cuadraban con una cifra que no era la del año. Ahora se
-  // nombran.
-  const kgSinClasificar = Math.max(0, kgAnio - suma(clasif.map(([, kg]) => kg)));
+  const agrupar = (clave: (v: VentaRow) => string) => {
+    const m = new Map<string, { kg: number; valor: number }>();
+    for (const v of delAnio) {
+      const k = clave(v);
+      const acc = m.get(k) ?? { kg: 0, valor: 0 };
+      acc.kg += num(v.kg);
+      acc.valor += num(v.valor_pagar);
+      m.set(k, acc);
+    }
+    return [...m.entries()].sort((a, b) => b[1].kg - a[1].kg);
+  };
 
   // ── Proyecciones ──────────────────────────────────────────────────────────
   const inicio = new Date(Date.UTC(anio, 0, 1));
@@ -163,8 +124,9 @@ export function agregarVentas(
   const proyeccionRitmoAnual = Math.round((kgAnio / diasTranscurridos) * 365);
 
   // Promedio de los últimos meses CON actividad: el ritmo del año se hunde
-  // cuando el arranque fue flojo, y en 2026 enero-marzo fueron casi cero.
-  const conActividad = meses.filter((m) => m.kg > 0 && m.mes <= corte.toISOString().slice(0, 7));
+  // cuando el arranque fue flojo.
+  const hasta = corte.toISOString().slice(0, 7);
+  const conActividad = meses.filter((m) => m.kg > 0 && m.mes <= hasta);
   const ultimos = conActividad.slice(-3);
   const promedioMes = ultimos.length ? suma(ultimos.map((m) => m.kg)) / ultimos.length : 0;
   const mesActual = corte.getUTCMonth() + 1;
@@ -173,21 +135,29 @@ export function agregarVentas(
   const mesesRestantes = 12 - mesActual + (1 - diaDelMes / diasDelMes);
   const proyeccionUltimosMeses = Math.round(kgAnio + promedioMes * mesesRestantes);
 
+  // El promedio se calcula solo sobre los kilos que sí tienen precio; si no,
+  // los envíos sin valorar lo hundirían y parecería una caída de precio.
+  const kgConValor = kgAnio - suma(sinValor.map((v) => num(v.kg)));
+
   return {
     meses,
-    porCliente: [...clientes.entries()]
-      .map(([cliente, kg]) => ({ cliente, kg }))
-      .sort((a, b) => b.kg - a.kg),
-    porClasificacion: [
-      ...clasif,
-      ...(kgSinClasificar > 0
-        ? ([["Sin clasificar", kgSinClasificar]] as [string, number][])
-        : []),
-    ].map(([tipo, kg]) => ({ tipo, kg })),
+    porCliente: agrupar((v) => v.cliente).map(([cliente, d]) => ({ cliente, ...d })),
+    porMercado: agrupar((v) => v.mercado || "Sin clasificar").map(([mercado, d]) => ({
+      mercado,
+      ...d,
+    })),
+
     kgAnio,
-    kgHistorico: suma(ventas.map((d) => Number(d.qty_kg) || 0)),
-    kgNoVenta,
-    kgSinFecha,
+    valorAnio,
+    bonificacionAnio,
+    precioPromedioKg: kgConValor > 0 ? valorAnio / kgConValor : 0,
+
+    kgSinValor: suma(sinValor.map((v) => num(v.kg))),
+    operacionesSinValor: sinValor.length,
+
+    kgHistorico: suma(ventas.map((v) => num(v.kg))),
+    valorHistorico: suma(ventas.map((v) => num(v.valor_pagar))),
+
     meta,
     avancePct: meta > 0 ? (kgAnio / meta) * 100 : 0,
     proyeccionRitmoAnual,

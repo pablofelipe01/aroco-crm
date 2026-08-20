@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { agregarVentas, type DespachoVenta } from "@/lib/ventas";
+import { agregarVentas, type VentaRow } from "@/lib/ventas";
 import { VentasClient } from "./ventas-client";
 
 export const dynamic = "force-dynamic";
@@ -12,22 +12,14 @@ export default async function VentasPage({
   const supabase = await createClient();
   const { anio: anioParam } = await searchParams;
 
-  const { data } = await supabase
-    .from("dispatches")
-    .select(
-      "dispatch_date, destination, qty_kg, qty_premium_kg, qty_corriente_kg, qty_corriente_c_kg, qty_organico_kg",
-    );
-  const despachos = (data ?? []) as DespachoVenta[];
+  const { data, error } = await supabase
+    .from("ventas")
+    .select("fecha, cliente, odc, kg, valor_total, bonificacion, valor_pagar, mercado")
+    .order("fecha");
+  const ventas = (data ?? []) as VentaRow[];
 
-  // Años con despachos, para el selector. Si aún no hay nada, el actual.
   const hoy = new Date();
-  const anios = [
-    ...new Set(
-      despachos
-        .map((d) => d.dispatch_date?.slice(0, 4))
-        .filter((a): a is string => !!a),
-    ),
-  ]
+  const anios = [...new Set(ventas.map((v) => v.fecha.slice(0, 4)))]
     .map(Number)
     .sort((a, b) => b - a);
   if (anios.length === 0) anios.push(hoy.getFullYear());
@@ -37,9 +29,12 @@ export default async function VentasPage({
 
   return (
     <VentasClient
-      ventas={agregarVentas(despachos, anio, hoy)}
+      ventas={agregarVentas(ventas, anio, hoy)}
       anio={anio}
       anios={anios}
+      // Sin esto, una consulta rota se ve igual que un año sin ventas.
+      error={error?.message ?? null}
+      vacio={ventas.length === 0}
     />
   );
 }
