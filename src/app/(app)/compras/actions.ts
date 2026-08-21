@@ -55,22 +55,103 @@ async function editable(
   return null;
 }
 
-export async function crearSolicitud(input: unknown): Promise<CompraResult> {
-  const parsed = solicitudSchema.safeParse(input);
+/**
+ * Crea la solicitud con sus cotizaciones en un solo paso, desde el formulario
+ * de alta. Antes había que crearla primero y volver a entrar al detalle a
+ * cargarlas una por una, y una solicitud sin cotizaciones no se puede mandar a
+ * aprobación: el flujo obligaba a dos viajes para algo que se sabe de una vez.
+ *
+ * Llega como FormData porque los PDF de los proveedores viajan con ella.
+ */
+export async function crearSolicitudConCotizaciones(
+  formData: FormData,
+): Promise<CompraResult & { avisos?: string[] }> {
+  const parsed = solicitudSchema.safeParse({
+    titulo: formData.get("titulo"),
+    descripcion: formData.get("descripcion") ?? "",
+    categoria: formData.get("categoria"),
+    area: formData.get("area") ?? "",
+    justificacion: formData.get("justificacion") ?? "",
+  });
   if (!parsed.success) {
     return { ok: false, error: parsed.error.issues[0]?.message ?? "Datos inválidos." };
   }
+
   const session = await requireSession();
   const supabase = await createClient();
   const { area, ...resto } = parsed.data;
+
   const { data, error } = await supabase
     .from("compra_solicitudes")
     .insert({ ...resto, area: (area as Dept | null) ?? null, created_by: session.userId })
     .select("id")
     .single();
   if (error) return { ok: false, error: legible(error.message) };
+
+  // Las cotizaciones van después y por separado. Si alguna falla, la solicitud
+  // NO se deshace: ya está en Borrador y se puede completar desde el detalle,
+  // y botar lo que la persona acabó de escribir sería peor que decirle cuál
+  // no entró.
+  const avisos: string[] = [];
+  const cuantas = Number(formData.get("cot_count") ?? 0);
+
+  for (let i = 0; i < cuantas; i++) {
+    const proveedor = String(formData.get(`cot_${i}_proveedor`) ?? "").trim();
+    const monto = String(formData.get(`cot_${i}_monto`) ?? "").trim();
+    // Una fila en blanco no es un error: es una que se agregó y no se llenó.
+    if (!proveedor && !monto) continue;
+
+    const cot = cotizacionSchema.safeParse({
+      solicitud_id: data.id,
+      proveedor,
+      nit: "",
+      descripcion: formData.get(`cot_${i}_descripcion`) ?? "",
+      monto,
+      moneda: formData.get(`cot_${i}_moneda`) ?? "COP",
+      incluye_iva: formData.get(`cot_${i}_incluye_iva`) === "on",
+      valida_hasta: formData.get(`cot_${i}_valida_hasta`) ?? "",
+      tiempo_entrega: formData.get(`cot_${i}_tiempo_entrega`) ?? "",
+      notas: "",
+    });
+    if (!cot.success) {
+      avisos.push(
+        `Cotización ${i + 1}${proveedor ? ` (${proveedor})` : ""}: ${
+          cot.error.issues[0]?.message ?? "datos inválidos"
+        }`,
+      );
+      continue;
+    }
+
+    let archivo_path: string | null = null;
+    let archivo_nombre: string | null = null;
+    const file = formData.get(`cot_${i}_archivo`);
+    if (file instanceof File && file.size > 0) {
+      const safe = file.name.replace(/[^\w.\-]+/g, "_").slice(-80);
+      const path = `${data.id}/${Date.now()}-${i}-${safe}`;
+      const { error: upErr } = await supabase.storage
+        .from("compras")
+        .upload(path, file, { contentType: file.type || "application/octet-stream" });
+      if (upErr) {
+        // Se guarda la cotización igual, sin soporte, y se avisa: perder el
+        // monto por un archivo que no subió sería peor.
+        avisos.push(`No se pudo subir el archivo de ${cot.data.proveedor}: ${upErr.message}`);
+      } else {
+        archivo_path = path;
+        archivo_nombre = file.name;
+      }
+    }
+
+    const { error: cotErr } = await supabase.from("compra_cotizaciones").insert({
+      ...cot.data,
+      archivo_path,
+      archivo_nombre,
+      created_by: session.userId,
+    });
+    if (cotErr) avisos.push(`Cotización de ${cot.data.proveedor}: ${legible(cotErr.message)}`);
+  }
+
   revalidatePath("/compras");
-  return { ok: true, id: data.id };
+  return { ok: true, id: data.id, avisos: avisos.length ? avisos : undefined };
 }
 
 export async function editarSolicitud(id: string, input: unknown): Promise<CompraResult> {
