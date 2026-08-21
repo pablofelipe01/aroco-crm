@@ -10,7 +10,7 @@ export const COMPRA_ESTADOS = [
 export const COMPRA_CATEGORIAS = [
   "Oficina",
   "Finca",
-  "Plantación",
+  "Cultivo",
   "Bodega",
   "Transporte",
   "Mantenimiento",

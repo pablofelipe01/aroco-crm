@@ -2161,7 +2161,7 @@ export type Database = {
       compra_categoria:
         | "Oficina"
         | "Finca"
-        | "Plantación"
+        | "Cultivo"
         | "Bodega"
         | "Transporte"
         | "Mantenimiento"

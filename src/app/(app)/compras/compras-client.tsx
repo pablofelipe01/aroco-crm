@@ -298,7 +298,7 @@ export function ComprasClient({
           <Field label="¿Qué se necesita? *" className="sm:col-span-2">
             <Input
               {...register("titulo", { required: true })}
-              placeholder="p. ej. Fertilizante para la plantación"
+              placeholder="p. ej. Fertilizante para el cultivo"
             />
           </Field>
           <Field label="Categoría">
