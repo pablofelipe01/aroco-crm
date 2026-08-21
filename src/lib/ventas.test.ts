@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { agregarVentas, type VentaRow } from "./ventas";
+import { agregarVentas, META_ANUAL_KG, type VentaRow } from "./ventas";
 import { numero, parseVentasSheet } from "./ventas/sheet";
 
 const v = (
@@ -130,6 +130,13 @@ test("las dos proyecciones difieren cuando el arranque del año fue flojo", () =
   );
   assert.ok(r.proyeccionUltimosMeses > r.proyeccionRitmoAnual);
   assert.equal(r.mesesUsadosEnProyeccion, 3);
+});
+
+test("la meta anual son 900 toneladas", () => {
+  // Fijada como constante y no escrita en la vista: la meta se usa en el
+  // avance, en las dos proyecciones y en la línea del gráfico, y con tres
+  // copias basta con olvidar una para que la página se contradiga sola.
+  assert.equal(META_ANUAL_KG, 900_000);
 });
 
 test("el avance se mide contra la meta", () => {

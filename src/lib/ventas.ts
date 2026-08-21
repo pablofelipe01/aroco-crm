@@ -12,8 +12,15 @@
  * es lo que permite saber si negociar calidad rinde.
  */
 
-/** Meta anual acordada en el Comité Financiero del 21-jul-2026: ~500 toneladas. */
-export const META_ANUAL_KG = 500_000;
+/**
+ * Meta anual de volumen: 900 toneladas.
+ *
+ * Sustituye a las ~500 t que fijó el Comité Financiero del 21-jul-2026. El
+ * cambio no es cosmético: con 500 t el año iba en 51,6% y una de las dos
+ * proyecciones alcanzaba; con 900 t el avance y ambas proyecciones quedan
+ * bastante por debajo, y el módulo lo va a decir así.
+ */
+export const META_ANUAL_KG = 900_000;
 
 export type VentaRow = {
   fecha: string;
