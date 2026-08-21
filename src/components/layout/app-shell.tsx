@@ -51,6 +51,7 @@ export function AppShell({
         >
           <Sidebar
             department={user.department}
+            role={user.role}
             collapsed={collapsed}
             onToggleCollapse={() => setCollapsed((v) => !v)}
           />
@@ -77,6 +78,7 @@ export function AppShell({
               >
                 <Sidebar
                   department={user.department}
+                  role={user.role}
                   collapsed={false}
                   onToggleCollapse={() => {}}
                   onNavigate={() => setMobileOpen(false)}

@@ -19,6 +19,7 @@ import {
 // reexporta aquí para no romper a quien ya la importaba desde nav.
 export { DEPARTMENTS, type Department } from "@/lib/departments";
 import type { Department } from "@/lib/departments";
+import type { UserRole } from "@/lib/types/database";
 
 export interface NavItem {
   href: string;
@@ -121,7 +122,21 @@ export const NAV_ITEMS: NavItem[] = [
 ];
 
 /** Filter modules a department can access. */
-export function navForDepartment(department: Department | null): NavItem[] {
+/**
+ * Los módulos que le tocan a una persona.
+ *
+ * El rol manda sobre el área: un SuperAdmin ve todo, sin importar dónde esté
+ * en el organigrama. Antes esto filtraba solo por área, y como casi todos los
+ * módulos listan «Dirección», el efecto era que los admin de Dirección veían
+ * todo y los de otras áreas no — Nicolás es SuperAdmin y Comercial, y le
+ * faltaban pestañas que sí tenía permiso de abrir. El menú decía una cosa y la
+ * base otra.
+ */
+export function navForUser(
+  department: Department | null,
+  role?: UserRole | null,
+): NavItem[] {
+  if (role === "admin") return NAV_ITEMS;
   return NAV_ITEMS.filter(
     (item) =>
       item.departments === "all" ||

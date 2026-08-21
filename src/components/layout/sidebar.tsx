@@ -5,23 +5,27 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
 import { ChevronLeft } from "lucide-react";
-import { navForDepartment, type Department } from "@/lib/nav";
+import { navForUser, type Department } from "@/lib/nav";
+import type { UserRole } from "@/lib/types/database";
 import { Wordmark, Logo } from "@/components/brand";
 import { cn } from "@/lib/utils";
 
 export function Sidebar({
   department,
+  role,
   collapsed,
   onToggleCollapse,
   onNavigate,
 }: {
   department: Department | null;
+  /** Un SuperAdmin ve todos los módulos, esté en el área que esté. */
+  role?: UserRole | null;
   collapsed: boolean;
   onToggleCollapse: () => void;
   onNavigate?: () => void;
 }) {
   const pathname = usePathname();
-  const items = navForDepartment(department);
+  const items = navForUser(department, role);
 
   return (
     <div className="flex h-full flex-col bg-surface">
