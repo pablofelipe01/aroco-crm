@@ -1,0 +1,7 @@
+cd "/Users/pablofelipe/Library/Mobile Documents/com~apple~CloudDocs/Desktop/Mi_Trabajo/aroco-ll/cacaoq" &&
+  ~/.venvs/cacaoq/bin/streamlit run app.py --server.headless true
+
+# El venv vive FUERA de iCloud (~/.venvs/cacaoq) a propósito: iCloud evicta y
+# corrompe los binarios/symlinks del venv. No lo muevas dentro del proyecto.
+# Para reinstalar dependencias:
+#   ~/.venvs/cacaoq/bin/python -m pip install -r requirements.txt

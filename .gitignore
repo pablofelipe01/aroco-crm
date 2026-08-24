@@ -44,3 +44,15 @@ next-env.d.ts
 
 # Business data snapshot — keep local, lives in Supabase
 AROCO_Libro_Maestro.xlsx
+
+# --- CacaoQ (Python / Streamlit) ---
+# El motor de riesgo e inteligencia de mercado vive en el mismo repo, pero se
+# despliega aparte: Streamlit necesita un servidor de larga vida y Vercel corre
+# funciones serverless.
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+cacaoq/.env
+cacaoq/data_db/
+cacaoq/statements/*.pdf

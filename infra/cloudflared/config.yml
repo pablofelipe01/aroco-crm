@@ -1,0 +1,45 @@
+# Cloudflared tunnel config — 3 MCPs de AROCO
+#
+# Antes de usar este archivo:
+#   1. Reemplazar TUNNEL_ID con el UUID que devuelve `cloudflared tunnel create`.
+#   2. Reemplazar tudominio.com con el dominio delegado en Cloudflare.
+#   3. Copiarlo a /etc/cloudflared/config.yml (necesita sudo).
+#
+# El archivo de credenciales lo genera `cloudflared tunnel create` en
+# ~/.cloudflared/<TUNNEL_ID>.json — moverlo a /etc/cloudflared/ y ajustar
+# la ruta de abajo.
+
+tunnel: TUNNEL_ID
+credentials-file: /etc/cloudflared/TUNNEL_ID.json
+
+# Logs estructurados (útiles si algo falla)
+loglevel: info
+
+# Reglas de ingress: hostname público → servicio local
+ingress:
+  - hostname: stonex-mcp.tudominio.com
+    service: http://localhost:8770
+    originRequest:
+      noTLSVerify: true
+      connectTimeout: 30s
+      # MCP streamable-http puede mantener conexiones largas
+      keepAliveTimeout: 90s
+
+  - hostname: barchart-mcp.tudominio.com
+    service: http://localhost:8769
+    originRequest:
+      noTLSVerify: true
+      connectTimeout: 30s
+      # Barchart hace navegación Playwright — necesita timeout grande
+      proxyConnectTimeout: 30s
+      keepAliveTimeout: 90s
+
+  - hostname: inventory-mcp.tudominio.com
+    service: http://localhost:8771
+    originRequest:
+      noTLSVerify: true
+      connectTimeout: 30s
+      keepAliveTimeout: 90s
+
+  # Catch-all obligatorio al final
+  - service: http_status:404
