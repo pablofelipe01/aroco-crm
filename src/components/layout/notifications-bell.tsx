@@ -11,6 +11,7 @@ import {
   Check,
   ShoppingCart,
   ClipboardCheck,
+  RefreshCwOff,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { hasSupabaseEnv } from "@/lib/env";
@@ -24,6 +25,7 @@ const ICON: Record<string, React.ElementType> = {
   price_alert: TrendingUp,
   compra_aprobacion: ShoppingCart,
   compra_decision: ClipboardCheck,
+  sync_error: RefreshCwOff,
 };
 
 /**

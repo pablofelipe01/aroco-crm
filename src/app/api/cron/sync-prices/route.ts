@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { serverEnv } from "@/lib/env";
 import { parsePricesSheet } from "@/lib/prices/sheet-sync";
+import { avisarFalloSync } from "@/lib/sync-alerta";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -90,6 +91,7 @@ async function fail(
     duration_ms: Date.now() - startedAt,
     error: message,
   });
+  await avisarFalloSync(db, "prices_sheet", "los precios", message);
   console.error("[sync-prices]", message);
   return NextResponse.json({ ok: false, error: message }, { status: 500 });
 }

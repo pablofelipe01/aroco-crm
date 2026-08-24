@@ -3,6 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { serverEnv } from "@/lib/env";
 import { parseInventorySheet } from "@/lib/inventory/sheet-sync";
 import { parseQualitySheet } from "@/lib/inventory/quality-sheet";
+import { avisarFalloSync } from "@/lib/sync-alerta";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -139,7 +140,8 @@ async function syncQuality(
       duration_ms: Date.now() - startedAt,
       error: message,
     });
-    console.error("[sync-inventory-quality]", message);
+    await avisarFalloSync(db, "inventory_sheet", "el inventario", message);
+  console.error("[sync-inventory-quality]", message);
     return { ok: false, error: message };
   }
 }

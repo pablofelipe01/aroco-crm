@@ -359,5 +359,33 @@ export function parseInventorySheet(csv: string): ParsedSheet {
     });
   }
 
+  // Dos filas con la misma clave hacen que Postgres aborte el upsert entero con
+  // «ON CONFLICT DO UPDATE command cannot affect row a second time», que no
+  // dice cuál fila ni qué código. Se detecta aquí para que el error nombre el
+  // problema: el sync se detiene igual —escribir una de las dos y descartar la
+  // otra perdería kilos en silencio— pero ahora se sabe qué corregir en la hoja.
+  const claves = new Map<string, string[]>();
+  for (const l of lots) {
+    const k = `${l.code}|${l.remision ?? ""}|${l.recepcion ?? ""}`;
+    if (!claves.has(k)) claves.set(k, []);
+    claves.get(k)!.push(`${l.entry_date ?? "sin fecha"} · ${l.qty_in_kg} kg`);
+  }
+  const chocan = [...claves.entries()].filter(([, v]) => v.length > 1);
+  if (chocan.length > 0) {
+    const detalle = chocan
+      .map(([k, v]) => {
+        const [code, remision, recepcion] = k.split("|");
+        return `«${code}» (remisión ${remision || "vacía"}, recepción ${
+          recepcion || "vacía"
+        }) aparece ${v.length} veces: ${v.join("; ")}`;
+      })
+      .join(" — ");
+    throw new ColumnaFaltante(
+      `La hoja tiene filas que el CRM no puede distinguir entre sí: ${detalle}. ` +
+        `Dos lotes con el mismo código, remisión y recepción son la misma fila para el CRM. ` +
+        `Corrige el número de recepción en la hoja para separarlas.`,
+    );
+  }
+
   return { lots, dispatches, rowsRead };
 }
