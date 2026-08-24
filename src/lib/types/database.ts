@@ -1792,6 +1792,7 @@ export type Database = {
         Row: {
           active: boolean;
           aprueba_compras: boolean;
+          ve_mercado: boolean;
           created_at: string;
           department: Database["public"]["Enums"]["department"] | null;
           email: string;
@@ -1804,6 +1805,7 @@ export type Database = {
         Insert: {
           active?: boolean;
           aprueba_compras?: boolean;
+          ve_mercado?: boolean;
           created_at?: string;
           department?: Database["public"]["Enums"]["department"] | null;
           email: string;
@@ -1816,6 +1818,7 @@ export type Database = {
         Update: {
           active?: boolean;
           aprueba_compras?: boolean;
+          ve_mercado?: boolean;
           created_at?: string;
           department?: Database["public"]["Enums"]["department"] | null;
           email?: string;

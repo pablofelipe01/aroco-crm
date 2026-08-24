@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
 import { ChevronLeft } from "lucide-react";
-import { navForUser, type Department } from "@/lib/nav";
+import { navForUser, type Department, type Permisos } from "@/lib/nav";
 import type { UserRole } from "@/lib/types/database";
 import { Wordmark, Logo } from "@/components/brand";
 import { cn } from "@/lib/utils";
@@ -13,6 +13,7 @@ import { cn } from "@/lib/utils";
 export function Sidebar({
   department,
   role,
+  permisos,
   collapsed,
   onToggleCollapse,
   onNavigate,
@@ -20,12 +21,14 @@ export function Sidebar({
   department: Department | null;
   /** Un SuperAdmin ve todos los módulos, esté en el área que esté. */
   role?: UserRole | null;
+  /** Permisos por persona, que ganan sobre el rol. */
+  permisos?: Permisos | null;
   collapsed: boolean;
   onToggleCollapse: () => void;
   onNavigate?: () => void;
 }) {
   const pathname = usePathname();
-  const items = navForUser(department, role);
+  const items = navForUser(department, role, permisos);
 
   return (
     <div className="flex h-full flex-col bg-surface">

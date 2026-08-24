@@ -8,13 +8,14 @@ import type { UserRole } from "@/lib/types/database";
 import { Topbar } from "@/components/layout/topbar";
 import { CommandPaletteProvider } from "@/components/layout/command-palette";
 import { AssistantProvider } from "@/components/assistant/assistant-panel";
-import { NAV_ITEMS, type Department } from "@/lib/nav";
+import { NAV_ITEMS, type Department, type Permisos } from "@/lib/nav";
 import { ease } from "@/lib/motion";
 
 export interface ShellUser {
   name: string;
   department: Department | null;
   role?: UserRole;
+  permisos?: Permisos;
 }
 
 /** Resolve the page title/subtitle from the current route. */
@@ -52,6 +53,7 @@ export function AppShell({
           <Sidebar
             department={user.department}
             role={user.role}
+            permisos={user.permisos}
             collapsed={collapsed}
             onToggleCollapse={() => setCollapsed((v) => !v)}
           />
@@ -79,6 +81,7 @@ export function AppShell({
                 <Sidebar
                   department={user.department}
                   role={user.role}
+                  permisos={user.permisos}
                   collapsed={false}
                   onToggleCollapse={() => {}}
                   onNavigate={() => setMobileOpen(false)}

@@ -31,6 +31,7 @@ export default async function AppLayout({
     name: profile.full_name,
     department: profile.department,
     role: profile.role,
+    permisos: { ve_mercado: profile.ve_mercado },
   };
 
   return <AppShell user={user}>{children}</AppShell>;

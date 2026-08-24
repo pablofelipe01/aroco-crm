@@ -2,6 +2,7 @@ import {
   ShoppingCart,
   TrendingUp,
   HelpCircle,
+  CandlestickChart,
   LayoutDashboard,
   Users,
   Calculator,
@@ -27,6 +28,13 @@ export interface NavItem {
   icon: LucideIcon;
   /** Departments allowed to see this module. `admin` (Dirección) sees all. */
   departments: Department[] | "all";
+  /**
+   * Permiso por persona que GANA sobre el rol. Un módulo con permiso no se le
+   * muestra a un SuperAdmin por serlo: hay información —posiciones de broker,
+   * márgenes, P&L— que no se hereda del cargo, y dar acceso de administrador no
+   * puede meter a alguien de rebote ahí.
+   */
+  permiso?: "ve_mercado";
 }
 
 export const NAV_ITEMS: NavItem[] = [
@@ -76,6 +84,13 @@ export const NAV_ITEMS: NavItem[] = [
     label: "Despachos",
     icon: Truck,
     departments: ["Dirección", "Bodega Central", "Comercial", "Operaciones"],
+  },
+  {
+    href: "/mercado",
+    label: "Mercado",
+    icon: CandlestickChart,
+    departments: "all",
+    permiso: "ve_mercado",
   },
   {
     href: "/preguntas",
@@ -132,14 +147,22 @@ export const NAV_ITEMS: NavItem[] = [
  * faltaban pestañas que sí tenía permiso de abrir. El menú decía una cosa y la
  * base otra.
  */
+export type Permisos = { ve_mercado?: boolean | null };
+
 export function navForUser(
   department: Department | null,
   role?: UserRole | null,
+  permisos?: Permisos | null,
 ): NavItem[] {
-  if (role === "admin") return NAV_ITEMS;
-  return NAV_ITEMS.filter(
-    (item) =>
+  return NAV_ITEMS.filter((item) => {
+    // El permiso se evalúa ANTES del rol: si no lo tiene, no lo ve, aunque sea
+    // SuperAdmin. Al revés —comprobar el rol primero— haría que `admin` viera
+    // todo y el permiso no serviría para nada.
+    if (item.permiso) return Boolean(permisos?.[item.permiso]);
+    if (role === "admin") return true;
+    return (
       item.departments === "all" ||
-      (department && item.departments.includes(department)),
-  );
+      (department !== null && item.departments.includes(department))
+    );
+  });
 }
