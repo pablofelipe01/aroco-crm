@@ -56,6 +56,16 @@ export const serverEnv = {
   get CRON_SECRET() {
     return required("CRON_SECRET", process.env.CRON_SECRET);
   },
+  /**
+   * Token del endpoint /api/posicion, que consume CacaoQ.
+   *
+   * Aparte del CRON_SECRET a propósito: si hay que revocarle el acceso a
+   * CacaoQ, revocarlo no puede apagar de paso las sincronizaciones diarias.
+   * Vacío = endpoint cerrado.
+   */
+  get POSICION_API_TOKEN() {
+    return process.env.POSICION_API_TOKEN ?? "";
+  },
   /** Gmail OAuth (lectura del buzón de Renata para el cron de Actas). */
   get GMAIL_CLIENT_ID() {
     return process.env.GMAIL_CLIENT_ID ?? "";

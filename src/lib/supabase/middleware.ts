@@ -6,7 +6,10 @@ import { hasSupabaseEnv } from "@/lib/env";
 /** Routes reachable without a session. */
 // /api/cron has its own Bearer-token auth (CRON_SECRET); it's hit by Vercel Cron
 // without a user session, so it must bypass the login redirect.
-const PUBLIC_PREFIXES = ["/login", "/auth", "/onboarding", "/api/cron"];
+// /api/posicion igual: lo consume CacaoQ con su propio token y sin sesión. Sin
+// esta excepción el middleware le devuelve un 307 a /login, que para un cliente
+// que espera JSON se ve como una respuesta vacía y no como «no autorizado».
+const PUBLIC_PREFIXES = ["/login", "/auth", "/onboarding", "/api/cron", "/api/posicion"];
 
 function isPublic(pathname: string) {
   return PUBLIC_PREFIXES.some(
