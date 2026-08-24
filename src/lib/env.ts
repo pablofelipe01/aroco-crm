@@ -66,6 +66,38 @@ export const serverEnv = {
   get POSICION_API_TOKEN() {
     return process.env.POSICION_API_TOKEN ?? "";
   },
+  /**
+   * Los tres MCP de AROCO (StoneX, Barchart, Inventory), detrás del túnel de
+   * Cloudflare. Autenticados con Service Tokens de Cloudflare Access, así que
+   * son alcanzables desde Vercel sin abrir nada al público.
+   */
+  get STONEX_MCP_URL() {
+    return process.env.STONEX_MCP_URL ?? "";
+  },
+  get STONEX_MCP_CF_CLIENT_ID() {
+    return process.env.STONEX_MCP_CF_CLIENT_ID ?? "";
+  },
+  get STONEX_MCP_CF_CLIENT_SECRET() {
+    return process.env.STONEX_MCP_CF_CLIENT_SECRET ?? "";
+  },
+  get BARCHART_MCP_URL() {
+    return process.env.BARCHART_MCP_URL ?? "";
+  },
+  get BARCHART_MCP_CF_CLIENT_ID() {
+    return process.env.BARCHART_MCP_CF_CLIENT_ID ?? "";
+  },
+  get BARCHART_MCP_CF_CLIENT_SECRET() {
+    return process.env.BARCHART_MCP_CF_CLIENT_SECRET ?? "";
+  },
+  get INVENTORY_MCP_URL() {
+    return process.env.INVENTORY_MCP_URL ?? "";
+  },
+  get INVENTORY_MCP_CF_CLIENT_ID() {
+    return process.env.INVENTORY_MCP_CF_CLIENT_ID ?? "";
+  },
+  get INVENTORY_MCP_CF_CLIENT_SECRET() {
+    return process.env.INVENTORY_MCP_CF_CLIENT_SECRET ?? "";
+  },
   /** Gmail OAuth (lectura del buzón de Renata para el cron de Actas). */
   get GMAIL_CLIENT_ID() {
     return process.env.GMAIL_CLIENT_ID ?? "";
