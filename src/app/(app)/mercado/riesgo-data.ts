@@ -53,15 +53,23 @@ export async function cargarMercado(
   ]);
 
   const posicion = construirPosicion((lotesRes.data ?? []) as LoteRow[], new Date());
+  // El balance marca cuál es el estado más reciente: siempre hay uno por
+  // estado procesado, tenga o no posiciones abiertas.
   const bal = balRes.data?.[0] ?? null;
   const pnl = pnlRes.data?.[0] ?? null;
   const board = boardRes.data?.[0] ?? null;
   const trmFila = trmRes.data?.[0] ?? null;
 
-  // Solo las posiciones del estado más reciente: mezclar días sumaría la misma
-  // cobertura varias veces.
-  const ultimaFecha = posRes.data?.[0]?.statement_date ?? null;
-  const posiciones = (posRes.data ?? []).filter((p) => p.statement_date === ultimaFecha) as PosicionBroker[];
+  // La fecha de referencia es la del ÚLTIMO ESTADO procesado, no la del último
+  // día que TIENE posiciones. No es lo mismo: si los estados recientes vienen
+  // sin posiciones —porque se cerró la cobertura— tomar el último día con filas
+  // resucita un collar viejo y la pantalla dice «100 % cubierto» cuando no hay
+  // ninguna cobertura. Un estado sin posiciones no es ausencia de datos: es la
+  // afirmación de que ese día no había nada abierto.
+  const ultimaFecha = bal?.statement_date ?? null;
+  const posiciones = (posRes.data ?? []).filter(
+    (p) => p.statement_date === ultimaFecha,
+  ) as PosicionBroker[];
 
   // Griegas del tablero más reciente, si alguien cargó uno.
   const { data: griegas } = board

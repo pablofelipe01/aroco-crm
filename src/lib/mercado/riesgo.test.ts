@@ -115,3 +115,27 @@ test("un rango absurdo no genera miles de filas", () => {
   });
   assert.equal(filas.length, 31, "se topa en 31 días");
 });
+
+test("un estado sin posiciones significa cero cobertura, no «sin datos»", () => {
+  // Cargar el collar histórico de marzo destapó esto: si se toma el último día
+  // CON posiciones en vez del último estado procesado, una cobertura cerrada
+  // hace meses revive y la pantalla dice «100 % cubierto» sin nada abierto.
+  // Aquí se fija la regla del motor: sin posiciones, no hay cobertura.
+  const r = calcularRiesgo({ ...base, posiciones: [] });
+  assert.equal(r.coberturaPct, 0);
+  assert.equal(r.collar, null);
+  assert.equal(r.toneladasDescubiertas, r.toneladasFisicas);
+});
+
+test("el collar de marzo se reconoce cuando SÍ es el estado vigente", () => {
+  const r = calcularRiesgo({
+    ...base,
+    kgFisico: 100_000,
+    posiciones: [
+      { option_type: "PUT", long_qty: 2, short_qty: 0, strike: 3250, contract_month: "MAY 26" },
+      { option_type: "CALL", long_qty: 0, short_qty: 2, strike: 3300, contract_month: "MAY 26" },
+    ],
+  });
+  assert.deepEqual(r.collar, { piso: 3250, techo: 3300 });
+  assert.equal(r.toneladasCubiertas, 20, "2 puts × 10 t");
+});
