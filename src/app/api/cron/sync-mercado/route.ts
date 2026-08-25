@@ -3,7 +3,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { serverEnv } from "@/lib/env";
 import { MCPS } from "@/lib/mcp/config";
 import { traerExtracto, diasHabiles } from "@/lib/mercado/stonex";
-import { guardarExtracto, type ResultadoGuardado } from "@/lib/mercado/guardar";
+import { guardarExtracto, guardarTablero, type ResultadoGuardado } from "@/lib/mercado/guardar";
+import { listarVencimientos, traerTablero } from "@/lib/mercado/barchart";
 import { avisarFalloSync } from "@/lib/sync-alerta";
 
 export const runtime = "nodejs";
@@ -53,11 +54,34 @@ export async function GET(request: NextRequest) {
     }
   }
 
+  // ── Barchart: tablero de opciones ─────────────────────────────────────────
+  // Se limitan los vencimientos más cercanos: cada uno es una navegación con
+  // Playwright del lado del MCP y traerlos todos no cabe en el tope de la
+  // función. Los lejanos casi no cotizan, así que se pierde poco.
+  const tableros: { contract_month: string; strikes: number }[] = [];
+  const hoy = new Date().toISOString().slice(0, 10);
+  if (MCPS.barchart.url) {
+    try {
+      const vencs = await listarVencimientos(MCPS.barchart);
+      for (const v of vencs.slice(0, 3)) {
+        const t = await traerTablero(MCPS.barchart, v);
+        if (t) tableros.push(await guardarTablero(db, t, hoy));
+      }
+    } catch (e) {
+      // Que Barchart falle no invalida lo de StoneX: son fuentes distintas y
+      // media sincronización sigue siendo mejor que ninguna.
+      fallos.push({
+        fecha: hoy,
+        error: `Barchart: ${e instanceof Error ? e.message.slice(0, 160) : "desconocido"}`,
+      });
+    }
+  }
+
   const durationMs = Date.now() - startedAt;
 
   // Que TODOS los días fallen es distinto de que ninguno tenga estado: lo
   // primero es una avería, lo segundo es un puente festivo.
-  if (guardados.length === 0 && fallos.length > 0) {
+  if (guardados.length === 0 && tableros.length === 0 && fallos.length > 0) {
     return await fail(
       db,
       startedAt,
@@ -68,7 +92,7 @@ export async function GET(request: NextRequest) {
   await db.from("inventory_sync_runs").insert({
     source: "stonex_mcp",
     status: "ok",
-    rows_read: guardados.length,
+    rows_read: guardados.length + tableros.length,
     duration_ms: durationMs,
     error: fallos.length
       ? `Fallaron ${fallos.length} días: ${fallos.map((f) => `${f.fecha} (${f.error})`).join("; ")}`
@@ -78,6 +102,7 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({
     ok: true,
     estados: guardados,
+    tableros,
     sin_estado: sinEstado,
     fallos,
     duration_ms: durationMs,

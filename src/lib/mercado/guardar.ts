@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/types/database";
 import type { Extracto } from "./stonex";
+import type { Tablero } from "./barchart";
 
 export type ResultadoGuardado = {
   statement_date: string;
@@ -90,4 +91,53 @@ export async function guardarExtracto(
     balance: e.balance.total_equity !== null,
     pnl: e.pnl.mtd !== 0 || e.pnl.ytd !== 0,
   };
+}
+
+/**
+ * Guarda un tablero de opciones y su cadena de strikes.
+ *
+ * Una fecha y un mes de contrato identifican el tablero, así que volver a
+ * consultarlo el mismo día actualiza las primas en vez de crear otro. Los
+ * strikes se reemplazan enteros: si un strike deja de cotizarse, dejarlo vivo
+ * mostraría una prima de ayer como si fuera de hoy.
+ */
+export async function guardarTablero(
+  db: SupabaseClient<Database>,
+  t: Tablero,
+  fecha: string,
+): Promise<{ contract_month: string; strikes: number }> {
+  const { data: board, error: eB } = await db
+    .from("options_board")
+    .upsert(
+      {
+        date: fecha,
+        contract_month: t.contract_month,
+        // El subyacente se deduce por paridad put-call de la propia cadena.
+        // DTE, volatilidad y tasa sí quedan en null: no hay de dónde sacarlas
+        // hasta que se porte el tablero por imagen.
+        underlying_price: t.underlying_price,
+        dte: null,
+        expiration: null,
+        volatility_calls: null,
+        volatility_puts: null,
+        interest_rate: null,
+      },
+      { onConflict: "date,contract_month" },
+    )
+    .select("id")
+    .single();
+  if (eB) throw new Error(`options_board: ${eB.message}`);
+
+  const { error: eDel } = await db
+    .from("options_chain")
+    .delete()
+    .eq("board_id", board.id);
+  if (eDel) throw new Error(`options_chain (limpieza): ${eDel.message}`);
+
+  const { error: eC } = await db
+    .from("options_chain")
+    .insert(t.filas.map((f) => ({ board_id: board.id, ...f })));
+  if (eC) throw new Error(`options_chain: ${eC.message}`);
+
+  return { contract_month: t.contract_month, strikes: t.filas.length };
 }
