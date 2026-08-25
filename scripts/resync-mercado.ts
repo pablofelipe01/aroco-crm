@@ -9,6 +9,7 @@ import type { Database } from "../src/lib/types/database";
 import { traerExtracto, diasHabiles } from "../src/lib/mercado/stonex";
 import { guardarExtracto, guardarTablero } from "../src/lib/mercado/guardar";
 import { listarVencimientos, traerTablero } from "../src/lib/mercado/barchart";
+import { traerTrm } from "../src/lib/mercado/trm";
 
 config({ path: ".env.local" });
 
@@ -77,6 +78,15 @@ async function main() {
         console.log(`  ${v.label.padEnd(14)} FALLA ${err instanceof Error ? err.message.slice(0, 140) : err}`);
       }
     }
+  }
+
+  // ── TRM ─────────────────────────────────────────────────────────────────
+  const filasTrm = await traerTrm(60);
+  const ult = filasTrm[filasTrm.length - 1];
+  console.log(`\nTRM — ${filasTrm.length} días · última ${ult.date}: $ ${ult.trm.toLocaleString("es-CO")}`);
+  if (!dry) {
+    const { error } = await db.from("trm_data").upsert(filasTrm, { onConflict: "date" });
+    console.log(error ? `  FALLA ${error.message}` : "  guardada ✓");
   }
 
   if (dry) console.log("\n(--dry: no se escribió nada)");

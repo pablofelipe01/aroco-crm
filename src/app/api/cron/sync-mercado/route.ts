@@ -5,6 +5,7 @@ import { MCPS } from "@/lib/mcp/config";
 import { traerExtracto, diasHabiles } from "@/lib/mercado/stonex";
 import { guardarExtracto, guardarTablero, type ResultadoGuardado } from "@/lib/mercado/guardar";
 import { listarVencimientos, traerTablero } from "@/lib/mercado/barchart";
+import { traerTrm } from "@/lib/mercado/trm";
 import { avisarFalloSync } from "@/lib/sync-alerta";
 
 export const runtime = "nodejs";
@@ -77,11 +78,28 @@ export async function GET(request: NextRequest) {
     }
   }
 
+  // ── TRM ───────────────────────────────────────────────────────────────────
+  // Fuente pública, sin MCP de por medio: si el túnel está caído esto igual
+  // entra, y sin TRM no se puede comparar un costo en pesos contra un precio
+  // en dólares.
+  let trm = 0;
+  try {
+    const filas = await traerTrm(60);
+    const { error } = await db.from("trm_data").upsert(filas, { onConflict: "date" });
+    if (error) throw new Error(error.message);
+    trm = filas.length;
+  } catch (e) {
+    fallos.push({
+      fecha: hoy,
+      error: `TRM: ${e instanceof Error ? e.message.slice(0, 160) : "desconocido"}`,
+    });
+  }
+
   const durationMs = Date.now() - startedAt;
 
   // Que TODOS los días fallen es distinto de que ninguno tenga estado: lo
   // primero es una avería, lo segundo es un puente festivo.
-  if (guardados.length === 0 && tableros.length === 0 && fallos.length > 0) {
+  if (guardados.length === 0 && tableros.length === 0 && trm === 0 && fallos.length > 0) {
     return await fail(
       db,
       startedAt,
@@ -92,7 +110,7 @@ export async function GET(request: NextRequest) {
   await db.from("inventory_sync_runs").insert({
     source: "stonex_mcp",
     status: "ok",
-    rows_read: guardados.length + tableros.length,
+    rows_read: guardados.length + tableros.length + trm,
     duration_ms: durationMs,
     error: fallos.length
       ? `Fallaron ${fallos.length} días: ${fallos.map((f) => `${f.fecha} (${f.error})`).join("; ")}`
@@ -103,6 +121,7 @@ export async function GET(request: NextRequest) {
     ok: true,
     estados: guardados,
     tableros,
+    trm,
     sin_estado: sinEstado,
     fallos,
     duration_ms: durationMs,

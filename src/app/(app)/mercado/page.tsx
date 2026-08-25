@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getSessionContext } from "@/lib/auth";
 import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
-import { construirPosicion, type LoteRow } from "@/lib/posicion";
+import { cargarMercado } from "./riesgo-data";
 import { MercadoClient } from "./mercado-client";
 
 export const dynamic = "force-dynamic";
@@ -27,17 +27,5 @@ export default async function MercadoPage() {
   }
 
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("inventory_lots")
-    .select(
-      "code, remision, recepcion, odc, entry_date, origin, qty_in_kg, qty_out_kg, purchase_price_cop_kg, quality",
-    )
-    .order("entry_date", { ascending: false, nullsFirst: false });
-
-  return (
-    <MercadoClient
-      posicion={construirPosicion((data ?? []) as LoteRow[], new Date())}
-      error={error?.message ?? null}
-    />
-  );
+  return <MercadoClient datos={await cargarMercado(supabase)} />;
 }
