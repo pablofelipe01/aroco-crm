@@ -404,6 +404,56 @@ type ToolResult = Record<string, unknown> | { error: string };
 const str = (v: unknown): string => String(v ?? "").trim();
 const today = (): string => new Date().toISOString().slice(0, 10);
 
+
+/**
+ * Herramientas de Mercado.
+ *
+ * Van aparte porque no se le ofrecen a todo el mundo: `herramientasPara()` las
+ * incluye solo si la persona tiene el permiso. La RLS ya las protegería —esas
+ * tablas exigen `ve_mercado()`— pero entonces el asistente las intentaría, le
+ * volverían vacías y respondería «no hay posiciones», que suena a que no hay
+ * cobertura en vez de a que no tiene acceso. Es una diferencia peligrosa
+ * justamente en este tema.
+ */
+export const MERCADO_TOOLS: Anthropic.Tool[] = [
+  {
+    name: "get_riesgo_mercado",
+    description:
+      "Exposición al precio del cacao: toneladas en bodega, cuántas están cubiertas con opciones o futuros, cuántas quedan descubiertas, el precio actual del cacao en COP/kg y la valorización del inventario contra su costo. Úsala para '¿cuánto cacao tengo sin cubrir?', '¿estamos expuestos?', '¿cuánto vale el inventario hoy?'.",
+    input_schema: { type: "object", properties: {}, required: [] },
+  },
+  {
+    name: "get_cuenta_broker",
+    description:
+      "Estado de la cuenta en StoneX: equity, margen inicial y P&L realizado del mes y del año, con la fecha del último estado de cuenta procesado. Úsala para '¿cómo está la cuenta del bróker?' o '¿cuánto llevamos de pérdida realizada?'.",
+    input_schema: { type: "object", properties: {}, required: [] },
+  },
+  {
+    name: "get_tablero_opciones",
+    description:
+      "Tablero de opciones de cacao: strikes con prima de call y de put, y delta si se cargó el tablero del bróker. Úsala para '¿cuánto cuesta un put de 5500?' o '¿qué strikes hay disponibles?'.",
+    input_schema: {
+      type: "object",
+      properties: {
+        contract_month: { type: "string", description: "Mes del contrato, p. ej. DEC26. Si se omite, el más reciente." },
+        strike_min: { type: "number" },
+        strike_max: { type: "number" },
+      },
+      required: [],
+    },
+  },
+];
+
+/**
+ * Las herramientas que se le ofrecen a quien pregunta.
+ *
+ * Recortar la LISTA y no solo el resultado es lo que hace que el asistente no
+ * hable de lo que no puede ver.
+ */
+export function herramientasPara(ctx: AgentContext): Anthropic.Tool[] {
+  return ctx.veMercado ? [...AI_TOOLS, ...MERCADO_TOOLS] : AI_TOOLS;
+}
+
 /**
  * Execute a tool by name. Returns a JSON-serializable result.
  *
@@ -418,6 +468,90 @@ export async function executeTool(
   ctx: AgentContext,
 ): Promise<ToolResult> {
   switch (name) {
+    case "get_riesgo_mercado": {
+      if (!ctx.veMercado) return { error: "No tienes acceso al módulo Mercado." };
+      const { cargarMercado } = await import("@/app/(app)/mercado/riesgo-data");
+      const d = await cargarMercado(db);
+      const r = d.riesgo;
+      return {
+        toneladas_en_bodega: r.toneladasFisicas,
+        toneladas_cubiertas: r.toneladasCubiertas,
+        toneladas_descubiertas: r.toneladasDescubiertas,
+        cobertura_pct: r.coberturaPct,
+        cobertura_efectiva_t: d.cobertura?.efectivaT ?? null,
+        costo_promedio_cop_kg: r.costoPromedioCopKg,
+        precio_cacao_cop_kg: r.precioMercadoCopKg,
+        precio_cacao_usd_t: d.mercado.precioUsdT,
+        contrato: d.mercado.contrato,
+        trm: d.trm.valor,
+        valorizacion_cop: r.pnlFisicoCop,
+        contratos: r.contratos,
+        collar: r.collar,
+        // Lo que falta se dice, para que el modelo no presente como completo un
+        // cálculo al que le faltan piezas.
+        faltantes: r.faltantes,
+        fechas: { cacao: d.mercado.fecha, trm: d.trm.fecha, broker: d.broker?.fecha ?? null },
+      };
+    }
+
+    case "get_cuenta_broker": {
+      if (!ctx.veMercado) return { error: "No tienes acceso al módulo Mercado." };
+      const [{ data: bal }, { data: pnl }] = await Promise.all([
+        db.from("account_balance").select("*").order("statement_date", { ascending: false }).limit(1),
+        db.from("broker_pnl").select("*").order("statement_date", { ascending: false }).limit(1),
+      ]);
+      if (!bal?.length) return { mensaje: "No hay estados de cuenta procesados todavía." };
+      const b = bal[0];
+      return {
+        fecha_estado: b.statement_date,
+        cuenta: b.account,
+        equity_usd: b.total_equity,
+        margen_inicial_usd: b.initial_margin,
+        margen_mantenimiento_usd: b.maintenance_margin,
+        exceso_equity_usd: b.excess_equity,
+        pnl_realizado_mes: pnl?.[0]?.realized_pnl_mtd ?? null,
+        pnl_realizado_ano: pnl?.[0]?.realized_pnl_ytd ?? null,
+        moneda: pnl?.[0]?.currency ?? "USD",
+      };
+    }
+
+    case "get_tablero_opciones": {
+      if (!ctx.veMercado) return { error: "No tienes acceso al módulo Mercado." };
+      let qb = db
+        .from("options_board")
+        .select("id, date, contract_month, underlying_price, dte, volatility_calls, volatility_puts")
+        .order("date", { ascending: false });
+      if (typeof input.contract_month === "string") {
+        qb = qb.eq("contract_month", input.contract_month.toUpperCase());
+      }
+      const { data: boards, error: eB } = await qb.limit(1);
+      if (eB) return { error: eB.message };
+      if (!boards?.length) return { mensaje: "No hay tableros de opciones cargados." };
+
+      const board = boards[0];
+      let qc = db
+        .from("options_chain")
+        .select("strike, call_premium, call_delta, put_premium, put_delta")
+        .eq("board_id", board.id)
+        .order("strike");
+      if (typeof input.strike_min === "number") qc = qc.gte("strike", input.strike_min);
+      if (typeof input.strike_max === "number") qc = qc.lte("strike", input.strike_max);
+      const { data: filas, error: eC } = await qc.limit(60);
+      if (eC) return { error: eC.message };
+
+      return {
+        fecha: board.date,
+        contrato: board.contract_month,
+        subyacente: board.underlying_price,
+        dias_al_vencimiento: board.dte,
+        volatilidad: { calls: board.volatility_calls, puts: board.volatility_puts },
+        // Las primas están en PUNTOS, la misma unidad que el strike.
+        unidad_prima: "puntos (misma unidad que el strike)",
+        con_delta: (filas ?? []).some((f) => f.call_delta !== null || f.put_delta !== null),
+        strikes: filas ?? [],
+      };
+    }
+
     case "query_leads": {
       let q = db
         .from("leads")

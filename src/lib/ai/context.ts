@@ -27,6 +27,11 @@ export type AgentContext = {
   teamMemberId: string | null;
   /** Cargo según el organigrama, para dar contexto en las respuestas. */
   roleTitle: string | null;
+  /**
+   * Puede ver Mercado: posiciones del bróker, cobertura y P&L. Gana sobre el
+   * rol — un SuperAdmin sin este permiso tampoco lo ve.
+   */
+  veMercado: boolean;
 };
 
 /** Resuelve el contexto del asistente para la sesión actual. */
@@ -49,6 +54,7 @@ export async function resolveAgentContext(
     department: (session.profile?.department as Department | null) ?? null,
     teamMemberId: member?.id ?? null,
     roleTitle: member?.role_title ?? null,
+    veMercado: session.profile?.ve_mercado === true,
   };
 }
 

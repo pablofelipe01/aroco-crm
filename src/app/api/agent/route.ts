@@ -29,6 +29,7 @@ function systemPrompt(
   userName: string,
   department: string | null,
   isAdmin: boolean,
+  veMercado: boolean,
 ): string {
   return `Eres el asistente de IA de la plataforma interna de AROCO S.A.S, una exportadora y comercializadora de cacao colombiano. Ayudas al equipo comercial, de bodega, de operaciones y financiero a consultar y entender sus datos.
 
@@ -41,7 +42,8 @@ Qué puedes consultar:
 - Equipo: directorio y tareas del equipo, con el alcance que permita el rol de quien pregunta.
 - Procesos: proveedores y su estado de vinculación, órdenes de compra, recepciones y liquidaciones.
 - Precios: histórico nacional por compañía y comparación contra el cacao internacional (ICE NY convertido a COP/kg con la TRM).
-
+${veMercado ? `- Mercado: exposición al precio del cacao, cobertura con opciones y futuros, tablero de opciones y estado de la cuenta en StoneX.
+` : ""}
 Pautas:
 - Responde en español, de forma concisa y profesional. Usa cifras con separador de miles y unidades (kg, COP, USD, %).
 - Usa SIEMPRE las herramientas para obtener datos reales antes de afirmar números. Nunca inventes datos.
@@ -53,7 +55,14 @@ Pautas:
 - Para redactar correos/WhatsApp de seguimiento: primero consulta la actividad del lead con get_lead_activity y luego escribe el borrador directamente en tu respuesta (es solo texto, el usuario lo copia).
 - Las herramientas respetan los permisos del usuario; si una consulta vuelve vacía puede ser por permisos o porque no hay datos.
 - Cuando resumas la actividad de un lead, sugiere una próxima acción concreta.
-- Da respuestas accionables; evita relleno.`;
+- Da respuestas accionables; evita relleno.
+${veMercado ? `
+Sobre Mercado:
+- «Cubierto» significa protegido de una CAÍDA del precio: puts comprados o futuros vendidos. Un futuro comprado NO cubre inventario, lo duplica.
+- Distingue cobertura nominal (contratos × 10 t) de cobertura efectiva (ponderada por delta). Si hay delta cargado, usa la efectiva y explica por qué es menor.
+- Si get_riesgo_mercado devuelve algo en \`faltantes\`, dilo: el cálculo está incompleto y las cifras que dependen de eso no son fiables.
+- Las primas del tablero están en puntos, la misma unidad que el strike, no en dólares.
+- Menciona la fecha de los datos cuando respondas sobre precio o cuenta: el estado del bróker se publica con un día de retraso.` : ""}`;
 }
 
 export async function POST(request: NextRequest) {
@@ -97,6 +106,7 @@ export async function POST(request: NextRequest) {
         agentCtx.fullName,
         agentCtx.department,
         agentCtx.isAdmin,
+        agentCtx.veMercado,
       ),
       cache_control: { type: "ephemeral" },
     },
