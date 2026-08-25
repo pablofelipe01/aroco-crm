@@ -429,6 +429,22 @@ export const MERCADO_TOOLS: Anthropic.Tool[] = [
     input_schema: { type: "object", properties: {}, required: [] },
   },
   {
+    name: "get_intel_mercado",
+    description:
+      "Análisis y noticias del mercado de cacao publicados por StoneX: inventarios certificados, clima, cosecha y movimientos de precio. Cada artículo trae un resumen en español y el texto completo. Úsala para '¿qué está pasando con el cacao?', '¿por qué subió el precio?' o '¿cómo van los inventarios certificados?'.",
+    input_schema: {
+      type: "object",
+      properties: {
+        limite: { type: "number", description: "Cuántos artículos, por defecto 5." },
+        con_texto: {
+          type: "boolean",
+          description: "Incluir el texto completo del reporte. Úsalo solo si el resumen no alcanza para responder.",
+        },
+      },
+      required: [],
+    },
+  },
+  {
     name: "get_tablero_opciones",
     description:
       "Tablero de opciones de cacao: strikes con prima de call y de put, y delta si se cargó el tablero del bróker. Úsala para '¿cuánto cuesta un put de 5500?' o '¿qué strikes hay disponibles?'.",
@@ -512,6 +528,37 @@ export async function executeTool(
         pnl_realizado_mes: pnl?.[0]?.realized_pnl_mtd ?? null,
         pnl_realizado_ano: pnl?.[0]?.realized_pnl_ytd ?? null,
         moneda: pnl?.[0]?.currency ?? "USD",
+      };
+    }
+
+    case "get_intel_mercado": {
+      if (!ctx.veMercado) return { error: "No tienes acceso al módulo Mercado." };
+      const limite = typeof input.limite === "number" ? Math.min(input.limite, 10) : 5;
+      const conTexto = input.con_texto === true;
+      // Dos consultas literales y no una cadena armada: TypeScript no resuelve
+      // un `.select()` concatenado y lo convierte en un error de tipo.
+      const { data, error } = conTexto
+        ? await db
+            .from("market_intel")
+            .select("title, resumen, abstract, author, url, published_at, texto")
+            .order("published_at", { ascending: false })
+            .limit(limite)
+        : await db
+            .from("market_intel")
+            .select("title, resumen, abstract, author, url, published_at")
+            .order("published_at", { ascending: false })
+            .limit(limite);
+      if (error) return { error: error.message };
+      if (!data?.length) return { mensaje: "Todavía no hay análisis de mercado sincronizados." };
+
+      return {
+        articulos: (data as Record<string, unknown>[]).map((a) => {
+          if (typeof a.texto !== "string") return a;
+          // El texto completo se recorta: estos reportes traen tablas largas
+          // que llenan el contexto sin aportar a la respuesta.
+          return { ...a, texto: a.texto.slice(0, 4000) };
+        }),
+        nota: "Los resúmenes están en español; los artículos originales, en inglés.",
       };
     }
 

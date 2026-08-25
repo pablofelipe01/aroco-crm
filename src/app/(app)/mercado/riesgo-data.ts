@@ -27,6 +27,10 @@ export type DatosMercado = {
    */
   cobertura: { efectivaT: number; sinDeltaT: number } | null;
   trm: { fecha: string | null; valor: number | null };
+  intel: {
+    article_id: string; title: string; resumen: string | null;
+    abstract: string | null; url: string | null; published_at: string;
+  }[];
   error: string | null;
 };
 
@@ -40,7 +44,7 @@ export type DatosMercado = {
 export async function cargarMercado(
   db: SupabaseClient<Database>,
 ): Promise<DatosMercado> {
-  const [lotesRes, balRes, pnlRes, posRes, boardRes, trmRes] = await Promise.all([
+  const [lotesRes, balRes, pnlRes, posRes, boardRes, trmRes, intelRes] = await Promise.all([
     db
       .from("inventory_lots")
       .select("code, remision, recepcion, odc, entry_date, origin, qty_in_kg, qty_out_kg, purchase_price_cop_kg, quality")
@@ -50,6 +54,11 @@ export async function cargarMercado(
     db.from("broker_positions").select("option_type, long_qty, short_qty, strike, contract_month, statement_date").order("statement_date", { ascending: false }),
     db.from("options_board").select("id, date, contract_month, underlying_price").not("underlying_price", "is", null).order("date", { ascending: false }).order("contract_month").limit(1),
     db.from("trm_data").select("date, trm").order("date", { ascending: false }).limit(1),
+    db
+      .from("market_intel")
+      .select("article_id, title, resumen, abstract, url, published_at")
+      .order("published_at", { ascending: false })
+      .limit(6),
   ]);
 
   const posicion = construirPosicion((lotesRes.data ?? []) as LoteRow[], new Date());
@@ -129,6 +138,7 @@ export async function cargarMercado(
       contrato: board?.contract_month ?? null,
     },
     trm: { fecha: trmFila?.date ?? null, valor: trmFila ? Number(trmFila.trm) : null },
+    intel: intelRes.data ?? [],
     error: lotesRes.error?.message ?? null,
   };
 }

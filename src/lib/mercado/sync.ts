@@ -4,12 +4,14 @@ import { MCPS } from "@/lib/mcp/config";
 import { traerExtracto, diasHabiles } from "./stonex";
 import { listarVencimientos, traerTablero } from "./barchart";
 import { traerTrm } from "./trm";
+import { sincronizarIntel } from "./intel";
 import { guardarExtracto, guardarTablero, type ResultadoGuardado } from "./guardar";
 
 export type ResumenSync = {
   estados: ResultadoGuardado[];
   tableros: { contract_month: string; strikes: number }[];
   trm: number;
+  intel: { nuevos: number; resumidos: number; total: number };
   sinEstado: string[];
   fallos: { fuente: string; error: string }[];
   duration_ms: number;
@@ -48,6 +50,7 @@ export async function sincronizarMercado(
   const texto = (e: unknown) => (e instanceof Error ? e.message.slice(0, 200) : "desconocido");
 
   let trm = 0;
+  let intel = { nuevos: 0, resumidos: 0, total: 0 };
 
   const conStonex = async () => {
     if (!MCPS.stonex.url) return;
@@ -96,25 +99,34 @@ export async function sincronizarMercado(
     }
   };
 
+  const conIntel = async () => {
+    if (!MCPS.stonex.url) return;
+    try {
+      intel = await sincronizarIntel(db, MCPS.stonex);
+    } catch (e) {
+      fallos.push({ fuente: "Inteligencia de mercado", error: texto(e) });
+    }
+  };
+
   // allSettled y no all: una fuente que reviente no puede tumbar a las otras
   // dos antes de que terminen.
-  await Promise.allSettled([conStonex(), conBarchart(), conTrm()]);
+  await Promise.allSettled([conStonex(), conBarchart(), conTrm(), conIntel()]);
 
   const duration_ms = Date.now() - inicio;
 
   // Que no entre NADA es una avería. Que no haya estados es un festivo.
-  const nadaEntro = estados.length === 0 && tableros.length === 0 && trm === 0;
+  const nadaEntro = estados.length === 0 && tableros.length === 0 && trm === 0 && intel.total === 0;
   await db.from("inventory_sync_runs").insert({
     source: "mercado",
     status: nadaEntro && fallos.length > 0 ? "error" : "ok",
-    rows_read: estados.length + tableros.length + trm,
+    rows_read: estados.length + tableros.length + trm + intel.total,
     duration_ms,
     error: fallos.length
       ? fallos.map((f) => `${f.fuente}: ${f.error}`).join(" · ").slice(0, 900)
       : null,
   });
 
-  return { estados, tableros, trm, sinEstado, fallos, duration_ms };
+  return { estados, tableros, trm, intel, sinEstado, fallos, duration_ms };
 }
 
 /** Cuándo terminó la última sincronización de Mercado, para mostrarla. */

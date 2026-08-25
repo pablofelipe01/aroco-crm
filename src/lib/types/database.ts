@@ -374,6 +374,48 @@ export type Database = {
         };
         Relationships: [];
       };
+      market_intel: {
+        Row: {
+          id: string;
+          article_id: string;
+          title: string;
+          abstract: string | null;
+          resumen: string | null;
+          author: string | null;
+          market_name: string | null;
+          url: string | null;
+          texto: string | null;
+          published_at: string;
+          synced_at: string;
+        };
+        Insert: {
+          id?: string;
+          article_id?: string;
+          title?: string;
+          abstract?: string | null;
+          resumen?: string | null;
+          author?: string | null;
+          market_name?: string | null;
+          url?: string | null;
+          texto?: string | null;
+          published_at?: string;
+          synced_at?: string;
+        };
+        Update: {
+          id?: string;
+          article_id?: string;
+          title?: string;
+          abstract?: string | null;
+          resumen?: string | null;
+          author?: string | null;
+          market_name?: string | null;
+          url?: string | null;
+          texto?: string | null;
+          published_at?: string;
+          synced_at?: string;
+        };
+        Relationships: [];
+      };
       market_data: {
         Row: {
           id: string;

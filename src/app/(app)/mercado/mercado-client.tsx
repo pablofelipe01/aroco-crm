@@ -4,6 +4,7 @@ import * as React from "react";
 import { motion } from "framer-motion";
 import {
   Boxes, Coins, ShieldAlert, TrendingUp, AlertTriangle, Landmark, RefreshCw, ImageUp,
+  Newspaper, ExternalLink,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -252,6 +253,47 @@ export function MercadoClient({
               primas, y Barchart no entrega las griegas: calcularlo sin ellas daría
               una cifra que parece precisa y no lo es.
             </p>
+          </CardBody>
+        </Card>
+      )}
+
+      {d.intel.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>
+              <span className="inline-flex items-center gap-2">
+                <Newspaper className="h-4 w-4 text-fg-subtle" /> Qué está pasando en el mercado
+              </span>
+            </CardTitle>
+          </CardHeader>
+          <CardBody>
+            <ul className="space-y-4">
+              {d.intel.map((a) => (
+                <li key={a.article_id} className="border-b border-border/60 pb-4 last:border-0 last:pb-0">
+                  <div className="flex items-baseline justify-between gap-3">
+                    <p className="min-w-0 text-sm font-medium text-fg">{a.title}</p>
+                    <span className="shrink-0 font-mono tnum text-xs text-fg-subtle">
+                      {formatDate(a.published_at)}
+                    </span>
+                  </div>
+                  {/* El resumen en español es lo que se lee; el original en
+                      inglés queda a un clic para quien quiera la fuente. */}
+                  <p className="mt-1 text-sm text-fg-muted">
+                    {a.resumen ?? a.abstract ?? "Sin resumen disponible."}
+                  </p>
+                  {a.url && (
+                    <a
+                      href={a.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-1 inline-flex items-center gap-1 text-xs text-accent hover:underline"
+                    >
+                      Leer en StoneX <ExternalLink className="h-3 w-3" />
+                    </a>
+                  )}
+                </li>
+              ))}
+            </ul>
           </CardBody>
         </Card>
       )}
