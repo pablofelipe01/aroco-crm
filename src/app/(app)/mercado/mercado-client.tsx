@@ -3,8 +3,12 @@
 import * as React from "react";
 import { motion } from "framer-motion";
 import {
-  Boxes, Coins, ShieldAlert, TrendingUp, AlertTriangle, Landmark,
+  Boxes, Coins, ShieldAlert, TrendingUp, AlertTriangle, Landmark, RefreshCw,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { useToast } from "@/components/ui/toast";
+import { sincronizarAhora } from "./actions";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardHeader, CardTitle, CardBody } from "@/components/ui/card";
 import { StatCard } from "@/components/ui/stat-card";
@@ -21,13 +25,52 @@ const usd = (n: number | null) =>
 const cop = (n: number | null) =>
   n === null ? "—" : Math.abs(n) >= 1_000_000 ? `$ ${formatNumber(n / 1_000_000, 1)} M` : formatCOP(n);
 
-export function MercadoClient({ datos: d }: { datos: DatosMercado }) {
+export function MercadoClient({
+  datos: d,
+  sync,
+}: {
+  datos: DatosMercado;
+  sync: { ran_at: string; status: string; error: string | null } | null;
+}) {
+  const router = useRouter();
+  const { toast } = useToast();
+  const [sincronizando, setSincronizando] = React.useState(false);
   const r = d.riesgo;
+
+  async function alSincronizar() {
+    setSincronizando(true);
+    const res = await sincronizarAhora();
+    setSincronizando(false);
+    toast({
+      tone: res.ok ? (res.detalle ? "warn" : "success") : "error",
+      title: res.mensaje,
+      description: res.detalle,
+    });
+    if (res.ok) router.refresh();
+  }
+
   const descubierto = r.toneladasFisicas > 0 && r.coberturaPct < 100;
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Mercado" description="Posición física, cobertura y exposición al precio" />
+      <PageHeader
+        title="Mercado"
+        description="Posición física, cobertura y exposición al precio"
+        actions={
+          <Button size="sm" variant="secondary" onClick={alSincronizar} loading={sincronizando}>
+            <RefreshCw className="h-4 w-4" />
+            Sincronizar ahora
+          </Button>
+        }
+      />
+
+      {/* Traer los datos tarda: Barchart navega con Playwright del otro lado.
+          Decirlo evita que alguien crea que se colgó y recargue a la mitad. */}
+      {sincronizando && (
+        <p className="text-xs text-fg-subtle">
+          Consultando StoneX, Barchart y la TRM. Puede tomar un par de minutos.
+        </p>
+      )}
 
       {d.error && (
         <div role="alert" className="flex items-start gap-3 rounded-[var(--radius-md)] border border-danger/40 bg-danger-soft p-4">
@@ -205,6 +248,12 @@ export function MercadoClient({ datos: d }: { datos: DatosMercado }) {
         {d.mercado.contrato ? ` (${d.mercado.contrato}, deducido por paridad put-call)` : ""} ·
         TRM {d.trm.fecha ? `${formatDate(d.trm.fecha)} $ ${formatNumber(d.trm.valor ?? 0, 2)}` : "sin dato"} ·
         broker {d.broker?.fecha ? formatDate(d.broker.fecha) : "sin estado"}
+        {sync && (
+          <>
+            {" · "}última sincronización {formatDate(sync.ran_at)}
+            {sync.status !== "ok" && <span className="text-danger"> (falló)</span>}
+          </>
+        )}
       </p>
     </div>
   );

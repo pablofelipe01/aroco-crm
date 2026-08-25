@@ -1,0 +1,131 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/lib/types/database";
+import { MCPS } from "@/lib/mcp/config";
+import { traerExtracto, diasHabiles } from "./stonex";
+import { listarVencimientos, traerTablero } from "./barchart";
+import { traerTrm } from "./trm";
+import { guardarExtracto, guardarTablero, type ResultadoGuardado } from "./guardar";
+
+export type ResumenSync = {
+  estados: ResultadoGuardado[];
+  tableros: { contract_month: string; strikes: number }[];
+  trm: number;
+  sinEstado: string[];
+  fallos: { fuente: string; error: string }[];
+  duration_ms: number;
+};
+
+/**
+ * Sincroniza las tres fuentes de Mercado.
+ *
+ * Vive aquí y no dentro de la ruta del cron porque el botón de «sincronizar
+ * ahora» corre exactamente lo mismo. Con dos copias, la que se usa a mano y la
+ * automática se irían separando y nadie sabría cuál de las dos produjo la
+ * cifra que está viendo.
+ *
+ * Cada fuente falla por su cuenta: que Barchart no responda no puede impedir
+ * que entre la TRM. Media sincronización, con el detalle de qué faltó, es más
+ * útil que ninguna.
+ *
+ * Las tres corren EN PARALELO. En serie tardaban 322 s —por encima del tope de
+ * 300 s de la función— y el botón se cortaba a la mitad, dejando el tablero a
+ * medio actualizar sin decirlo. Son fuentes distintas y no dependen entre sí,
+ * así que el costo pasa de ser la suma a ser la más lenta.
+ */
+export async function sincronizarMercado(
+  db: SupabaseClient<Database>,
+  opciones: { dias?: number; vencimientos?: number } = {},
+): Promise<ResumenSync> {
+  const inicio = Date.now();
+  const dias = opciones.dias ?? 5;
+  const vencimientos = opciones.vencimientos ?? 3;
+  const hoy = new Date().toISOString().slice(0, 10);
+
+  const estados: ResultadoGuardado[] = [];
+  const tableros: { contract_month: string; strikes: number }[] = [];
+  const sinEstado: string[] = [];
+  const fallos: { fuente: string; error: string }[] = [];
+  const texto = (e: unknown) => (e instanceof Error ? e.message.slice(0, 200) : "desconocido");
+
+  let trm = 0;
+
+  const conStonex = async () => {
+    if (!MCPS.stonex.url) return;
+    // Los días sí van en serie: es el mismo MCP y pedirle varios PDF a la vez
+    // lo pone a competir consigo mismo.
+    for (const fecha of diasHabiles(new Date(), dias)) {
+      try {
+        const extracto = await traerExtracto(MCPS.stonex, fecha);
+        if (!extracto) {
+          sinEstado.push(fecha);
+          continue;
+        }
+        estados.push(await guardarExtracto(db, extracto));
+      } catch (e) {
+        fallos.push({ fuente: `StoneX ${fecha}`, error: texto(e) });
+      }
+    }
+  };
+
+  const conBarchart = async () => {
+    if (!MCPS.barchart.url || vencimientos <= 0) return;
+    try {
+      const vencs = await listarVencimientos(MCPS.barchart);
+      for (const v of vencs.slice(0, vencimientos)) {
+        try {
+          const t = await traerTablero(MCPS.barchart, v);
+          if (t) tableros.push(await guardarTablero(db, t, hoy));
+        } catch (e) {
+          // Un vencimiento que falla no cancela los otros.
+          fallos.push({ fuente: `Barchart ${v.label}`, error: texto(e) });
+        }
+      }
+    } catch (e) {
+      fallos.push({ fuente: "Barchart", error: texto(e) });
+    }
+  };
+
+  const conTrm = async () => {
+    try {
+      const filas = await traerTrm(60);
+      const { error } = await db.from("trm_data").upsert(filas, { onConflict: "date" });
+      if (error) throw new Error(error.message);
+      trm = filas.length;
+    } catch (e) {
+      fallos.push({ fuente: "TRM", error: texto(e) });
+    }
+  };
+
+  // allSettled y no all: una fuente que reviente no puede tumbar a las otras
+  // dos antes de que terminen.
+  await Promise.allSettled([conStonex(), conBarchart(), conTrm()]);
+
+  const duration_ms = Date.now() - inicio;
+
+  // Que no entre NADA es una avería. Que no haya estados es un festivo.
+  const nadaEntro = estados.length === 0 && tableros.length === 0 && trm === 0;
+  await db.from("inventory_sync_runs").insert({
+    source: "mercado",
+    status: nadaEntro && fallos.length > 0 ? "error" : "ok",
+    rows_read: estados.length + tableros.length + trm,
+    duration_ms,
+    error: fallos.length
+      ? fallos.map((f) => `${f.fuente}: ${f.error}`).join(" · ").slice(0, 900)
+      : null,
+  });
+
+  return { estados, tableros, trm, sinEstado, fallos, duration_ms };
+}
+
+/** Cuándo terminó la última sincronización de Mercado, para mostrarla. */
+export async function ultimaSync(
+  db: SupabaseClient<Database>,
+): Promise<{ ran_at: string; status: string; error: string | null } | null> {
+  const { data } = await db
+    .from("inventory_sync_runs")
+    .select("ran_at, status, error")
+    .in("source", ["mercado", "stonex_mcp"])
+    .order("ran_at", { ascending: false })
+    .limit(1);
+  return data?.[0] ?? null;
+}

@@ -4,9 +4,14 @@ import { getSessionContext } from "@/lib/auth";
 import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
 import { cargarMercado } from "./riesgo-data";
+import { ultimaSync } from "@/lib/mercado/sync";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { MercadoClient } from "./mercado-client";
 
 export const dynamic = "force-dynamic";
+// El botón de sincronizar corre en esta ruta y Barchart tarda: con el tope por
+// defecto se cortaría a la mitad y dejaría el tablero incompleto sin decirlo.
+export const maxDuration = 300;
 
 export default async function MercadoPage() {
   const session = await getSessionContext();
@@ -27,5 +32,9 @@ export default async function MercadoPage() {
   }
 
   const supabase = await createClient();
-  return <MercadoClient datos={await cargarMercado(supabase)} />;
+  const [datos, sync] = await Promise.all([
+    cargarMercado(supabase),
+    ultimaSync(createAdminClient()),
+  ]);
+  return <MercadoClient datos={datos} sync={sync} />;
 }
