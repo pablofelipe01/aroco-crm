@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/types/database";
 import { construirPosicion, type LoteRow } from "@/lib/posicion";
 import { calcularRiesgo, escenarios, type PosicionBroker, type Riesgo } from "@/lib/mercado/riesgo";
+import { toneladasPorDelta } from "@/lib/mercado/tablero-imagen";
 
 export type DatosMercado = {
   riesgo: Riesgo;
@@ -19,6 +20,12 @@ export type DatosMercado = {
     moneda: string;
   } | null;
   mercado: { fecha: string | null; precioUsdT: number | null; contrato: string | null };
+  /**
+   * Cobertura ponderada por delta. `null` cuando no hay griegas cargadas: los
+   * contratos nominales ya están en `riesgo`, y repetirlos aquí como si fueran
+   * cobertura efectiva diría que se sabe algo que no se sabe.
+   */
+  cobertura: { efectivaT: number; sinDeltaT: number } | null;
   trm: { fecha: string | null; valor: number | null };
   error: string | null;
 };
@@ -41,7 +48,7 @@ export async function cargarMercado(
     db.from("account_balance").select("*").order("statement_date", { ascending: false }).limit(1),
     db.from("broker_pnl").select("*").order("statement_date", { ascending: false }).limit(1),
     db.from("broker_positions").select("option_type, long_qty, short_qty, strike, contract_month, statement_date").order("statement_date", { ascending: false }),
-    db.from("options_board").select("date, contract_month, underlying_price").not("underlying_price", "is", null).order("date", { ascending: false }).order("contract_month").limit(1),
+    db.from("options_board").select("id, date, contract_month, underlying_price").not("underlying_price", "is", null).order("date", { ascending: false }).order("contract_month").limit(1),
     db.from("trm_data").select("date, trm").order("date", { ascending: false }).limit(1),
   ]);
 
@@ -55,6 +62,25 @@ export async function cargarMercado(
   // cobertura varias veces.
   const ultimaFecha = posRes.data?.[0]?.statement_date ?? null;
   const posiciones = (posRes.data ?? []).filter((p) => p.statement_date === ultimaFecha) as PosicionBroker[];
+
+  // Griegas del tablero más reciente, si alguien cargó uno.
+  const { data: griegas } = board
+    ? await db
+        .from("options_chain")
+        .select("strike, call_delta, put_delta")
+        .eq("board_id", board.id)
+        .or("call_delta.not.is.null,put_delta.not.is.null")
+    : { data: null };
+
+  const deltaPorStrike = new Map(
+    (griegas ?? []).map((g) => [
+      Number(g.strike),
+      {
+        call: g.call_delta === null ? null : Number(g.call_delta),
+        put: g.put_delta === null ? null : Number(g.put_delta),
+      },
+    ]),
+  );
 
   const kgFisico = posicion.totales.kg_disponible;
   const riesgo = calcularRiesgo({
@@ -82,6 +108,13 @@ export async function cargarMercado(
           moneda: pnl?.currency ?? "USD",
         }
       : null,
+    cobertura:
+      deltaPorStrike.size > 0 && posiciones.length > 0
+        ? (() => {
+            const t = toneladasPorDelta(posiciones, deltaPorStrike);
+            return { efectivaT: t.conDelta, sinDeltaT: t.sinDelta };
+          })()
+        : null,
     mercado: {
       fecha: board?.date ?? null,
       precioUsdT: board?.underlying_price == null ? null : Number(board.underlying_price),

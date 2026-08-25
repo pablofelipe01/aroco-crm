@@ -3,12 +3,14 @@
 import * as React from "react";
 import { motion } from "framer-motion";
 import {
-  Boxes, Coins, ShieldAlert, TrendingUp, AlertTriangle, Landmark, RefreshCw,
+  Boxes, Coins, ShieldAlert, TrendingUp, AlertTriangle, Landmark, RefreshCw, ImageUp,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
-import { sincronizarAhora } from "./actions";
+import { sincronizarAhora, subirTablero } from "./actions";
+import { Modal } from "@/components/ui/modal";
+import { Field, Input } from "@/components/ui/input";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardHeader, CardTitle, CardBody } from "@/components/ui/card";
 import { StatCard } from "@/components/ui/stat-card";
@@ -35,6 +37,8 @@ export function MercadoClient({
   const router = useRouter();
   const { toast } = useToast();
   const [sincronizando, setSincronizando] = React.useState(false);
+  const [tableroOpen, setTableroOpen] = React.useState(false);
+  const [leyendo, setLeyendo] = React.useState(false);
   const r = d.riesgo;
 
   async function alSincronizar() {
@@ -51,16 +55,39 @@ export function MercadoClient({
 
   const descubierto = r.toneladasFisicas > 0 && r.coberturaPct < 100;
 
+  async function alSubirTablero(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const fd = new FormData(e.currentTarget);
+    setLeyendo(true);
+    const res = await subirTablero(fd);
+    setLeyendo(false);
+    toast({
+      tone: res.ok ? (res.detalle ? "warn" : "success") : "error",
+      title: res.mensaje,
+      description: res.detalle,
+    });
+    if (res.ok) {
+      setTableroOpen(false);
+      router.refresh();
+    }
+  }
+
   return (
     <div className="space-y-6">
       <PageHeader
         title="Mercado"
         description="Posición física, cobertura y exposición al precio"
         actions={
-          <Button size="sm" variant="secondary" onClick={alSincronizar} loading={sincronizando}>
-            <RefreshCw className="h-4 w-4" />
-            Sincronizar ahora
-          </Button>
+          <div className="flex gap-2">
+            <Button size="sm" variant="ghost" onClick={() => setTableroOpen(true)}>
+              <ImageUp className="h-4 w-4" />
+              Cargar tablero
+            </Button>
+            <Button size="sm" variant="secondary" onClick={alSincronizar} loading={sincronizando}>
+              <RefreshCw className="h-4 w-4" />
+              Sincronizar ahora
+            </Button>
+          </div>
         }
       />
 
@@ -133,6 +160,28 @@ export function MercadoClient({
               <Dato k="Futuros vendidos" v={`${r.contratos.futurosCortos} contratos`} />
               <Dato k="Futuros comprados" v={`${r.contratos.futurosLargos} contratos`} />
             </dl>
+            {d.cobertura && (
+              <div className="rounded-[var(--radius-md)] border border-border p-3 text-sm">
+                <p className="text-fg">
+                  Cobertura efectiva:{" "}
+                  <span className="font-mono tnum font-semibold">
+                    {formatNumber(d.cobertura.efectivaT, 2)} t
+                  </span>{" "}
+                  de {formatNumber(r.toneladasCubiertas, 2)} t nominales
+                </p>
+                {/* Contar contratos sobreestima la protección: un put muy fuera
+                    de dinero cubre en el papel y casi nada en la práctica. */}
+                <p className="mt-1 text-xs text-fg-subtle">
+                  Ponderada por delta. Los contratos nominales suponen protección
+                  total; el delta dice cuánto se mueve la opción de verdad cuando
+                  cae el precio.
+                  {d.cobertura.sinDeltaT > 0 && (
+                    <> {formatNumber(d.cobertura.sinDeltaT, 2)} t sin delta en el tablero cargado.</>
+                  )}
+                </p>
+              </div>
+            )}
+
             {r.collar ? (
               <p className="rounded-[var(--radius-md)] border border-border p-3 text-sm text-fg-muted">
                 Collar armado entre <span className="font-mono tnum text-fg">{usd(r.collar.piso)}</span> y{" "}
@@ -141,6 +190,9 @@ export function MercadoClient({
             ) : (
               <p className="text-xs text-fg-subtle">
                 No hay collar: haría falta un put comprado y un call vendido a la vez.
+                {!d.cobertura && r.contratos.putsLargos > 0 && (
+                  <> Carga el tablero para ver cuánto cubren de verdad esos puts.</>
+                )}
               </p>
             )}
           </CardBody>
@@ -241,6 +293,13 @@ export function MercadoClient({
         </CardBody>
       </Card>
 
+      <ModalTablero
+        open={tableroOpen}
+        onClose={() => setTableroOpen(false)}
+        onSubmit={alSubirTablero}
+        leyendo={leyendo}
+      />
+
       {/* De cuándo es cada cifra. Sin esto, un dato de hace tres días se ve
           idéntico a uno de hoy. */}
       <p className="text-xs text-fg-subtle">
@@ -256,6 +315,51 @@ export function MercadoClient({
         )}
       </p>
     </div>
+  );
+}
+
+function ModalTablero({
+  open,
+  onClose,
+  onSubmit,
+  leyendo,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onSubmit: (e: React.FormEvent<HTMLFormElement>) => void;
+  leyendo: boolean;
+}) {
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      title="Cargar tablero de opciones"
+      description="Una captura del tablero del bróker. Se lee y se descarta: la imagen no se guarda."
+      footer={
+        <>
+          <Button variant="ghost" size="sm" onClick={onClose}>
+            Cancelar
+          </Button>
+          <Button type="submit" form="form-tablero" size="sm" loading={leyendo}>
+            Leer tablero
+          </Button>
+        </>
+      }
+    >
+      <form id="form-tablero" onSubmit={onSubmit} className="space-y-4">
+        <Field label="Captura del tablero *">
+          <Input type="file" name="imagen" accept="image/png,image/jpeg,image/webp" required />
+        </Field>
+        <Field label="Fecha del tablero" hint="Si se deja vacía, hoy.">
+          <Input type="date" name="fecha" defaultValue={new Date().toISOString().slice(0, 10)} />
+        </Field>
+        <p className="text-xs text-fg-subtle">
+          De aquí salen delta y volatilidad, que Barchart no entrega. Sin delta no
+          se puede decir cuánto protege de verdad una cobertura: un put muy fuera
+          de dinero cubre en el papel y casi nada en la práctica.
+        </p>
+      </form>
+    </Modal>
   );
 }
 
