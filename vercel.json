@@ -16,6 +16,10 @@
     {
       "path": "/api/cron/sync-ventas",
       "schedule": "0 12 * * *"
+    },
+    {
+      "path": "/api/cron/sync-mercado",
+      "schedule": "0 13 * * 1-5"
     }
   ]
 }

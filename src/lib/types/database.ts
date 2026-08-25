@@ -203,6 +203,354 @@ export type Database = {
         };
         Relationships: [];
       };
+      broker_statements: {
+        Row: {
+          id: string;
+          filename: string;
+          statement_date: string;
+          account: string;
+          file_hash: string;
+          num_positions: number | null;
+          processed_at: string;
+        };
+        Insert: {
+          id?: string;
+          filename?: string;
+          statement_date?: string;
+          account?: string;
+          file_hash?: string;
+          num_positions?: number | null;
+          processed_at?: string;
+        };
+        Update: {
+          id?: string;
+          filename?: string;
+          statement_date?: string;
+          account?: string;
+          file_hash?: string;
+          num_positions?: number | null;
+          processed_at?: string;
+        };
+        Relationships: [];
+      };
+      broker_positions: {
+        Row: {
+          id: string;
+          statement_date: string;
+          account: string;
+          trade_date: string | null;
+          card: string | null;
+          long_qty: number;
+          short_qty: number;
+          option_type: string | null;
+          contract_month: string | null;
+          exchange: string | null;
+          strike: number | null;
+          settle_price: number | null;
+          market_value: number | null;
+          dr_cr: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          statement_date?: string;
+          account?: string;
+          trade_date?: string | null;
+          card?: string | null;
+          long_qty?: number;
+          short_qty?: number;
+          option_type?: string | null;
+          contract_month?: string | null;
+          exchange?: string | null;
+          strike?: number | null;
+          settle_price?: number | null;
+          market_value?: number | null;
+          dr_cr?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          statement_date?: string;
+          account?: string;
+          trade_date?: string | null;
+          card?: string | null;
+          long_qty?: number;
+          short_qty?: number;
+          option_type?: string | null;
+          contract_month?: string | null;
+          exchange?: string | null;
+          strike?: number | null;
+          settle_price?: number | null;
+          market_value?: number | null;
+          dr_cr?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      account_balance: {
+        Row: {
+          id: string;
+          statement_date: string;
+          account: string;
+          beginning_balance: number | null;
+          ending_balance: number | null;
+          total_equity: number | null;
+          long_option_value: number | null;
+          short_option_value: number | null;
+          net_option_value: number | null;
+          net_liquidating_value: number | null;
+          prior_net_liquidating_value: number | null;
+          market_variance: number | null;
+          initial_margin: number | null;
+          maintenance_margin: number | null;
+          excess_equity: number | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          statement_date?: string;
+          account?: string;
+          beginning_balance?: number | null;
+          ending_balance?: number | null;
+          total_equity?: number | null;
+          long_option_value?: number | null;
+          short_option_value?: number | null;
+          net_option_value?: number | null;
+          net_liquidating_value?: number | null;
+          prior_net_liquidating_value?: number | null;
+          market_variance?: number | null;
+          initial_margin?: number | null;
+          maintenance_margin?: number | null;
+          excess_equity?: number | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          statement_date?: string;
+          account?: string;
+          beginning_balance?: number | null;
+          ending_balance?: number | null;
+          total_equity?: number | null;
+          long_option_value?: number | null;
+          short_option_value?: number | null;
+          net_option_value?: number | null;
+          net_liquidating_value?: number | null;
+          prior_net_liquidating_value?: number | null;
+          market_variance?: number | null;
+          initial_margin?: number | null;
+          maintenance_margin?: number | null;
+          excess_equity?: number | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      broker_pnl: {
+        Row: {
+          id: string;
+          statement_date: string;
+          account: string;
+          realized_pnl_mtd: number | null;
+          realized_pnl_ytd: number | null;
+          currency: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          statement_date?: string;
+          account?: string;
+          realized_pnl_mtd?: number | null;
+          realized_pnl_ytd?: number | null;
+          currency?: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          statement_date?: string;
+          account?: string;
+          realized_pnl_mtd?: number | null;
+          realized_pnl_ytd?: number | null;
+          currency?: string;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      market_data: {
+        Row: {
+          id: string;
+          date: string;
+          ticker: string;
+          close_price: number | null;
+          open_price: number | null;
+          high: number | null;
+          low: number | null;
+          volume: number | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          date?: string;
+          ticker?: string;
+          close_price?: number | null;
+          open_price?: number | null;
+          high?: number | null;
+          low?: number | null;
+          volume?: number | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          date?: string;
+          ticker?: string;
+          close_price?: number | null;
+          open_price?: number | null;
+          high?: number | null;
+          low?: number | null;
+          volume?: number | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      trm_data: {
+        Row: {
+          id: string;
+          date: string;
+          trm: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          date?: string;
+          trm?: number;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          date?: string;
+          trm?: number;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      options_board: {
+        Row: {
+          id: string;
+          date: string;
+          contract_month: string;
+          underlying_price: number | null;
+          dte: number | null;
+          expiration: string | null;
+          volatility_calls: number | null;
+          volatility_puts: number | null;
+          interest_rate: number | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          date?: string;
+          contract_month?: string;
+          underlying_price?: number | null;
+          dte?: number | null;
+          expiration?: string | null;
+          volatility_calls?: number | null;
+          volatility_puts?: number | null;
+          interest_rate?: number | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          date?: string;
+          contract_month?: string;
+          underlying_price?: number | null;
+          dte?: number | null;
+          expiration?: string | null;
+          volatility_calls?: number | null;
+          volatility_puts?: number | null;
+          interest_rate?: number | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      options_chain: {
+        Row: {
+          id: string;
+          board_id: string;
+          strike: number;
+          call_premium: number | null;
+          call_delta: number | null;
+          put_premium: number | null;
+          put_delta: number | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          board_id?: string;
+          strike?: number;
+          call_premium?: number | null;
+          call_delta?: number | null;
+          put_premium?: number | null;
+          put_delta?: number | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          board_id?: string;
+          strike?: number;
+          call_premium?: number | null;
+          call_delta?: number | null;
+          put_premium?: number | null;
+          put_delta?: number | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      risk_snapshots: {
+        Row: {
+          id: string;
+          date: string;
+          total_physical_tonnes: number | null;
+          covered_tonnes: number | null;
+          coverage_pct: number | null;
+          cacao_price_usd: number | null;
+          trm: number | null;
+          net_liquidating_value: number | null;
+          unrealized_pnl_physical: number | null;
+          unrealized_pnl_hedge: number | null;
+          collar_floor: number | null;
+          collar_cap: number | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          date?: string;
+          total_physical_tonnes?: number | null;
+          covered_tonnes?: number | null;
+          coverage_pct?: number | null;
+          cacao_price_usd?: number | null;
+          trm?: number | null;
+          net_liquidating_value?: number | null;
+          unrealized_pnl_physical?: number | null;
+          unrealized_pnl_hedge?: number | null;
+          collar_floor?: number | null;
+          collar_cap?: number | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          date?: string;
+          total_physical_tonnes?: number | null;
+          covered_tonnes?: number | null;
+          coverage_pct?: number | null;
+          cacao_price_usd?: number | null;
+          trm?: number | null;
+          net_liquidating_value?: number | null;
+          unrealized_pnl_physical?: number | null;
+          unrealized_pnl_hedge?: number | null;
+          collar_floor?: number | null;
+          collar_cap?: number | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
       preguntas: {
         Row: {
           area: Database["public"]["Enums"]["department"] | null;
