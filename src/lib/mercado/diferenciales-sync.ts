@@ -34,7 +34,10 @@ export async function sincronizarDiferenciales(
   db: SupabaseClient<Database>,
   mcp: McpConfig,
 ): Promise<ResultadoDiferenciales> {
-  const r = await llamarHerramienta(mcp, "get_cocoa_tables", {}, 240_000);
+  // 90 s y no más: Cloudflare corta cualquier tool del túnel a los 100 s. Un
+  // timeout mayor no espera más —el túnel ya cortó— y convierte un corte del
+  // borde en un error críptico en vez de uno que dice qué pasó.
+  const r = await llamarHerramienta(mcp, "get_cocoa_tables", {}, 90_000);
   if (typeof r === "string") throw new Error(r);
 
   const payload = r as { differentials?: Tabla; missing?: string[] };
