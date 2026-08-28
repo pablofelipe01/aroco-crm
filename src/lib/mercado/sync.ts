@@ -6,6 +6,7 @@ import { listarVencimientos, traerTablero } from "./barchart";
 import { traerTrm } from "./trm";
 import { sincronizarIntel } from "./intel";
 import { precioEnVivo, guardarPrecio } from "./precio";
+import { sincronizarDiferenciales, type ResultadoDiferenciales } from "./diferenciales-sync";
 import { guardarExtracto, guardarTablero, type ResultadoGuardado } from "./guardar";
 
 export type ResumenSync = {
@@ -13,6 +14,7 @@ export type ResumenSync = {
   tableros: { contract_month: string; strikes: number }[];
   trm: number;
   precio: number | null;
+  diferenciales: ResultadoDiferenciales | null;
   intel: { nuevos: number; resumidos: number; total: number };
   sinEstado: string[];
   fallos: { fuente: string; error: string }[];
@@ -38,7 +40,7 @@ export type ResumenSync = {
  */
 export async function sincronizarMercado(
   db: SupabaseClient<Database>,
-  opciones: { dias?: number; vencimientos?: number } = {},
+  opciones: { dias?: number; vencimientos?: number; diferenciales?: boolean } = {},
 ): Promise<ResumenSync> {
   const inicio = Date.now();
   const dias = opciones.dias ?? 5;
@@ -54,6 +56,7 @@ export async function sincronizarMercado(
   let trm = 0;
   let intel = { nuevos: 0, resumidos: 0, total: 0 };
   let precio: number | null = null;
+  let diferenciales: ResultadoDiferenciales | null = null;
 
   const conStonex = async () => {
     if (!MCPS.stonex.url) return;
@@ -123,9 +126,21 @@ export async function sincronizarMercado(
     }
   };
 
+  const conDiferenciales = async () => {
+    if (!MCPS.stonex.url || !opciones.diferenciales) return;
+    try {
+      diferenciales = await sincronizarDiferenciales(db, MCPS.stonex);
+      if (diferenciales.aviso) fallos.push({ fuente: "Diferenciales", error: diferenciales.aviso });
+    } catch (e) {
+      fallos.push({ fuente: "Diferenciales", error: texto(e) });
+    }
+  };
+
   // allSettled y no all: una fuente que reviente no puede tumbar a las otras
   // dos antes de que terminen.
-  await Promise.allSettled([conStonex(), conBarchart(), conTrm(), conIntel(), conPrecio()]);
+  await Promise.allSettled([
+    conStonex(), conBarchart(), conTrm(), conIntel(), conPrecio(), conDiferenciales(),
+  ]);
 
   const duration_ms = Date.now() - inicio;
 
@@ -142,7 +157,7 @@ export async function sincronizarMercado(
       : null,
   });
 
-  return { estados, tableros, trm, precio, intel, sinEstado, fallos, duration_ms };
+  return { estados, tableros, trm, precio, diferenciales, intel, sinEstado, fallos, duration_ms };
 }
 
 /** Cuándo terminó la última sincronización de Mercado, para mostrarla. */

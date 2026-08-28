@@ -36,6 +36,10 @@ export type DatosMercado = {
    */
   cobertura: { efectivaT: number; sinDeltaT: number } | null;
   trm: { fecha: string | null; valor: number | null };
+  diferenciales: {
+    fecha: string | null;
+    filas: { origen: string; grado: string | null; valor: number; unidad: string; fuente: string; metodo: string | null }[];
+  };
   intel: {
     article_id: string; title: string; resumen: string | null;
     abstract: string | null; url: string | null; published_at: string;
@@ -53,7 +57,7 @@ export type DatosMercado = {
 export async function cargarMercado(
   db: SupabaseClient<Database>,
 ): Promise<DatosMercado> {
-  const [lotesRes, balRes, pnlRes, posRes, boardRes, trmRes, intelRes] = await Promise.all([
+  const [lotesRes, balRes, pnlRes, posRes, boardRes, trmRes, intelRes, difRes] = await Promise.all([
     db
       .from("inventory_lots")
       .select("code, remision, recepcion, odc, entry_date, origin, qty_in_kg, qty_out_kg, purchase_price_cop_kg, quality")
@@ -68,6 +72,12 @@ export async function cargarMercado(
       .select("article_id, title, resumen, abstract, url, published_at")
       .order("published_at", { ascending: false })
       .limit(6),
+    db
+      .from("cocoa_differentials")
+      .select("report_date, origen, grado, valor, unidad, fuente, metodo")
+      .order("report_date", { ascending: false })
+      .order("valor", { ascending: false })
+      .limit(40),
   ]);
 
   const posicion = construirPosicion((lotesRes.data ?? []) as LoteRow[], new Date());
@@ -191,6 +201,13 @@ export async function cargarMercado(
       cierrePrevio,
     },
     trm: { fecha: trmFila?.date ?? null, valor: trmFila ? Number(trmFila.trm) : null },
+    // Solo el reporte más reciente: mezclar semanas pondría dos diferenciales
+    // del mismo origen uno al lado del otro sin decir cuál es el vigente.
+    diferenciales: (() => {
+      const todas = difRes.data ?? [];
+      const ultima = todas[0]?.report_date ?? null;
+      return { fecha: ultima, filas: todas.filter((f) => f.report_date === ultima) };
+    })(),
     intel: intelRes.data ?? [],
     error: lotesRes.error?.message ?? null,
   };

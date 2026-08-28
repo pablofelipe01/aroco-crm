@@ -28,7 +28,11 @@ export async function GET(request: NextRequest) {
 
   const db = createAdminClient();
   const dias = Number(request.nextUrl.searchParams.get("dias") ?? 5);
-  const r = await sincronizarMercado(db, { dias });
+  // Los diferenciales son un reporte SEMANAL y traerlos obliga al agente a
+  // navegar el portal y parsear un PDF. Pedirlos a diario sería cargar ese
+  // trabajo cinco veces por un dato que no cambió.
+  const diferenciales = request.nextUrl.searchParams.get("diferenciales") === "1";
+  const r = await sincronizarMercado(db, { dias, diferenciales });
 
   // Solo se avisa si no entró NADA. Que falle un vencimiento o un día suelto
   // es ruido; avisar por eso enseña a ignorar la campana.

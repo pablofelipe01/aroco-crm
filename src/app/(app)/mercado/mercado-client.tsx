@@ -4,7 +4,7 @@ import * as React from "react";
 import { motion } from "framer-motion";
 import {
   Boxes, Coins, ShieldAlert, TrendingUp, AlertTriangle, Landmark, RefreshCw, ImageUp,
-  Newspaper, ExternalLink,
+  Newspaper, ExternalLink, Scale as Balanza,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -269,6 +269,72 @@ export function MercadoClient({
               Solo la pata física. El efecto de la cobertura depende de strikes y
               primas, y Barchart no entrega las griegas: calcularlo sin ellas daría
               una cifra que parece precisa y no lo es.
+            </p>
+          </CardBody>
+        </Card>
+      )}
+
+      {d.diferenciales.filas.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>
+              <span className="inline-flex items-center gap-2">
+                <Balanza className="h-4 w-4 text-fg-subtle" /> Diferenciales por origen
+              </span>
+            </CardTitle>
+          </CardHeader>
+          <CardBody>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border text-left text-[11px] uppercase tracking-wide text-fg-subtle">
+                    <th className="pb-2 pr-3 font-medium">Origen</th>
+                    <th className="pb-2 pr-3 text-right font-medium">Sobre ICE</th>
+                    <th className="pb-2 font-medium">Fuente</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {d.diferenciales.filas.map((f) => {
+                    const esEstimacion = f.fuente !== "stonex";
+                    return (
+                      <tr
+                        key={`${f.origen}-${f.grado ?? ""}-${f.fuente}`}
+                        className={
+                          "border-b border-border/60 last:border-0 " +
+                          (esEstimacion ? "bg-warn-soft/40" : "")
+                        }
+                      >
+                        <td className="py-2 pr-3 text-fg">
+                          {f.origen}
+                          {f.grado && <span className="text-fg-subtle"> · {f.grado}</span>}
+                        </td>
+                        <td className="py-2 pr-3 text-right font-mono tnum text-fg">
+                          {f.valor > 0 ? "+" : ""}
+                          {formatNumber(f.valor)} {f.unidad}
+                        </td>
+                        <td className="py-2 text-xs">
+                          {esEstimacion ? (
+                            /* Una fila que pusimos nosotros no puede verse igual
+                               que una cotización: alguien la citaría en una
+                               negociación como si fuera precio de mercado. */
+                            <Badge tone="warn">estimación AROCO</Badge>
+                          ) : (
+                            <span className="text-fg-subtle">StoneX</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            {d.diferenciales.filas.find((f) => f.metodo) && (
+              <p className="mt-3 text-xs text-fg-subtle">
+                {d.diferenciales.filas.find((f) => f.metodo)!.metodo}
+              </p>
+            )}
+            <p className="mt-1 text-xs text-fg-subtle">
+              Reporte del {d.diferenciales.fecha ? formatDate(d.diferenciales.fecha) : "—"}.
             </p>
           </CardBody>
         </Card>

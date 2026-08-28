@@ -374,6 +374,93 @@ export type Database = {
         };
         Relationships: [];
       };
+      cocoa_report_tables: {
+        Row: {
+          id: string;
+          reporte: string;
+          report_date: string;
+          pdf_url: string | null;
+          matriz: Json;
+          synced_at: string;
+        };
+        Insert: {
+          id?: string;
+          reporte?: string;
+          report_date?: string;
+          pdf_url?: string | null;
+          matriz?: Json;
+          synced_at?: string;
+        };
+        Update: {
+          id?: string;
+          reporte?: string;
+          report_date?: string;
+          pdf_url?: string | null;
+          matriz?: Json;
+          synced_at?: string;
+        };
+        Relationships: [];
+      };
+      cocoa_differentials: {
+        Row: {
+          id: string;
+          report_date: string;
+          origen: string;
+          grado: string | null;
+          valor: number;
+          unidad: string;
+          fuente: string;
+          metodo: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          report_date?: string;
+          origen?: string;
+          grado?: string | null;
+          valor?: number;
+          unidad?: string;
+          fuente?: string;
+          metodo?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          report_date?: string;
+          origen?: string;
+          grado?: string | null;
+          valor?: number;
+          unidad?: string;
+          fuente?: string;
+          metodo?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      ajustes_mercado: {
+        Row: {
+          clave: string;
+          valor: number;
+          descripcion: string | null;
+          updated_at: string;
+          updated_by: string | null;
+        };
+        Insert: {
+          clave?: string;
+          valor?: number;
+          descripcion?: string | null;
+          updated_at?: string;
+          updated_by?: string | null;
+        };
+        Update: {
+          clave?: string;
+          valor?: number;
+          descripcion?: string | null;
+          updated_at?: string;
+          updated_by?: string | null;
+        };
+        Relationships: [];
+      };
       market_intel: {
         Row: {
           id: string;

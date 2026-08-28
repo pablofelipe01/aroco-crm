@@ -429,6 +429,18 @@ export const MERCADO_TOOLS: Anthropic.Tool[] = [
     input_schema: { type: "object", properties: {}, required: [] },
   },
   {
+    name: "get_diferenciales",
+    description:
+      "Diferenciales de cacao físico por origen sobre el futuro de ICE, del reporte semanal de StoneX. Incluye la estimación de Colombia, que NO viene en el reporte y la calcula AROCO. Úsala para '¿cuál es el diferencial de Colombia?', '¿cuánto vale nuestro cacao sobre bolsa?' o para comparar contra Ecuador y Perú.",
+    input_schema: {
+      type: "object",
+      properties: {
+        origen: { type: "string", description: "Filtrar por origen, p. ej. Colombia, Ecuador, Peru." },
+      },
+      required: [],
+    },
+  },
+  {
     name: "get_intel_mercado",
     description:
       "Análisis y noticias del mercado de cacao publicados por StoneX: inventarios certificados, clima, cosecha y movimientos de precio. Cada artículo trae un resumen en español y el texto completo. Úsala para '¿qué está pasando con el cacao?', '¿por qué subió el precio?' o '¿cómo van los inventarios certificados?'.",
@@ -536,6 +548,36 @@ export async function executeTool(
         pnl_realizado_mes: pnl?.[0]?.realized_pnl_mtd ?? null,
         pnl_realizado_ano: pnl?.[0]?.realized_pnl_ytd ?? null,
         moneda: pnl?.[0]?.currency ?? "USD",
+      };
+    }
+
+    case "get_diferenciales": {
+      if (!ctx.veMercado) return { error: "No tienes acceso al módulo Mercado." };
+      const { data: ultima } = await db
+        .from("cocoa_differentials")
+        .select("report_date")
+        .order("report_date", { ascending: false })
+        .limit(1);
+      if (!ultima?.length) return { mensaje: "Todavía no hay diferenciales sincronizados." };
+
+      let q = db
+        .from("cocoa_differentials")
+        .select("origen, grado, valor, unidad, fuente, metodo")
+        .eq("report_date", ultima[0].report_date)
+        .order("valor", { ascending: false });
+      if (typeof input.origen === "string" && input.origen.trim()) {
+        q = q.ilike("origen", `%${input.origen.trim()}%`);
+      }
+      const { data, error } = await q;
+      if (error) return { error: error.message };
+
+      return {
+        fecha_reporte: ultima[0].report_date,
+        diferenciales: data ?? [],
+        // El modelo tiene que poder distinguirlas: una es cotización, la otra
+        // es un juicio nuestro, y citarlas igual en una negociación es el error
+        // que esto existe para evitar.
+        nota: "Las filas con fuente 'stonex' son cotizaciones del reporte. La de Colombia tiene fuente 'aroco': es una estimación de AROCO, no un precio de mercado — su método está en el campo 'metodo' y debe mencionarse al citarla.",
       };
     }
 
