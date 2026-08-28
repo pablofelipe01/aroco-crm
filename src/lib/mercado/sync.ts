@@ -5,12 +5,14 @@ import { traerExtracto, diasHabiles } from "./stonex";
 import { listarVencimientos, traerTablero } from "./barchart";
 import { traerTrm } from "./trm";
 import { sincronizarIntel } from "./intel";
+import { precioEnVivo, guardarPrecio } from "./precio";
 import { guardarExtracto, guardarTablero, type ResultadoGuardado } from "./guardar";
 
 export type ResumenSync = {
   estados: ResultadoGuardado[];
   tableros: { contract_month: string; strikes: number }[];
   trm: number;
+  precio: number | null;
   intel: { nuevos: number; resumidos: number; total: number };
   sinEstado: string[];
   fallos: { fuente: string; error: string }[];
@@ -51,6 +53,7 @@ export async function sincronizarMercado(
 
   let trm = 0;
   let intel = { nuevos: 0, resumidos: 0, total: 0 };
+  let precio: number | null = null;
 
   const conStonex = async () => {
     if (!MCPS.stonex.url) return;
@@ -108,14 +111,27 @@ export async function sincronizarMercado(
     }
   };
 
+  const conPrecio = async () => {
+    try {
+      // Rápido y sin credenciales. Se guarda para tener histórico y para poder
+      // responder si Yahoo no contesta cuando alguien abra la pantalla.
+      const p = await precioEnVivo(10_000);
+      await guardarPrecio(db, p);
+      precio = p.usdT;
+    } catch (e) {
+      fallos.push({ fuente: "Precio del cacao", error: texto(e) });
+    }
+  };
+
   // allSettled y no all: una fuente que reviente no puede tumbar a las otras
   // dos antes de que terminen.
-  await Promise.allSettled([conStonex(), conBarchart(), conTrm(), conIntel()]);
+  await Promise.allSettled([conStonex(), conBarchart(), conTrm(), conIntel(), conPrecio()]);
 
   const duration_ms = Date.now() - inicio;
 
   // Que no entre NADA es una avería. Que no haya estados es un festivo.
-  const nadaEntro = estados.length === 0 && tableros.length === 0 && trm === 0 && intel.total === 0;
+  const nadaEntro =
+    estados.length === 0 && tableros.length === 0 && trm === 0 && intel.total === 0 && precio === null;
   await db.from("inventory_sync_runs").insert({
     source: "mercado",
     status: nadaEntro && fallos.length > 0 ? "error" : "ok",
@@ -126,7 +142,7 @@ export async function sincronizarMercado(
       : null,
   });
 
-  return { estados, tableros, trm, intel, sinEstado, fallos, duration_ms };
+  return { estados, tableros, trm, precio, intel, sinEstado, fallos, duration_ms };
 }
 
 /** Cuándo terminó la última sincronización de Mercado, para mostrarla. */

@@ -3,6 +3,7 @@ import type { Database } from "@/lib/types/database";
 import { construirPosicion, type LoteRow } from "@/lib/posicion";
 import { calcularRiesgo, escenarios, type PosicionBroker, type Riesgo } from "@/lib/mercado/riesgo";
 import { toneladasPorDelta } from "@/lib/mercado/tablero-imagen";
+import { precioEnVivo, ultimoPrecioGuardado } from "@/lib/mercado/precio";
 
 export type DatosMercado = {
   riesgo: Riesgo;
@@ -19,7 +20,15 @@ export type DatosMercado = {
     pnlYtd: number | null;
     moneda: string;
   } | null;
-  mercado: { fecha: string | null; precioUsdT: number | null; contrato: string | null };
+  mercado: {
+    fecha: string | null;
+    precioUsdT: number | null;
+    contrato: string | null;
+    /** De dónde salió el precio, para poder decirlo en pantalla. */
+    fuente: "vivo" | "guardado" | "paridad" | null;
+    momento: string | null;
+    cierrePrevio: number | null;
+  };
   /**
    * Cobertura ponderada por delta. `null` cuando no hay griegas cargadas: los
    * contratos nominales ya están en `riesgo`, y repetirlos aquí como si fueran
@@ -99,12 +108,53 @@ export async function cargarMercado(
     ]),
   );
 
+  // ── Precio del cacao ──────────────────────────────────────────────────────
+  // En vivo primero. Antes salía de la paridad put-call sobre la cadena de
+  // Barchart, que solo se refresca con el sync lento: el 28-ago eso daba 5.949
+  // con el mercado en 6.483, y el inventario se valoraba con un precio de hace
+  // días. Si la consulta no responde a tiempo se cae a lo último guardado y,
+  // en último caso, a la paridad — y la pantalla dice cuál se usó.
+  const paridad =
+    board?.underlying_price === undefined || board?.underlying_price === null
+      ? null
+      : Number(board.underlying_price);
+
+  let precioUsdT: number | null = null;
+  let fuente: "vivo" | "guardado" | "paridad" | null = null;
+  let momento: string | null = null;
+  let cierrePrevio: number | null = null;
+  let fechaPrecio: string | null = null;
+
+  try {
+    const vivo = await precioEnVivo();
+    precioUsdT = vivo.usdT;
+    fuente = "vivo";
+    momento = vivo.momento;
+    cierrePrevio = vivo.cierrePrevio;
+    fechaPrecio = vivo.fecha;
+    // Aquí NO se guarda: esta función corre con el cliente del usuario y
+    // `market_data` no tiene política de escritura, así que el intento fallaría
+    // y arrastraría el precio recién traído al camino de respaldo. Guardar es
+    // tarea del sync, que corre con service_role.
+  } catch {
+    const guardado = await ultimoPrecioGuardado(db);
+    if (guardado) {
+      precioUsdT = guardado.usdT;
+      fuente = "guardado";
+      fechaPrecio = guardado.fecha;
+    } else if (paridad !== null) {
+      precioUsdT = paridad;
+      fuente = "paridad";
+      fechaPrecio = board?.date ?? null;
+    }
+  }
+
   const kgFisico = posicion.totales.kg_disponible;
   const riesgo = calcularRiesgo({
     kgFisico,
     costoPromedioCopKg: posicion.totales.costo_promedio_cop_kg,
     posiciones,
-    precioCacaoUsdT: board?.underlying_price !== undefined && board?.underlying_price !== null ? Number(board.underlying_price) : null,
+    precioCacaoUsdT: precioUsdT,
     trm: trmFila ? Number(trmFila.trm) : null,
   });
 
@@ -133,9 +183,12 @@ export async function cargarMercado(
           })()
         : null,
     mercado: {
-      fecha: board?.date ?? null,
-      precioUsdT: board?.underlying_price == null ? null : Number(board.underlying_price),
+      fecha: fechaPrecio,
+      precioUsdT,
       contrato: board?.contract_month ?? null,
+      fuente,
+      momento,
+      cierrePrevio,
     },
     trm: { fecha: trmFila?.date ?? null, valor: trmFila ? Number(trmFila.trm) : null },
     intel: intelRes.data ?? [],

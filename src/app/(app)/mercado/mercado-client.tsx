@@ -115,8 +115,25 @@ export function MercadoClient({
           hint={`${d.totales.lotes_con_saldo} lotes · costo ${formatCOP(d.totales.costo_promedio_cop_kg ?? 0)}/kg`} />
         <StatCard label="Descubierto" value={r.toneladasDescubiertas} decimals={2} suffix=" t" icon={ShieldAlert}
           hint={r.coberturaPct === 0 ? "Sin ninguna cobertura" : `${r.coberturaPct.toFixed(1)}% cubierto`} />
-        <StatCard label="Cacao hoy" value={r.precioMercadoCopKg ?? 0} prefix="$ " suffix="/kg" icon={TrendingUp}
-          hint={d.mercado.precioUsdT ? `${usd(d.mercado.precioUsdT)}/t · ${d.mercado.contrato}` : "Sin precio"} />
+        <StatCard
+          label="Cacao hoy"
+          value={r.precioMercadoCopKg ?? 0}
+          prefix="$ "
+          suffix="/kg"
+          icon={TrendingUp}
+          // La variación del día es lo que dice si hay que mirar la pantalla
+          // ahora o mañana.
+          delta={
+            d.mercado.precioUsdT && d.mercado.cierrePrevio
+              ? ((d.mercado.precioUsdT - d.mercado.cierrePrevio) / d.mercado.cierrePrevio) * 100
+              : undefined
+          }
+          hint={
+            d.mercado.precioUsdT
+              ? `${usd(d.mercado.precioUsdT)}/t${d.mercado.fuente === "vivo" ? " · en vivo" : ""}`
+              : "Sin precio"
+          }
+        />
         <StatCard label="Valorización" value={Math.round((r.pnlFisicoCop ?? 0) / 1_000_000)} prefix="$ " suffix=" M" icon={Coins}
           hint="Contra el costo de compra" />
       </motion.div>
@@ -345,10 +362,24 @@ export function MercadoClient({
       {/* De cuándo es cada cifra. Sin esto, un dato de hace tres días se ve
           idéntico a uno de hoy. */}
       <p className="text-xs text-fg-subtle">
-        Inventario al día · cacao {d.mercado.fecha ? formatDate(d.mercado.fecha) : "sin dato"}
-        {d.mercado.contrato ? ` (${d.mercado.contrato}, deducido por paridad put-call)` : ""} ·
+        Inventario al día · cacao{" "}
+        {d.mercado.momento
+          ? new Date(d.mercado.momento).toLocaleString("es-CO", { dateStyle: "medium", timeStyle: "short" })
+          : d.mercado.fecha
+            ? formatDate(d.mercado.fecha)
+            : "sin dato"}{" "}
+        (ICE NY) ·
         TRM {d.trm.fecha ? `${formatDate(d.trm.fecha)} $ ${formatNumber(d.trm.valor ?? 0, 2)}` : "sin dato"} ·
         broker {d.broker?.fecha ? formatDate(d.broker.fecha) : "sin estado"}
+        {/* De dónde salió el precio. Un valor de hace días presentado igual que
+            uno en vivo es lo que hace valorar el inventario con un precio que
+            ya no existe. */}
+        {d.mercado.fuente === "guardado" && (
+          <span className="text-warn"> · precio del último cierre guardado, no en vivo</span>
+        )}
+        {d.mercado.fuente === "paridad" && (
+          <span className="text-warn"> · precio deducido del tablero, no cotizado</span>
+        )}
         {sync && (
           <>
             {" · "}última sincronización {formatDate(sync.ran_at)}

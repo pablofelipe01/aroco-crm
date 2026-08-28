@@ -498,6 +498,14 @@ export async function executeTool(
         costo_promedio_cop_kg: r.costoPromedioCopKg,
         precio_cacao_cop_kg: r.precioMercadoCopKg,
         precio_cacao_usd_t: d.mercado.precioUsdT,
+        // De dónde salió: «vivo» es la cotización del momento; «guardado» y
+        // «paridad» son de antes, y el modelo tiene que poder decirlo.
+        precio_fuente: d.mercado.fuente,
+        precio_momento: d.mercado.momento,
+        variacion_dia_pct:
+          d.mercado.precioUsdT && d.mercado.cierrePrevio
+            ? Math.round(((d.mercado.precioUsdT - d.mercado.cierrePrevio) / d.mercado.cierrePrevio) * 10000) / 100
+            : null,
         contrato: d.mercado.contrato,
         trm: d.trm.valor,
         valorizacion_cop: r.pnlFisicoCop,

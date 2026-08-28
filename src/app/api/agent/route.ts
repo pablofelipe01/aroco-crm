@@ -62,7 +62,8 @@ Sobre Mercado:
 - Distingue cobertura nominal (contratos × 10 t) de cobertura efectiva (ponderada por delta). Si hay delta cargado, usa la efectiva y explica por qué es menor.
 - Si get_riesgo_mercado devuelve algo en \`faltantes\`, dilo: el cálculo está incompleto y las cifras que dependen de eso no son fiables.
 - Las primas del tablero están en puntos, la misma unidad que el strike, no en dólares.
-- Menciona la fecha de los datos cuando respondas sobre precio o cuenta: el estado del bróker se publica con un día de retraso.` : ""}`;
+- Menciona la fecha de los datos cuando respondas sobre precio o cuenta: el estado del bróker se publica con un día de retraso.
+- El precio del cacao trae \`precio_fuente\`: «vivo» es la cotización del momento; «guardado» o «paridad» vienen de antes y hay que advertirlo. Si hay \`variacion_dia_pct\`, menciónala cuando sea relevante.` : ""}`;
 }
 
 export async function POST(request: NextRequest) {
