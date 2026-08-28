@@ -43,9 +43,16 @@ create table if not exists public.cocoa_differentials (
   fuente       text not null default 'stonex',
   /** Cómo se obtuvo, cuando no es una cotización. */
   metodo       text,
-  created_at   timestamptz not null default now(),
-  unique (report_date, origen, coalesce(grado, ''), fuente)
+  created_at   timestamptz not null default now()
 );
+
+-- La clave va como ÍNDICE y no como `unique (...)` de tabla: una restricción de
+-- tabla no admite expresiones, y aquí hace falta `coalesce` porque un grado
+-- nulo tiene que contar como valor. Sin eso, dos filas del mismo origen sin
+-- grado no chocarían —en SQL null nunca es igual a null— y el mismo origen
+-- entraría dos veces.
+create unique index if not exists cocoa_differentials_clave
+  on public.cocoa_differentials (report_date, origen, coalesce(grado, ''), fuente);
 
 create index if not exists cocoa_differentials_fecha_idx
   on public.cocoa_differentials (report_date desc, origen);
