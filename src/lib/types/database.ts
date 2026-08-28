@@ -440,21 +440,24 @@ export type Database = {
       ajustes_mercado: {
         Row: {
           clave: string;
-          valor: number;
+          valor: number | null;
+          texto: string | null;
           descripcion: string | null;
           updated_at: string;
           updated_by: string | null;
         };
         Insert: {
           clave?: string;
-          valor?: number;
+          valor?: number | null;
+          texto?: string | null;
           descripcion?: string | null;
           updated_at?: string;
           updated_by?: string | null;
         };
         Update: {
           clave?: string;
-          valor?: number;
+          valor?: number | null;
+          texto?: string | null;
           descripcion?: string | null;
           updated_at?: string;
           updated_by?: string | null;

@@ -1,12 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/types/database";
 import { llamarHerramienta, type McpConfig } from "@/lib/mcp/client";
-import {
-  parsearMatriz,
-  estimarColombia,
-  POSICION_COLOMBIA,
-  type Matriz,
-} from "./diferenciales";
+import { parsearMatriz, estimarColombia, POSICION_COLOMBIA, type Matriz } from "./diferenciales";
 
 /**
  * Trae los diferenciales semanales de StoneX por el agente del servidor.
@@ -87,23 +82,29 @@ export async function sincronizarDiferenciales(
     filas.map((f) => ({
       report_date: reportDate,
       origen: f.origen,
-      grado: f.grado,
       valor: f.valor,
-      unidad: f.unidad,
+      unidad: f.moneda,
+      grado: f.incoterm,
       fuente: "stonex",
     })),
   );
   if (eFilas) throw new Error(`cocoa_differentials: ${eFilas.message}`);
 
-  // 3) Colombia, con la posición que tenga configurada Comercial.
-  const { data: ajuste } = await db
+  // 3) Colombia. Tanto la posición como QUÉ DOS FILAS comparar salen de la
+  // base: las dos son juicios de Comercial, y la segunda resultó ser más
+  // delicada de lo que parecía —Ecuador aparece en tres incoterms y solo uno
+  // es comparable con Perú.
+  const { data: ajustes } = await db
     .from("ajustes_mercado")
-    .select("valor")
-    .eq("clave", "posicion_colombia")
-    .maybeSingle();
-  const posicion = ajuste ? Number(ajuste.valor) : POSICION_COLOMBIA;
+    .select("clave, valor, texto")
+    .in("clave", ["posicion_colombia", "ref_baja", "ref_alta"]);
 
-  const est = estimarColombia(filas, posicion);
+  const buscar = (c: string) => ajustes?.find((a) => a.clave === c);
+  const posicion = Number(buscar("posicion_colombia")?.valor ?? POSICION_COLOMBIA);
+  const refBaja = buscar("ref_baja")?.texto ?? "Peru Grade 1";
+  const refAlta = buscar("ref_alta")?.texto ?? "Ecuador Grade 2 ExW US";
+
+  const est = estimarColombia(filas, refBaja, refAlta, posicion);
   let colombia: number | null = null;
   let aviso: string | null = null;
 
@@ -123,9 +124,11 @@ export async function sincronizarDiferenciales(
       origen: "Colombia",
       grado: null,
       valor: est.valor,
-      unidad: est.unidad,
+      unidad: est.moneda,
       fuente: "aroco",
-      metodo: est.metodo,
+      // La advertencia va pegada al método: si las referencias no son
+      // comparables, quien lea el número tiene que verlo junto al número.
+      metodo: est.advertencia ? `${est.metodo} ${est.advertencia}` : est.metodo,
     });
     if (eCol) throw new Error(`Colombia: ${eCol.message}`);
     colombia = est.valor;

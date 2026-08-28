@@ -1,106 +1,119 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import {
-  numero, parsearMatriz, separarGrado, buscarFila, estimarColombia,
-  POSICION_COLOMBIA,
-} from "./diferenciales";
+import { numero, moneda, parsearMatriz, buscarFila, estimarColombia, etiqueta } from "./diferenciales";
 
-test("los paréntesis del reporte son negativos", () => {
-  // Convención contable habitual en estos PDF: (75) es −75, no 75.
-  assert.equal(numero("(75)"), -75);
-  assert.equal(numero("+150"), 150);
-  assert.equal(numero("-1,250"), -1250);
-  assert.equal(numero("  325 "), 325);
-  assert.equal(numero("n/a"), null);
-  assert.equal(numero(""), null);
+/** El reporte real del 20-ago-2026, tal como lo entrega el agente. */
+const REAL: string[][] = [
+  ["Cocoa Differentials"],
+  ["August 20th, 2026"],
+  ["a"],
+  ["DIFFERENTIAL", "PRICE"],
+  ["Ivory Coast", "13-Aug", "20-Aug", "Change", "GBP", "EUR", "USD"],
+  ["CIF N. Europe", "£ 380", "£ 450", "£ 70", "£ 4,786", "€ 5,587", "$ 6,521"],
+  ["CIF N. Europe + LID", "£ 295", "£ 295", "£ -", "£ 4,631", "€ 5,406", "$ 6,310"],
+  ["ExW US", "$ 400", "$ 450", "$ 50", "£ 4,781", "€ 5,581", "$ 6,514"],
+  ["Ghana"],
+  ["CIF UK + LID", "£ 581", "£ 600", "£ 19", "£ 4,936", "€ 5,762", "$ 6,725"],
+  ["ExW US", "$ 850", "$ 825", "$ (25)", "£ 5,056", "€ 5,903", "$ 6,889"],
+  ["Ecuador Grade 2"],
+  ["CIF N. Europe", "£ 430", "£ 430", "£ -", "£ 4,766", "€ 5,564", "$ 6,494"],
+  ["ExW US", "$ 380", "$ 320", "$ (60)", "£ 4,686", "€ 5,470", "$ 6,384"],
+  ["FOB Guayaquil", "$ 90", "$ (30)", "$ (120)", "£ 4,429", "€ 5,170", "$ 6,034"],
+  ["Other Origins"],
+  ["Peru Grade 1 ExW US", "$ 326", "$ 281", "$ (45)", "£ 4,657", "€ 5,437", "$ 6,345"],
+  ["FUTURES", "EXCHANGE RATES"],
+  ["NY-DEC", "$5,719", "$6,064", "$345", "EURUSD", "$ 1.1525", "$ 1.1671", "0.0146"],
+  ["Source: CRA, Reuters"],
+];
+
+const { filas, ignoradas } = parsearMatriz(REAL);
+
+test("los paréntesis son negativos y las comas son miles", () => {
+  assert.equal(numero("$ (250)"), -250);
+  assert.equal(numero("£ 4,786"), 4786);
+  assert.equal(numero("£ -"), null, "un guion es «sin cambio», no cero");
+  assert.equal(moneda("£ 450"), "GBP");
+  assert.equal(moneda("$ 450"), "USD");
 });
 
-test("el grado se separa del origen", () => {
-  assert.deepEqual(separarGrado("Guayaquil grade 2"), { origen: "Guayaquil", grado: "grade 2" });
-  assert.deepEqual(separarGrado("Peru grade 1"), { origen: "Peru", grado: "grade 1" });
-  assert.deepEqual(separarGrado("Ivory Coast"), { origen: "Ivory Coast", grado: null });
+test("el origen viene de la sección, no de cada fila", () => {
+  const ghana = filas.filter((f) => f.origen === "Ghana");
+  assert.equal(ghana.length, 2);
+  assert.deepEqual(ghana.map((f) => f.incoterm), ["CIF UK + LID", "ExW US"]);
+  // La primera sección sale del encabezado de columnas, que la lleva pegada.
+  assert.ok(filas.some((f) => f.origen === "Ivory Coast"));
 });
 
-test("la matriz se lee sin asumir en qué columna está el valor", () => {
-  // El PDF no tiene grilla: la matriz llega como el agente pudo agruparla, y
-  // las columnas varían entre semanas. Se toma el primer número de la fila.
-  const { filas, ignoradas } = parsearMatriz([
-    ["Origin", "Differential", "Change"],
-    ["Ivory Coast", "+325", "+10"],
-    ["Guayaquil grade 2", "+150", "0"],
-    ["Peru grade 1", "(75)", "-5"],
-    ["", "", ""],
-    ["Source: StoneX"],
-  ]);
-  assert.deepEqual(filas.map((f) => [f.origen, f.grado, f.valor]), [
-    ["Ivory Coast", null, 325],
-    ["Guayaquil", "grade 2", 150],
-    ["Peru", "grade 1", -75],
-  ]);
-  // El encabezado y el pie no se descartan en silencio: quedan reportados.
-  assert.ok(ignoradas.some((x) => x.includes("Origin")));
-  assert.ok(ignoradas.some((x) => x.includes("Source")));
+test("se toma el diferencial VIGENTE, no el de la semana pasada", () => {
+  // Ghana ExW US: 850 la semana pasada, 825 esta. Tomar el primero daría un
+  // número viejo con toda la apariencia de estar al día.
+  const g = filas.find((f) => f.origen === "Ghana" && f.incoterm === "ExW US")!;
+  assert.equal(g.valor, 825);
+  assert.equal(g.valorAnterior, 850);
 });
 
-const BASE = parsearMatriz([
-  ["Guayaquil grade 2", "+150"],
-  ["Peru grade 1", "(75)"],
-]).filas;
-
-test("Colombia queda al 77,5 % del tramo, no en el percentil de la tabla", () => {
-  const r = estimarColombia(BASE);
-  assert.ok(!("error" in r));
-  if ("error" in r) return;
-  // De −75 a +150 hay 225. El 77,5 % son 174,375 → −75 + 174,375 = 99,375.
-  assert.equal(r.valor, 99.38);
-  assert.equal(r.referenciaBaja.etiqueta, "Peru grade 1");
-  assert.equal(r.referenciaAlta.etiqueta, "Guayaquil grade 2");
-  assert.match(r.metodo, /No es una cotización de mercado/);
+test("la moneda se lee por fila, no por tabla", () => {
+  const cif = filas.find((f) => f.origen === "Ivory Coast" && f.incoterm === "CIF N. Europe")!;
+  const exw = filas.find((f) => f.origen === "Ivory Coast" && f.incoterm === "ExW US")!;
+  assert.equal(cif.moneda, "GBP");
+  assert.equal(exw.moneda, "USD");
 });
 
-test("Colombia queda más cerca del caro que del barato", () => {
-  const r = estimarColombia(BASE);
+test("los negativos del reporte se conservan", () => {
+  const fob = filas.find((f) => f.incoterm === "FOB Guayaquil")!;
+  assert.equal(fob.valor, -30);
+  assert.equal(fob.origen, "Ecuador Grade 2");
+});
+
+test("la tabla de futuros y el pie no entran como orígenes", () => {
+  assert.ok(!filas.some((f) => /NY-DEC|Source|FUTURES/i.test(f.origen)));
+  assert.ok(ignoradas.length > 0, "lo descartado se reporta, no se calla");
+});
+
+test("con el mismo incoterm, Colombia queda entre Perú y Ecuador", () => {
+  // Perú Grade 1 ExW US = 281 · Ecuador Grade 2 ExW US = 320.
+  const r = estimarColombia(filas, "Peru Grade 1", "Ecuador Grade 2 ExW US");
   if ("error" in r) throw new Error(r.error);
-  const distAlCaro = Math.abs(r.referenciaAlta.valor - r.valor);
-  const distAlBarato = Math.abs(r.valor - r.referenciaBaja.valor);
-  assert.ok(distAlCaro < distAlBarato, "debe estar del lado caro del tramo");
+  assert.equal(r.referenciaBaja.valor, 281);
+  assert.equal(r.referenciaAlta.valor, 320);
+  // 281 + 77,5 % de 39 = 311,225, redondeado a dos decimales.
+  assert.equal(r.valor, 311.23);
+  assert.equal(r.incoterm, "ExW US");
+  assert.equal(r.advertencia, null, "mismo incoterm, sin advertencia");
 });
 
-test("si Perú cotiza por encima de Ecuador, el tramo se da vuelta solo", () => {
-  // Cuál es el caro se decide con los valores, no con el nombre. Si no, un mes
-  // en que Perú suba dejaría a Colombia del lado barato sin que nadie lo note.
-  const filas = parsearMatriz([
-    ["Guayaquil grade 2", "+50"],
-    ["Peru grade 1", "+200"],
-  ]).filas;
-  const r = estimarColombia(filas);
+test("mezclar incoterms se permite pero se advierte", () => {
+  // Perú ExW US (281) contra FOB Guayaquil (−30): la diferencia incluye flete.
+  const r = estimarColombia(filas, "FOB Guayaquil", "Peru Grade 1");
   if ("error" in r) throw new Error(r.error);
-  assert.equal(r.referenciaBaja.etiqueta, "Guayaquil grade 2");
-  assert.equal(r.referenciaAlta.etiqueta, "Peru grade 1");
-  assert.equal(r.valor, 50 + 0.775 * 150);
+  assert.equal(r.referenciaBaja.valor, -30);
+  assert.equal(r.referenciaAlta.valor, 281);
+  assert.match(r.advertencia ?? "", /incoterms distintos/);
 });
 
-test("la posición es un parámetro: Comercial puede moverla", () => {
-  const a = estimarColombia(BASE, 0.75);
-  const b = estimarColombia(BASE, 0.8);
-  if ("error" in a || "error" in b) throw new Error("no debía fallar");
-  assert.equal(a.valor, -75 + 0.75 * 225);
-  assert.equal(b.valor, -75 + 0.8 * 225);
-  assert.ok(a.valor < b.valor);
-  assert.equal(POSICION_COLOMBIA, 0.775, "el default es el centro del 75-80 %");
+test("cuál es la cara se decide por valor, no por nombre", () => {
+  // En este reporte Ecuador FOB (−30) es MÁS BARATO que Perú (281): si la cara
+  // se fijara por nombre, Colombia caería del lado equivocado.
+  const r = estimarColombia(filas, "Peru Grade 1", "FOB Guayaquil");
+  if ("error" in r) throw new Error(r.error);
+  assert.equal(r.referenciaAlta.etiqueta, "Peru Grade 1 · ExW US");
 });
 
-test("sin una de las dos referencias no se inventa un número", () => {
-  const soloEcuador = parsearMatriz([["Guayaquil grade 2", "+150"]]).filas;
-  const r = estimarColombia(soloEcuador);
-  assert.ok("error" in r && /Peru grade 1/.test(r.error));
+test("no se interpola entre monedas distintas", () => {
+  const r = estimarColombia(filas, "Ivory Coast CIF N. Europe", "Peru Grade 1");
+  assert.ok("error" in r && /no son comparables/.test(r.error));
 });
 
-test("una posición fuera de 0-1 se rechaza", () => {
-  const r = estimarColombia(BASE, 1.5);
-  assert.ok("error" in r && /entre 0 y 1/.test(r.error));
+test("una fila con su propio origen manda sobre la sección", () => {
+  // «Peru Grade 1 ExW US» dentro de «Other Origins»: el origen real es Perú.
+  const p = filas.find((f) => f.origen === "Peru Grade 1")!;
+  assert.equal(p.incoterm, "ExW US");
+  assert.equal(p.valor, 281);
+  assert.ok(!filas.some((f) => f.origen === "Other Origins"));
 });
 
-test("buscarFila tolera mayúsculas y espacios de más", () => {
-  assert.equal(buscarFila(BASE, "peru   GRADE 1")?.valor, -75);
+test("la etiqueta junta origen e incoterm", () => {
+  const f = filas.find((x) => x.incoterm === "FOB Guayaquil")!;
+  assert.equal(etiqueta(f), "Ecuador Grade 2 · FOB Guayaquil");
+  assert.equal(buscarFila(filas, "fob guayaquil")?.valor, -30);
 });
