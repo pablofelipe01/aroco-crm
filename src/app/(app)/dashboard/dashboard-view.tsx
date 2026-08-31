@@ -18,8 +18,9 @@ import { Card, CardHeader, CardTitle, CardBody } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
-import { TASK_STATUS_META, type TaskStatus } from "@/lib/status";
-import { formatNumber, formatDate, formatCOP, cn } from "@/lib/utils";
+import { TASK_STATUS_META, etiquetaTarea, type TaskStatus } from "@/lib/status";
+import { useT, useFormatos } from "@/lib/i18n/provider";
+import { cn } from "@/lib/utils";
 import { staggerContainer } from "@/lib/motion";
 import {
   PipelineChart,
@@ -60,7 +61,8 @@ export interface DashboardData {
     status: string;
     overdue: boolean;
   }[];
-  tasksScopeLabel: string;
+  /** El área cuyas tareas se están mirando, o null si son las propias. */
+  tasksScopeDept: string | null;
   pipeline: PipelineDatum[];
   pipelineValue: { weighted: number; total: number };
   inventory: InventoryDatum[];
@@ -79,15 +81,17 @@ function shortCompany(c: string): string {
 
 export function DashboardView({ data }: { data: DashboardData }) {
   const { kpis } = data;
+  const t = useT();
+  const f = useFormatos();
   return (
     <div className="space-y-8">
       <PageHeader
-        title={`Hola, ${data.name.split(" ")[0] || "equipo"}`}
-        description="Resumen general de la operación comercial de AROCO."
+        title={`${t.dashboard.saludo}, ${data.name.split(" ")[0] || t.dashboard.equipo}`}
+        description={t.dashboard.descripcion}
         actions={
           <Badge tone="accent">
             <Sparkles className="h-3 w-3" />
-            En vivo
+            {t.dashboard.enVivo}
           </Badge>
         }
       />
@@ -99,26 +103,26 @@ export function DashboardView({ data }: { data: DashboardData }) {
         className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4"
       >
         <StatCard
-          label="Leads en pipeline"
+          label={t.dashboard.leadsPipeline}
           value={kpis.totalLeads}
           icon={Users}
-          hint={`${kpis.activeLeads} activos`}
+          hint={`${kpis.activeLeads} ${t.dashboard.activos}`}
         />
         <StatCard
-          label="Disponible en bodega"
+          label={t.dashboard.disponibleBodega}
           value={kpis.kgAvailable}
           suffix=" kg"
           icon={Boxes}
-          hint={`${kpis.lotsCount} lotes`}
+          hint={`${kpis.lotsCount} ${t.dashboard.lotes}`}
         />
         <StatCard
-          label="Despachos registrados"
+          label={t.dashboard.despachosRegistrados}
           value={kpis.dispatchCount}
           icon={Truck}
-          hint={`${Math.round(kpis.dispatchedKg).toLocaleString("es-CO")} kg`}
+          hint={f.kg(Math.round(kpis.dispatchedKg))}
         />
         <StatCard
-          label="Kg despachados"
+          label={t.dashboard.kgDespachados}
           value={kpis.dispatchedKg}
           suffix=" kg"
           icon={FileText}
@@ -129,54 +133,53 @@ export function DashboardView({ data }: { data: DashboardData }) {
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <Card>
           <CardHeader>
-            <CardTitle>Referencias de mercado</CardTitle>
+            <CardTitle>{t.dashboard.referencias}</CardTitle>
             <DollarSign className="h-4 w-4 text-fg-subtle" />
           </CardHeader>
           <CardBody className="space-y-2.5">
             <RefRow
               icon={<DollarSign className="h-4 w-4" />}
-              label="TRM oficial"
-              value={data.refs.trm != null ? `$${formatNumber(data.refs.trm, 2)}` : "—"}
-              hint={data.refs.trmDate ? `Banrep · ${formatDate(data.refs.trmDate)}` : "Banrep"}
+              label={t.dashboard.trmOficial}
+              value={data.refs.trm != null ? `$${f.numero(data.refs.trm, 2)}` : "—"}
+              hint={data.refs.trmDate ? `Banrep · ${f.fecha(data.refs.trmDate)}` : "Banrep"}
             />
             <RefRow
               icon={<DollarSign className="h-4 w-4" />}
-              label="USD/COP spot"
-              value={data.refs.spot != null ? `$${formatNumber(data.refs.spot, 2)}` : "—"}
+              label={t.dashboard.spot}
+              value={data.refs.spot != null ? `$${f.numero(data.refs.spot, 2)}` : "—"}
               hint={
                 data.refs.spot != null && data.refs.trm != null
-                  ? `${data.refs.spot >= data.refs.trm ? "+" : ""}${formatNumber(
+                  ? `${data.refs.spot >= data.refs.trm ? "+" : ""}${f.numero(
                       data.refs.spot - data.refs.trm,
-                      0,
                     )} vs TRM`
                   : "Yahoo"
               }
             />
             <RefRow
               icon={<Coins className="h-4 w-4" />}
-              label="Cacao ICE"
-              value={data.refs.cocoaUsdT != null ? `$${formatNumber(data.refs.cocoaUsdT)}` : "—"}
+              label={t.dashboard.cacaoIce}
+              value={data.refs.cocoaUsdT != null ? `$${f.numero(data.refs.cocoaUsdT)}` : "—"}
               hint={data.refs.cocoaContract ? `${data.refs.cocoaContract} · USD/T` : "USD/T"}
             />
             <div className="border-t border-border pt-2.5">
               <p className="mb-1.5 text-[11px] uppercase tracking-wide text-fg-subtle">
-                Cacao nacional (COP/kg)
+                {t.dashboard.cacaoNacional}
               </p>
               {data.refs.cacao.length === 0 ? (
-                <p className="text-sm text-fg-subtle">Sin precios cargados.</p>
+                <p className="text-sm text-fg-subtle">{t.dashboard.sinPrecios}</p>
               ) : (
                 data.refs.cacao.map((c) => (
                   <div key={c.company} className="flex items-center justify-between py-0.5 text-sm">
                     <span className="truncate text-fg-muted">{shortCompany(c.company)}</span>
                     <span className="font-mono tnum text-fg">
-                      {c.price != null ? formatNumber(c.price) : "—"}
+                      {c.price != null ? f.numero(c.price) : "—"}
                     </span>
                   </div>
                 ))
               )}
             </div>
             <p className="text-[11px] text-fg-subtle">
-              TRM: Banco de la República · Spot y Cacao ICE: Yahoo Finance.
+              {t.dashboard.fuentes}
             </p>
           </CardBody>
         </Card>
@@ -185,37 +188,46 @@ export function DashboardView({ data }: { data: DashboardData }) {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <ListChecks className="h-4 w-4 text-accent" />
-              Próximas tareas
+              {t.dashboard.proximasTareas}
             </CardTitle>
-            <Badge tone="neutral">{data.tasksScopeLabel}</Badge>
+            <Badge tone="neutral">
+              {data.tasksScopeDept
+                ? `${t.dashboard.departamento}: ${data.tasksScopeDept}`
+                : t.dashboard.proximas}
+            </Badge>
           </CardHeader>
           <CardBody className="p-0">
             {data.upcomingTasks.length === 0 ? (
               <p className="px-5 py-8 text-center text-sm text-fg-subtle">
-                No hay tareas pendientes. 🎉
+                {t.dashboard.sinTareas}
               </p>
             ) : (
               <ul className="divide-y divide-border">
-                {data.upcomingTasks.map((t) => (
-                  <li key={t.id} className="flex items-center gap-3 px-5 py-2.5">
-                    <Badge tone={TASK_STATUS_META[t.status as TaskStatus]?.tone ?? "neutral"} dot>
-                      {TASK_STATUS_META[t.status as TaskStatus]?.label ?? t.status}
+                {data.upcomingTasks.map((tarea) => (
+                  <li key={tarea.id} className="flex items-center gap-3 px-5 py-2.5">
+                    <Badge
+                      tone={
+                        TASK_STATUS_META[tarea.status as TaskStatus]?.tone ?? "neutral"
+                      }
+                      dot
+                    >
+                      {etiquetaTarea(tarea.status, t)}
                     </Badge>
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium text-fg">{t.name}</p>
-                      {t.person_name && (
-                        <p className="truncate text-xs text-fg-muted">{t.person_name}</p>
+                      <p className="truncate text-sm font-medium text-fg">{tarea.name}</p>
+                      {tarea.person_name && (
+                        <p className="truncate text-xs text-fg-muted">{tarea.person_name}</p>
                       )}
                     </div>
-                    {t.due_date && (
+                    {tarea.due_date && (
                       <span
                         className={cn(
                           "flex shrink-0 items-center gap-1 font-mono text-xs",
-                          t.overdue ? "font-medium text-danger" : "text-fg-subtle",
+                          tarea.overdue ? "font-medium text-danger" : "text-fg-subtle",
                         )}
                       >
                         <Calendar className="h-3 w-3" />
-                        {formatDate(t.due_date)}
+                        {f.fecha(tarea.due_date)}
                       </span>
                     )}
                   </li>
@@ -224,7 +236,7 @@ export function DashboardView({ data }: { data: DashboardData }) {
             )}
             <div className="border-t border-border px-5 py-2.5 text-right">
               <Link href="/tareas" className="text-xs text-accent hover:underline">
-                Ver todas las tareas →
+                {t.dashboard.verTareas}
               </Link>
             </div>
           </CardBody>
@@ -234,23 +246,26 @@ export function DashboardView({ data }: { data: DashboardData }) {
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-2">
           <CardHeader>
-            <CardTitle>Embudo del pipeline</CardTitle>
-            <Badge tone="neutral">{kpis.totalLeads} leads</Badge>
+            <CardTitle>{t.dashboard.embudo}</CardTitle>
+            <Badge tone="neutral">
+              {kpis.totalLeads} {t.dashboard.leads}
+            </Badge>
           </CardHeader>
           <CardBody>
             {data.pipelineValue.weighted > 0 && (
               <div className="mb-4 flex flex-wrap items-end justify-between gap-x-3 gap-y-1">
                 <div>
                   <p className="text-[11px] uppercase tracking-wide text-fg-subtle">
-                    Valor ponderado del pipeline
+                    {t.dashboard.valorPonderado}
                   </p>
                   <p className="mt-0.5 font-mono text-2xl font-bold tnum text-fg">
-                    {formatCOP(data.pipelineValue.weighted)}
+                    {f.cop(data.pipelineValue.weighted)}
                   </p>
                 </div>
                 {data.pipelineValue.total > 0 && (
                   <p className="text-xs text-fg-subtle">
-                    de {formatCOP(data.pipelineValue.total)} potencial
+                    {t.comun.de} {f.cop(data.pipelineValue.total)}{" "}
+                    {t.dashboard.dePotencial}
                   </p>
                 )}
               </div>
@@ -258,19 +273,19 @@ export function DashboardView({ data }: { data: DashboardData }) {
             {data.pipeline.some((p) => p.count > 0) ? (
               <PipelineChart data={data.pipeline} />
             ) : (
-              <EmptyState title="Sin leads aún" />
+              <EmptyState title={t.dashboard.sinLeads} />
             )}
           </CardBody>
         </Card>
         <Card>
           <CardHeader>
-            <CardTitle>Inventario por procedencia</CardTitle>
+            <CardTitle>{t.dashboard.inventarioProcedencia}</CardTitle>
           </CardHeader>
           <CardBody>
             {data.inventory.length > 0 ? (
               <InventoryChart data={data.inventory} />
             ) : (
-              <EmptyState title="Sin inventario" />
+              <EmptyState title={t.dashboard.sinInventario} />
             )}
           </CardBody>
         </Card>
@@ -278,17 +293,17 @@ export function DashboardView({ data }: { data: DashboardData }) {
 
       <Card>
         <CardHeader>
-          <CardTitle>Tendencia · nacional vs internacional</CardTitle>
+          <CardTitle>{t.dashboard.tendencia}</CardTitle>
           <Badge tone="neutral">
             {data.priceCompanies.filter((c) => !c.toUpperCase().includes("INTERNACIONAL")).length}{" "}
-            compañías
+            {t.dashboard.companias}
           </Badge>
         </CardHeader>
         <CardBody>
           {data.priceSeries.length > 0 ? (
             <PriceChart data={data.priceSeries} companies={data.priceCompanies} />
           ) : (
-            <EmptyState title="Sin histórico de precios" />
+            <EmptyState title={t.dashboard.sinHistorico} />
           )}
         </CardBody>
       </Card>

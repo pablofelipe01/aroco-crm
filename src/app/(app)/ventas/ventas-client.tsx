@@ -18,18 +18,10 @@ import { StatCard } from "@/components/ui/stat-card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Badge } from "@/components/ui/badge";
 import { staggerContainer } from "@/lib/motion";
-import { formatNumber, formatCOP } from "@/lib/utils";
+import { useT, useFormatos } from "@/lib/i18n/provider";
 import { VentasChart } from "@/components/charts/ventas-chart";
 import type { Ventas } from "@/lib/ventas";
 
-const t = (kg: number) => `${formatNumber(kg / 1000, 1)} t`;
-
-/** Millones y miles de millones: en pesos crudos la cifra deja de leerse. */
-function plata(v: number): string {
-  if (Math.abs(v) >= 1_000_000_000) return `$ ${formatNumber(v / 1_000_000_000, 2)} MM`;
-  if (Math.abs(v) >= 1_000_000) return `$ ${formatNumber(v / 1_000_000, 1)} M`;
-  return formatCOP(v);
-}
 
 export function VentasClient({
   ventas: v,
@@ -45,6 +37,19 @@ export function VentasClient({
   vacio?: boolean;
 }) {
   const router = useRouter();
+  const t = useT();
+  const f = useFormatos();
+
+  const ton = (kg: number) => `${f.numero(kg / 1000, 1)} t`;
+
+  /** Millones y miles de millones: en pesos crudos la cifra deja de leerse. */
+  const plata = (valor: number): string => {
+    if (Math.abs(valor) >= 1_000_000_000)
+      return `$ ${f.numero(valor / 1_000_000_000, 2)} ${t.ventas.milesDeMillones}`;
+    if (Math.abs(valor) >= 1_000_000)
+      return `$ ${f.numero(valor / 1_000_000, 1)} ${t.ventas.millones}`;
+    return f.cop(valor);
+  };
 
   const faltan = Math.max(0, v.meta - v.kgAnio);
   const alcanza = v.proyeccionUltimosMeses >= v.meta;
@@ -52,8 +57,8 @@ export function VentasClient({
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Ventas"
-        description={`Volumen y facturación contra la meta anual · ${anio}`}
+        title={t.ventas.titulo}
+        description={`${t.ventas.descripcion} · ${anio}`}
         actions={
           <Select
             value={String(anio)}
@@ -77,7 +82,7 @@ export function VentasClient({
           <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-danger" />
           <div className="min-w-0">
             <p className="text-sm font-medium text-danger">
-              No se pudieron cargar las ventas
+              {t.ventas.errorCarga}
             </p>
             <p className="mt-1 font-mono text-xs text-fg-subtle">{error}</p>
           </div>
@@ -86,11 +91,8 @@ export function VentasClient({
 
       {!error && vacio && (
         <div className="rounded-[var(--radius-md)] border border-warn/40 bg-warn-soft p-4">
-          <p className="text-sm font-medium text-warn">La tabla de ventas está vacía</p>
-          <p className="mt-1 text-sm text-fg-muted">
-            Todavía no ha corrido el sync con la hoja de ventas. Hasta entonces esta
-            página no tiene de dónde sacar cifras.
-          </p>
+          <p className="text-sm font-medium text-warn">{t.ventas.tablaVacia}</p>
+          <p className="mt-1 text-sm text-fg-muted">{t.ventas.tablaVaciaDetalle}</p>
         </div>
       )}
 
@@ -101,14 +103,14 @@ export function VentasClient({
         className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4"
       >
         <StatCard
-          label="Vendido en el año"
+          label={t.ventas.vendidoAnio}
           value={Number((v.kgAnio / 1000).toFixed(1))}
           suffix=" t"
           icon={Truck}
-          hint={`${v.avancePct.toFixed(1)}% de la meta`}
+          hint={`${v.avancePct.toFixed(1)}% ${t.ventas.deLaMeta}`}
         />
         <StatCard
-          label="Facturado"
+          label={t.ventas.facturado}
           // En millones: en pesos crudos son diez dígitos y deja de leerse.
           value={Math.round(v.valorAnio / 1_000_000)}
           prefix="$ "
@@ -116,23 +118,23 @@ export function VentasClient({
           icon={Coins}
           hint={
             v.precioPromedioKg > 0
-              ? `${formatCOP(v.precioPromedioKg)}/kg promedio`
-              : "Sin valores cargados"
+              ? `${f.cop(v.precioPromedioKg)}/kg ${t.ventas.promedio}`
+              : t.ventas.sinValores
           }
         />
         <StatCard
-          label="Falta para la meta"
+          label={t.ventas.faltaMeta}
           value={Number((faltan / 1000).toFixed(1))}
           suffix=" t"
           icon={Target}
-          hint={`Meta ${formatNumber(v.meta / 1000)} t`}
+          hint={`${t.ventas.meta} ${f.numero(v.meta / 1000)} t`}
         />
         <StatCard
-          label="Proyección de cierre"
+          label={t.ventas.proyeccionCierre}
           value={Number((v.proyeccionUltimosMeses / 1000).toFixed(1))}
           suffix=" t"
           icon={TrendingUp}
-          hint={`Al ritmo de los últimos ${v.mesesUsadosEnProyeccion} meses`}
+          hint={`${t.ventas.alRitmoDe} ${v.mesesUsadosEnProyeccion} ${t.ventas.meses}`}
         />
       </motion.div>
 
@@ -140,11 +142,14 @@ export function VentasClient({
         <CardBody>
           <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
             <p className="text-sm text-fg-muted">
-              Avance <span className="font-mono tnum font-semibold text-fg">{t(v.kgAnio)}</span>{" "}
-              de {t(v.meta)}
+              {t.ventas.avance}{" "}
+              <span className="font-mono tnum font-semibold text-fg">
+                {ton(v.kgAnio)}
+              </span>{" "}
+              {t.comun.de} {ton(v.meta)}
             </p>
             <Badge tone={alcanza ? "success" : "warn"}>
-              {alcanza ? "La proyección alcanza la meta" : "La proyección queda corta"}
+              {alcanza ? t.ventas.alcanzaMeta : t.ventas.quedaCorta}
             </Badge>
           </div>
           <div className="h-3 w-full overflow-hidden rounded-full bg-bg-muted">
@@ -159,22 +164,25 @@ export function VentasClient({
           <dl className="mt-4 grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
             <div className="rounded-[var(--radius-md)] border border-border p-3">
               <dt className="text-[11px] uppercase tracking-wide text-fg-subtle">
-                Proyección por ritmo del año
+                {t.ventas.proyRitmoAnual}
               </dt>
-              <dd className="mt-0.5 font-mono tnum text-fg">{t(v.proyeccionRitmoAnual)}</dd>
+              <dd className="mt-0.5 font-mono tnum text-fg">
+                {ton(v.proyeccionRitmoAnual)}
+              </dd>
               <p className="mt-1 text-xs text-fg-subtle">
-                Lo vendido dividido por los días transcurridos. Castiga si el año
-                arrancó flojo.
+                {t.ventas.proyRitmoAnualNota}
               </p>
             </div>
             <div className="rounded-[var(--radius-md)] border border-border p-3">
               <dt className="text-[11px] uppercase tracking-wide text-fg-subtle">
-                Proyección por meses recientes
+                {t.ventas.proyMesesRecientes}
               </dt>
-              <dd className="mt-0.5 font-mono tnum text-fg">{t(v.proyeccionUltimosMeses)}</dd>
+              <dd className="mt-0.5 font-mono tnum text-fg">
+                {ton(v.proyeccionUltimosMeses)}
+              </dd>
               <p className="mt-1 text-xs text-fg-subtle">
-                Promedio de los últimos {v.mesesUsadosEnProyeccion} meses con ventas,
-                proyectado a fin de año.
+                {t.ventas.proyMesesRecientesNota1} {v.mesesUsadosEnProyeccion}{" "}
+                {t.ventas.proyMesesRecientesNota2}
               </p>
             </div>
           </dl>
@@ -183,13 +191,13 @@ export function VentasClient({
 
       <Card>
         <CardHeader>
-          <CardTitle>Vendido por mes y acumulado</CardTitle>
+          <CardTitle>{t.ventas.porMesTitulo}</CardTitle>
         </CardHeader>
         <CardBody>
           {v.kgAnio > 0 ? (
             <VentasChart meses={v.meses} metaKg={v.meta} />
           ) : (
-            <EmptyState title={`Sin ventas en ${anio}`} />
+            <EmptyState title={`${t.ventas.sinVentasEn} ${anio}`} />
           )}
         </CardBody>
       </Card>
@@ -197,11 +205,11 @@ export function VentasClient({
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle>Por cliente</CardTitle>
+            <CardTitle>{t.ventas.porCliente}</CardTitle>
           </CardHeader>
           <CardBody>
             {v.porCliente.length === 0 ? (
-              <EmptyState title="Sin ventas" />
+              <EmptyState title={t.ventas.sinVentas} />
             ) : (
               <ul className="space-y-2">
                 {v.porCliente.map((c) => {
@@ -211,7 +219,7 @@ export function VentasClient({
                       <div className="flex items-baseline justify-between gap-3 text-sm">
                         <span className="min-w-0 truncate text-fg">{c.cliente}</span>
                         <span className="shrink-0 font-mono tnum text-fg-muted">
-                          {t(c.kg)} · {plata(c.valor)}
+                          {ton(c.kg)} · {plata(c.valor)}
                         </span>
                       </div>
                       <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-bg-muted">
@@ -233,13 +241,13 @@ export function VentasClient({
             <CardTitle>
               <span className="inline-flex items-center gap-2">
                 <Globe className="h-4 w-4 text-fg-subtle" />
-                Nacional vs exportación
+                {t.ventas.nacionalVsExport}
               </span>
             </CardTitle>
           </CardHeader>
           <CardBody>
             {v.porMercado.length === 0 ? (
-              <EmptyState title="Sin datos de mercado" />
+              <EmptyState title={t.ventas.sinMercado} />
             ) : (
               <ul className="space-y-2">
                 {v.porMercado.map((m) => {
@@ -249,7 +257,7 @@ export function VentasClient({
                       <div className="flex items-baseline justify-between gap-3 text-sm">
                         <span className="text-fg">{m.mercado}</span>
                         <span className="shrink-0 font-mono tnum text-fg-muted">
-                          {t(m.kg)} · {pct.toFixed(1)}% · {plata(m.valor)}
+                          {ton(m.kg)} · {pct.toFixed(1)}% · {plata(m.valor)}
                         </span>
                       </div>
                       <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-bg-muted">
@@ -266,12 +274,13 @@ export function VentasClient({
 
             {v.bonificacionAnio > 0 && (
               <p className="mt-4 border-t border-border pt-3 text-xs text-fg-subtle">
-                De lo facturado,{" "}
+                {t.ventas.bonifPrefijo}{" "}
                 <span className="font-mono tnum text-fg-muted">
                   {plata(v.bonificacionAnio)}
                 </span>{" "}
-                son bonificación por calidad del grano —
-                {((v.bonificacionAnio / v.valorAnio) * 100).toFixed(1)}% del total.
+                {t.ventas.bonifSufijo}
+                {((v.bonificacionAnio / v.valorAnio) * 100).toFixed(1)}%{" "}
+                {t.ventas.bonifDelTotal}
               </p>
             )}
           </CardBody>
@@ -284,14 +293,12 @@ export function VentasClient({
         <Card>
           <CardBody>
             <p className="text-xs text-fg-subtle">
-              {v.operacionesSinValor} envío{v.operacionesSinValor === 1 ? "" : "s"} del año
-              suman{" "}
-              <span className="font-mono tnum text-fg-muted">
-                {formatNumber(v.kgSinValor)} kg
-              </span>{" "}
-              y todavía no tienen valor cargado en la hoja. Cuentan en los kilos pero no
-              en lo facturado, y el precio promedio se calcula solo sobre los kilos que
-              sí tienen precio.
+              {v.operacionesSinValor}{" "}
+              {v.operacionesSinValor === 1
+                ? t.ventas.sinValorUno
+                : t.ventas.sinValorVarios}{" "}
+              <span className="font-mono tnum text-fg-muted">{f.kg(v.kgSinValor)}</span>{" "}
+              {t.ventas.sinValorNota}
             </p>
           </CardBody>
         </Card>

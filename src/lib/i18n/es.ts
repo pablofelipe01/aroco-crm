@@ -47,6 +47,95 @@ export const es = {
     miembro: "Miembro",
   },
 
+  dashboard: {
+    saludo: "Hola",
+    equipo: "equipo",
+    descripcion: "Resumen general de la operación comercial de AROCO.",
+    enVivo: "En vivo",
+    leadsPipeline: "Leads en pipeline",
+    activos: "activos",
+    disponibleBodega: "Disponible en bodega",
+    lotes: "lotes",
+    despachosRegistrados: "Despachos registrados",
+    kgDespachados: "Kg despachados",
+    referencias: "Referencias de mercado",
+    trmOficial: "TRM oficial",
+    spot: "USD/COP spot",
+    cacaoIce: "Cacao ICE",
+    cacaoNacional: "Cacao nacional (COP/kg)",
+    sinPrecios: "Sin precios cargados.",
+    fuentes: "TRM: Banco de la República · Spot y Cacao ICE: Yahoo Finance.",
+    proximasTareas: "Próximas tareas",
+    proximas: "Próximas",
+    departamento: "Departamento",
+    sinTareas: "No hay tareas pendientes. 🎉",
+    verTareas: "Ver todas las tareas →",
+    embudo: "Embudo del pipeline",
+    leads: "leads",
+    valorPonderado: "Valor ponderado del pipeline",
+    dePotencial: "potencial",
+    sinLeads: "Sin leads aún",
+    inventarioProcedencia: "Inventario por procedencia",
+    sinInventario: "Sin inventario",
+    tendencia: "Tendencia · nacional vs internacional",
+    companias: "compañías",
+    sinHistorico: "Sin histórico de precios",
+  },
+
+  ventas: {
+    titulo: "Ventas",
+    descripcion: "Volumen y facturación contra la meta anual",
+    errorCarga: "No se pudieron cargar las ventas",
+    tablaVacia: "La tabla de ventas está vacía",
+    tablaVaciaDetalle:
+      "Todavía no ha corrido el sync con la hoja de ventas. Hasta entonces esta página no tiene de dónde sacar cifras.",
+    vendidoAnio: "Vendido en el año",
+    deLaMeta: "de la meta",
+    facturado: "Facturado",
+    promedio: "promedio",
+    sinValores: "Sin valores cargados",
+    faltaMeta: "Falta para la meta",
+    meta: "Meta",
+    proyeccionCierre: "Proyección de cierre",
+    alRitmoDe: "Al ritmo de los últimos",
+    meses: "meses",
+    avance: "Avance",
+    alcanzaMeta: "La proyección alcanza la meta",
+    quedaCorta: "La proyección queda corta",
+    proyRitmoAnual: "Proyección por ritmo del año",
+    proyRitmoAnualNota:
+      "Lo vendido dividido por los días transcurridos. Castiga si el año arrancó flojo.",
+    proyMesesRecientes: "Proyección por meses recientes",
+    proyMesesRecientesNota1: "Promedio de los últimos",
+    proyMesesRecientesNota2: "meses con ventas, proyectado a fin de año.",
+    porMesTitulo: "Vendido por mes y acumulado",
+    sinVentasEn: "Sin ventas en",
+    porCliente: "Por cliente",
+    sinVentas: "Sin ventas",
+    nacionalVsExport: "Nacional vs exportación",
+    sinMercado: "Sin datos de mercado",
+    bonifPrefijo: "De lo facturado,",
+    bonifSufijo: "son bonificación por calidad del grano —",
+    bonifDelTotal: "del total.",
+    sinValorUno: "envío del año suma",
+    sinValorVarios: "envíos del año suman",
+    sinValorNota:
+      "y todavía no tienen valor cargado en la hoja. Cuentan en los kilos pero no en lo facturado, y el precio promedio se calcula solo sobre los kilos que sí tienen precio.",
+    millones: "M",
+    milesDeMillones: "MM",
+  },
+
+  mesesCortos: {
+    ene: "Ene", feb: "Feb", mar: "Mar", abr: "Abr", may: "May", jun: "Jun",
+    jul: "Jul", ago: "Ago", sep: "Sep", oct: "Oct", nov: "Nov", dic: "Dic",
+  },
+
+  grafico: {
+    mes: "Mes",
+    acumulado: "Acumulado",
+    meta: "Meta",
+  },
+
   paleta: {
     placeholder: "Buscar o saltar a…",
     titulo: "Paleta de comandos",
@@ -87,6 +176,38 @@ export const es = {
     acciones: "Acciones",
     opcional: "opcional",
     obligatorio: "obligatorio",
+  },
+
+  /**
+   * Etiquetas de los estados que en la base están en español.
+   *
+   * Las claves son el valor exacto que guarda Postgres —«Cotización», con
+   * tilde— porque eso es lo que llega del servidor y lo que hay que poder
+   * indexar. Traducir el valor en la base no era opción: rompería los enums,
+   * las políticas RLS y todo lo ya guardado.
+   */
+  etapas: {
+    Nuevo: "Nuevo",
+    "Cotización": "Cotización",
+    "Negociación": "Negociación",
+    Enviado: "Enviado",
+    "En espera": "En espera",
+    Cerrado: "Cerrado",
+    Descartado: "Descartado",
+  },
+
+  tareaEstados: {
+    pending: "Pendiente",
+    progress: "En progreso",
+    done: "Completado",
+    blocked: "Bloqueado",
+  },
+
+  cotizacionEstados: {
+    borrador: "Borrador",
+    enviada: "Enviada",
+    aceptada: "Aceptada",
+    rechazada: "Rechazada",
   },
 
   estados: {

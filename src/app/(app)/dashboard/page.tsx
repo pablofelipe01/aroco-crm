@@ -172,7 +172,8 @@ export default async function DashboardPage() {
       cacao,
     },
     upcomingTasks,
-    tasksScopeLabel: isAdmin && dept ? `Departamento: ${dept}` : "Próximas",
+    // El rótulo se arma en el cliente, que es quien sabe el idioma.
+    tasksScopeDept: isAdmin && dept ? dept : null,
     pipeline,
     pipelineValue: { weighted: pipelineWeighted, total: pipelineTotal },
     inventory: topRegions,

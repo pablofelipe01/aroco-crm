@@ -63,3 +63,28 @@ export const QUOTE_STATUS_META: Record<
   aceptada: { label: "Aceptada", tone: "success" },
   rechazada: { label: "Rechazada", tone: "danger" },
 };
+
+// ── Etiquetas traducidas ────────────────────────────────────────────────────
+//
+//  Los estados se guardan en español en la base y ahí se quedan: son valores de
+//  enum, viven en políticas RLS y en todo lo ya escrito. Lo que cambia es cómo
+//  se muestran. Estas funciones toman el diccionario y devuelven el rótulo; el
+//  `tone` sigue saliendo de los mapas de arriba, que no dependen del idioma.
+//
+//  Indexar el diccionario con el tipo del estado hace que TypeScript exija que
+//  estén todas las etapas: si alguien agrega una octava a `LEAD_STAGES` y no la
+//  traduce, esto no compila.
+
+import type { Diccionario } from "@/lib/i18n/es";
+
+export function etiquetaEtapa(etapa: LeadStage, t: Diccionario): string {
+  return t.etapas[etapa];
+}
+
+export function etiquetaTarea(estado: string, t: Diccionario): string {
+  return t.tareaEstados[estado as TaskStatus] ?? estado;
+}
+
+export function etiquetaCotizacion(estado: string, t: Diccionario): string {
+  return t.cotizacionEstados[estado as keyof Diccionario["cotizacionEstados"]] ?? estado;
+}

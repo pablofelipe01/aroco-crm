@@ -12,13 +12,8 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
-import { formatNumber } from "@/lib/utils";
+import { useT, useFormatos } from "@/lib/i18n/provider";
 import type { PuntoMes } from "@/lib/ventas";
-
-const MESES = [
-  "Ene", "Feb", "Mar", "Abr", "May", "Jun",
-  "Jul", "Ago", "Sep", "Oct", "Nov", "Dic",
-];
 
 /** Toneladas: en kilos el eje se vuelve ilegible a esta escala. */
 const aT = (kg: number) => kg / 1000;
@@ -31,10 +26,15 @@ const aT = (kg: number) => kg / 1000;
  * ser comparable a simple vista.
  */
 export function VentasChart({ meses, metaKg }: { meses: PuntoMes[]; metaKg: number }) {
+  const t = useT();
+  const f = useFormatos();
+  // Recharts usa la clave de la serie como rótulo de la leyenda, así que el
+  // nombre traducido tiene que ser la clave misma, no un alias.
+  const cortos = Object.values(t.mesesCortos);
   const data = meses.map((m, i) => ({
-    mes: MESES[i],
-    Mes: aT(m.kg),
-    Acumulado: aT(m.acumulado),
+    mes: cortos[i],
+    [t.grafico.mes]: aT(m.kg),
+    [t.grafico.acumulado]: aT(m.acumulado),
   }));
 
   return (
@@ -53,10 +53,10 @@ export function VentasChart({ meses, metaKg }: { meses: PuntoMes[]; metaKg: numb
             axisLine={false}
             tickLine={false}
             width={44}
-            tickFormatter={(v: number) => `${formatNumber(v)} t`}
+            tickFormatter={(v: number) => `${f.numero(v)} t`}
           />
           <Tooltip
-            formatter={(v, name) => [`${formatNumber(Number(v) || 0, 1)} t`, String(name)]}
+            formatter={(v, name) => [`${f.numero(Number(v) || 0, 1)} t`, String(name)]}
             contentStyle={{
               background: "var(--color-surface-raised)",
               border: "1px solid var(--color-border)",
@@ -70,16 +70,21 @@ export function VentasChart({ meses, metaKg }: { meses: PuntoMes[]; metaKg: numb
             stroke="var(--color-accent)"
             strokeDasharray="5 4"
             label={{
-              value: `Meta ${formatNumber(aT(metaKg))} t`,
+              value: `${t.grafico.meta} ${f.numero(aT(metaKg))} t`,
               position: "insideTopRight",
               fill: "var(--color-accent)",
               fontSize: 11,
             }}
           />
-          <Bar dataKey="Mes" fill="#40916C" radius={[4, 4, 0, 0]} maxBarSize={34} />
+          <Bar
+            dataKey={t.grafico.mes}
+            fill="#40916C"
+            radius={[4, 4, 0, 0]}
+            maxBarSize={34}
+          />
           <Line
             type="monotone"
-            dataKey="Acumulado"
+            dataKey={t.grafico.acumulado}
             stroke="#B45309"
             strokeWidth={2}
             dot={false}
