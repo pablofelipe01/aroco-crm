@@ -4,7 +4,7 @@ import * as React from "react";
 import { motion } from "framer-motion";
 import {
   Boxes, Coins, ShieldAlert, TrendingUp, AlertTriangle, Landmark, RefreshCw, ImageUp,
-  Newspaper, ExternalLink, Scale as Balanza,
+  Newspaper, ExternalLink, Scale as Balanza, Factory, ArrowLeftRight,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -270,6 +270,127 @@ export function MercadoClient({
               primas, y Barchart no entrega las griegas: calcularlo sin ellas daría
               una cifra que parece precisa y no lo es.
             </p>
+          </CardBody>
+        </Card>
+      )}
+
+      {/* Futuros y arbitraje. Van antes de los ratios porque son la base
+          contra la que se miden: sin saber en cuánto está el contrato, un
+          ratio de 1,74 no dice nada. */}
+      {d.ratios.futuros.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>
+              <span className="inline-flex items-center gap-2">
+                <ArrowLeftRight className="h-4 w-4 text-fg-subtle" /> Futuros y arbitraje
+              </span>
+            </CardTitle>
+          </CardHeader>
+          <CardBody>
+            <dl className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              {d.ratios.futuros.map((f) => {
+                const cambio = f.valor_anterior === null ? null : f.valor - f.valor_anterior;
+                const simbolo = f.moneda === "GBP" ? "£" : f.moneda === "EUR" ? "€" : "$";
+                return (
+                  <div key={f.contrato} className="rounded-[var(--radius-md)] border border-border p-3">
+                    <dt className="text-[11px] uppercase tracking-wide text-fg-subtle">
+                      {f.contrato === "ARBITRAGE" ? "Arbitraje NY − Londres" : f.contrato}
+                    </dt>
+                    <dd className="mt-0.5 font-mono tnum text-lg text-fg">
+                      {f.valor < 0 ? "−" : ""}
+                      {simbolo}
+                      {formatNumber(Math.abs(f.valor))}
+                    </dd>
+                    {cambio !== null && cambio !== 0 && (
+                      <p
+                        className={
+                          "mt-0.5 font-mono tnum text-xs " +
+                          (cambio > 0 ? "text-success" : "text-danger")
+                        }
+                      >
+                        {cambio > 0 ? "+" : "−"}
+                        {simbolo}
+                        {formatNumber(Math.abs(cambio))} en la semana
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
+            </dl>
+            <p className="mt-3 text-xs text-fg-subtle">
+              Reporte del {d.ratios.fecha ? formatDate(d.ratios.fecha) : "—"}. El arbitraje
+              es la diferencia entre el contrato de Nueva York y el de Londres.
+            </p>
+          </CardBody>
+        </Card>
+      )}
+
+      {/* ── Ratios de producto ─────────────────────────────────────────── */}
+      {d.ratios.filas.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>
+              <span className="inline-flex items-center gap-2">
+                <Factory className="h-4 w-4 text-fg-subtle" /> Ratios de producto
+              </span>
+            </CardTitle>
+          </CardHeader>
+          <CardBody>
+            <p className="mb-3 text-xs text-fg-subtle">
+              Cuántas veces el precio del futuro vale cada derivado. Un ratio de 1,74
+              significa que ese producto se cotiza a 1,74 veces el grano — es lo que
+              dice si conviene vender cacao o transformarlo.
+            </p>
+            <div className="space-y-4">
+              {["Liquor", "Butter", "Powder", "Combined"].map((cat) => {
+                const filas = d.ratios.filas.filter((f) => f.categoria === cat);
+                if (filas.length === 0) return null;
+                return (
+                  <div key={cat}>
+                    <h4 className="mb-1.5 text-[11px] uppercase tracking-wide text-fg-subtle">
+                      {cat === "Liquor" ? "Licor" : cat === "Butter" ? "Manteca"
+                        : cat === "Powder" ? "Polvo" : "Combinado"}
+                    </h4>
+                    <ul className="space-y-1">
+                      {filas.map((f) => {
+                        const cambio =
+                          f.ratio_anterior === null
+                            ? null
+                            : Math.round((f.ratio - f.ratio_anterior) * 100) / 100;
+                        return (
+                          <li
+                            key={`${f.producto}-${f.incoterm ?? ""}`}
+                            className="flex flex-wrap items-baseline justify-between gap-2 border-b border-border/50 pb-1 text-sm last:border-0"
+                          >
+                            <span className="min-w-0 text-fg">
+                              {f.producto}
+                              {f.mercado && (
+                                <span className="ml-1.5 text-xs text-fg-subtle">{f.mercado}</span>
+                              )}
+                            </span>
+                            <span className="shrink-0 font-mono tnum text-fg-muted">
+                              {f.ratio.toFixed(2)}
+                              {cambio !== null && cambio !== 0 && (
+                                <span className={cambio > 0 ? "text-success" : "text-danger"}>
+                                  {" "}
+                                  {cambio > 0 ? "+" : ""}
+                                  {cambio.toFixed(2)}
+                                </span>
+                              )}
+                              {f.precio_usd && (
+                                <span className="ml-2 text-fg-subtle">
+                                  US$ {formatNumber(f.precio_usd)}
+                                </span>
+                              )}
+                            </span>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
+                );
+              })}
+            </div>
           </CardBody>
         </Card>
       )}

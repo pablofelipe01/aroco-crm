@@ -40,6 +40,11 @@ export type DatosMercado = {
     fecha: string | null;
     filas: { origen: string; grado: string | null; valor: number; unidad: string; fuente: string; metodo: string | null }[];
   };
+  ratios: {
+    fecha: string | null;
+    filas: { categoria: string; producto: string; incoterm: string | null; mercado: string | null; ratio: number; ratio_anterior: number | null; precio_usd: number | null }[];
+    futuros: { contrato: string; valor: number; valor_anterior: number | null; moneda: string }[];
+  };
   intel: {
     article_id: string; title: string; resumen: string | null;
     abstract: string | null; url: string | null; published_at: string;
@@ -57,7 +62,8 @@ export type DatosMercado = {
 export async function cargarMercado(
   db: SupabaseClient<Database>,
 ): Promise<DatosMercado> {
-  const [lotesRes, balRes, pnlRes, posRes, boardRes, trmRes, intelRes, difRes] = await Promise.all([
+  const [lotesRes, balRes, pnlRes, posRes, boardRes, trmRes, intelRes, difRes, ratRes, futRes] =
+    await Promise.all([
     db
       .from("inventory_lots")
       .select("code, remision, recepcion, odc, entry_date, origin, qty_in_kg, qty_out_kg, purchase_price_cop_kg, quality")
@@ -78,6 +84,18 @@ export async function cargarMercado(
       .order("report_date", { ascending: false })
       .order("valor", { ascending: false })
       .limit(40),
+    db
+      .from("cocoa_ratios")
+      .select("report_date, categoria, producto, incoterm, mercado, ratio, ratio_anterior, precio_usd")
+      .order("report_date", { ascending: false })
+      .order("categoria")
+      .order("producto")
+      .limit(60),
+    db
+      .from("cocoa_futuros")
+      .select("report_date, contrato, valor, valor_anterior, moneda")
+      .order("report_date", { ascending: false })
+      .limit(10),
   ]);
 
   const posicion = construirPosicion((lotesRes.data ?? []) as LoteRow[], new Date());
@@ -207,6 +225,17 @@ export async function cargarMercado(
       const todas = difRes.data ?? [];
       const ultima = todas[0]?.report_date ?? null;
       return { fecha: ultima, filas: todas.filter((f) => f.report_date === ultima) };
+    })(),
+    // Solo el reporte más reciente: mezclar semanas pondría dos ratios del
+    // mismo producto uno al lado del otro sin decir cuál es el vigente.
+    ratios: (() => {
+      const todas = ratRes.data ?? [];
+      const ultima = todas[0]?.report_date ?? null;
+      return {
+        fecha: ultima,
+        filas: todas.filter((f) => f.report_date === ultima),
+        futuros: (futRes.data ?? []).filter((f) => f.report_date === ultima),
+      };
     })(),
     intel: intelRes.data ?? [],
     error: lotesRes.error?.message ?? null,

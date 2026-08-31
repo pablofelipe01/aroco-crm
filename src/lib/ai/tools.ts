@@ -429,6 +429,22 @@ export const MERCADO_TOOLS: Anthropic.Tool[] = [
     input_schema: { type: "object", properties: {}, required: [] },
   },
   {
+    name: "get_ratios_cacao",
+    description:
+      "Ratios de producto del cacao (licor, manteca, polvo) sobre el futuro, del reporte semanal de StoneX, más los precios de los contratos de Nueva York y Londres y el arbitraje entre ellos. Un ratio de 1,74 significa que ese derivado se cotiza a 1,74 veces el grano. Úsala para '¿cuánto vale la manteca?', '¿conviene transformar o vender grano?' o '¿cómo está el arbitraje NY-Londres?'.",
+    input_schema: {
+      type: "object",
+      properties: {
+        categoria: {
+          type: "string",
+          enum: ["Liquor", "Butter", "Powder", "Combined"],
+          description: "Filtrar por tipo de derivado.",
+        },
+      },
+      required: [],
+    },
+  },
+  {
     name: "get_diferenciales",
     description:
       "Diferenciales de cacao físico por origen sobre el futuro de ICE, del reporte semanal de StoneX. Incluye la estimación de Colombia, que NO viene en el reporte y la calcula AROCO. Úsala para '¿cuál es el diferencial de Colombia?', '¿cuánto vale nuestro cacao sobre bolsa?' o para comparar contra Ecuador y Perú.",
@@ -548,6 +564,44 @@ export async function executeTool(
         pnl_realizado_mes: pnl?.[0]?.realized_pnl_mtd ?? null,
         pnl_realizado_ano: pnl?.[0]?.realized_pnl_ytd ?? null,
         moneda: pnl?.[0]?.currency ?? "USD",
+      };
+    }
+
+    case "get_ratios_cacao": {
+      if (!ctx.veMercado) return { error: "No tienes acceso al módulo Mercado." };
+      const { data: ultimo } = await db
+        .from("cocoa_ratios")
+        .select("report_date")
+        .order("report_date", { ascending: false })
+        .limit(1);
+      if (!ultimo?.length) return { mensaje: "Todavía no hay ratios sincronizados." };
+      const fecha = ultimo[0].report_date;
+
+      let q = db
+        .from("cocoa_ratios")
+        .select("categoria, producto, incoterm, mercado, ratio, ratio_anterior, precio_usd")
+        .eq("report_date", fecha)
+        .order("categoria")
+        .order("producto");
+      if (typeof input.categoria === "string") q = q.eq("categoria", input.categoria);
+
+      const [{ data: ratios, error }, { data: futuros }] = await Promise.all([
+        q,
+        db
+          .from("cocoa_futuros")
+          .select("contrato, valor, valor_anterior, moneda")
+          .eq("report_date", fecha),
+      ]);
+      if (error) return { error: error.message };
+
+      return {
+        fecha_reporte: fecha,
+        ratios: ratios ?? [],
+        futuros: futuros ?? [],
+        nota:
+          "El ratio multiplica el precio del futuro: manteca con ratio 1,74 y grano en 6.173 " +
+          "da 10.741 USD/t. `ratio_anterior` es el de la semana pasada. El contrato ARBITRAGE " +
+          "es la diferencia Nueva York menos Londres, no un producto.",
       };
     }
 
