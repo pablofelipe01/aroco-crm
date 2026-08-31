@@ -30,8 +30,15 @@ export function LanguageToggle({ className }: { className?: string }) {
       title={otro === "en" ? t.shell.ingles : t.shell.espanol}
       onClick={async () => {
         setCambiando(true);
-        await cambiarIdioma(otro);
-        // No se apaga: la acción revalida el layout y esto se vuelve a montar.
+        // Hay que apagarlo a mano. `revalidatePath` vuelve a renderizar los
+        // componentes de servidor, pero React conserva el estado de los de
+        // cliente: este botón NO se vuelve a montar. Dejarlo encendido lo
+        // deshabilitaba para siempre, y el idioma se podía cambiar una sola vez.
+        try {
+          await cambiarIdioma(otro);
+        } finally {
+          setCambiando(false);
+        }
       }}
       className={cn(
         "flex h-9 min-w-9 items-center justify-center rounded-[var(--radius-md)] px-2 font-mono text-xs font-semibold text-fg-muted transition-colors hover:bg-bg-subtle hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50",

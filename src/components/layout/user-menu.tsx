@@ -28,10 +28,15 @@ export function UserMenu({
   async function elegirIdioma(nuevo: Idioma) {
     if (nuevo === idioma) return setOpen(false);
     setCambiando(nuevo);
-    await cambiarIdioma(nuevo);
-    // No se apaga `cambiando`: la acción revalida el layout y este componente
-    // se vuelve a montar con el idioma nuevo. Apagarlo aquí solo alcanzaría a
-    // parpadear.
+    // Se apaga a mano: `revalidatePath` vuelve a renderizar los componentes de
+    // servidor, pero el estado de los de cliente sobrevive — este menú no se
+    // vuelve a montar. Sin esto quedaba deshabilitado y solo dejaba cambiar de
+    // idioma una vez, sin vuelta atrás.
+    try {
+      await cambiarIdioma(nuevo);
+    } finally {
+      setCambiando(null);
+    }
     setOpen(false);
   }
 
