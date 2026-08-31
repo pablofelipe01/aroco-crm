@@ -16,7 +16,8 @@ import {
 import { motion } from "framer-motion";
 import { LEAD_STAGES, LEAD_STAGE_TONE, LEAD_STAGE_WEIGHT, type LeadStage } from "@/lib/status";
 import { Badge } from "@/components/ui/badge";
-import { cn, formatCOP } from "@/lib/utils";
+import { cn } from "@/lib/utils";
+import { useT, useFormatos } from "@/lib/i18n/provider";
 import { staggerContainer, fadeUp } from "@/lib/motion";
 import { leadDisplayValue, type Market } from "@/lib/calc/lead-value";
 import type { ReferencePrices } from "@/lib/calc/lead-value";
@@ -61,6 +62,8 @@ function Column({
   onSelect: (l: LeadWithOwner) => void;
   prices: ReferencePrices;
 }) {
+  const t = useT();
+  const f = useFormatos();
   const { setNodeRef, isOver } = useDroppable({ id: stage });
   const prob = Math.round((LEAD_STAGE_WEIGHT[stage] ?? 0) * 100);
   const tons = leads.reduce((s, l) => s + (l.toneladas ?? 0), 0);
@@ -78,14 +81,14 @@ function Column({
       <div className="mb-2 flex items-center justify-between gap-2 px-1">
         <div className="flex items-center gap-1.5">
           <Badge tone={LEAD_STAGE_TONE[stage]} dot>
-            {stage}
+            {t.etapas[stage]}
           </Badge>
           <span className="font-mono text-[11px] font-semibold tnum text-accent-soft-fg">
             {prob}%
           </span>
         </div>
         <span className="font-mono text-xs text-fg-subtle tnum">
-          {tons > 0 ? `${tons.toLocaleString("es-CO")} TM · ` : ""}
+          {tons > 0 ? `${f.numero(tons, 1)} ${t.unidades.tm} · ` : ""}
           {leads.length}
         </span>
       </div>
@@ -111,19 +114,19 @@ function Column({
         ))}
         {leads.length === 0 && (
           <p className="px-2 py-6 text-center text-xs text-fg-subtle">
-            Sin leads
+            {t.comercial.sinLeads}
           </p>
         )}
       </motion.div>
       {/* Totales de la etapa: toneladas y valor potencial. */}
       <div className="mt-2 flex items-center justify-between gap-2 rounded-[var(--radius-md)] border border-border bg-surface px-3 py-2">
         <span className="text-[11px] font-medium uppercase tracking-wide text-fg-subtle">
-          Total
+          {t.comun.total}
         </span>
         <span className="flex items-center gap-2 font-mono text-xs tnum text-fg">
-          <span>{tons > 0 ? `${tons.toLocaleString("es-CO")} TM` : "—"}</span>
+          <span>{tons > 0 ? `${f.numero(tons, 1)} ${t.unidades.tm}` : "—"}</span>
           <span className="text-fg-subtle">·</span>
-          <span className="font-semibold">{value > 0 ? formatCOP(value) : "—"}</span>
+          <span className="font-semibold">{value > 0 ? f.cop(value) : "—"}</span>
         </span>
       </div>
     </div>

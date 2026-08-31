@@ -14,7 +14,8 @@ import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Users, MapPin } from "lucide-react";
 import { LEAD_STAGE_TONE, LEAD_STAGE_WEIGHT, type LeadStage } from "@/lib/status";
-import { formatDate, initials } from "@/lib/utils";
+import { initials } from "@/lib/utils";
+import { useT, useFormatos } from "@/lib/i18n/provider";
 import type { LeadWithOwner } from "./page";
 
 const col = createColumnHelper<LeadWithOwner>();
@@ -26,39 +27,44 @@ export function LeadList({
   leads: LeadWithOwner[];
   onSelect: (l: LeadWithOwner) => void;
 }) {
+  const t = useT();
+  const f = useFormatos();
   const [sorting, setSorting] = React.useState<SortingState>([]);
 
   const columns = React.useMemo(
     () => [
       col.accessor("company", {
-        header: "Empresa",
+        header: t.comercial.empresa,
         cell: (c) => (
           <span className="font-medium text-fg">{c.getValue()}</span>
         ),
       }),
       col.accessor("contact_name", {
-        header: "Contacto",
+        header: t.comercial.contacto,
         cell: (c) => c.getValue() ?? "—",
       }),
       col.accessor("country", {
-        header: "País",
+        header: t.comercial.pais,
         cell: (c) => c.getValue() ?? "—",
       }),
       col.accessor("market", {
-        header: "Mercado",
-        cell: (c) => c.getValue() ?? "—",
+        header: t.comercial.mercado,
+        cell: (c) => {
+          const m = c.getValue();
+          return m ? (t.mercados[m as keyof typeof t.mercados] ?? m) : "—";
+        },
       }),
       col.accessor("status", {
-        header: "Estado",
+        header: t.comercial.estado,
         cell: (c) => (
           <Badge tone={LEAD_STAGE_TONE[c.getValue() as LeadStage]} dot>
-            {c.getValue()}
+            {t.etapas[c.getValue() as LeadStage]}
           </Badge>
         ),
       }),
       col.accessor((l) => LEAD_STAGE_WEIGHT[l.status as LeadStage] ?? 0, {
         id: "prob",
-        header: "Prob.",
+        header: t.comercial.prob,
         cell: (c) => (
           <span className="font-mono tnum font-semibold text-accent-soft-fg">
             {Math.round((c.getValue() as number) * 100)}%
@@ -67,23 +73,21 @@ export function LeadList({
       }),
       col.accessor((l) => l.toneladas ?? 0, {
         id: "toneladas",
-        header: "TM",
+        header: t.unidades.tm,
         cell: (c) =>
-          (c.getValue() as number) > 0
-            ? (c.getValue() as number).toLocaleString("es-CO")
-            : "—",
+          (c.getValue() as number) > 0 ? f.numero(c.getValue() as number, 1) : "—",
       }),
       col.accessor((l) => l.owner?.name ?? "", {
         id: "owner",
-        header: "Responsable",
+        header: t.comercial.responsable,
         cell: (c) => c.getValue() || "—",
       }),
       col.accessor("next_action_date", {
-        header: "Próxima acción",
-        cell: (c) => (c.getValue() ? formatDate(c.getValue()) : "—"),
+        header: t.comercial.proximaAccion,
+        cell: (c) => (c.getValue() ? f.fecha(c.getValue()) : "—"),
       }),
     ],
-    [],
+    [t, f],
   );
 
   // eslint-disable-next-line react-hooks/incompatible-library -- TanStack Table manages its own memoization
@@ -100,8 +104,8 @@ export function LeadList({
     return (
       <EmptyState
         icon={<Users className="h-6 w-6" />}
-        title="Sin leads"
-        description="No hay leads que coincidan con los filtros."
+        title={t.comercial.sinLeads}
+        description={t.comercial.sinCoincidencias}
       />
     );
   }

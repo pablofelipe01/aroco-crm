@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { MultiSelect } from "@/components/ui/multi-select";
 import { useToast } from "@/components/ui/toast";
 import { cn } from "@/lib/utils";
+import { useT } from "@/lib/i18n/provider";
 import { LEAD_STAGES } from "@/lib/status";
 import { MARKETS } from "@/lib/schemas/lead";
 import type { TeamMember } from "@/lib/types/database";
@@ -38,6 +39,7 @@ export function ComercialClient({
 }) {
   const router = useRouter();
   const { toast } = useToast();
+  const t = useT();
 
   // Local copy so Kanban drag can update optimistically. Re-seed when the
   // server sends fresh data (adjust-state-during-render pattern).
@@ -107,7 +109,11 @@ export function ComercialClient({
     const res = await updateLeadStatus(id, status);
     if (!res.ok) {
       setLeads(prev);
-      toast({ tone: "error", title: "No se pudo mover el lead", description: res.error });
+      toast({
+        tone: "error",
+        title: t.comercial.noSePudoMover,
+        description: res.error,
+      });
     } else {
       router.refresh();
     }
@@ -125,15 +131,15 @@ export function ComercialClient({
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Comercial"
-        description={`${leads.length} leads en el pipeline${
-          hasFilters ? ` · ${filtered.length} filtrados` : ""
+        title={t.comercial.titulo}
+        description={`${leads.length} ${t.comercial.leadsPipeline}${
+          hasFilters ? ` · ${filtered.length} ${t.comercial.filtrados}` : ""
         }`}
         actions={
           canWrite && (
             <Button size="sm" onClick={openNew}>
               <Plus className="h-4 w-4" />
-              Nuevo lead
+              {t.comercial.nuevoLead}
             </Button>
           )
         }
@@ -149,32 +155,32 @@ export function ComercialClient({
             <Input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Buscar empresa, contacto…"
+              placeholder={t.comercial.buscarPlaceholder}
               className="pl-9"
             />
           </div>
           <MultiSelect
-            label="Estado"
+            label={t.comercial.estado}
             selected={fStatus}
             onChange={setFStatus}
-            options={LEAD_STAGES.map((s) => ({ value: s, label: s }))}
+            options={LEAD_STAGES.map((s) => ({ value: s, label: t.etapas[s] }))}
           />
           <MultiSelect
-            label="Mercado"
+            label={t.comercial.mercado}
             selected={fMarket}
             onChange={setFMarket}
-            options={MARKETS.map((m) => ({ value: m, label: m }))}
+            options={MARKETS.map((m) => ({ value: m, label: t.mercados[m] }))}
           />
           <MultiSelect
-            label="Responsable"
+            label={t.comercial.responsable}
             selected={fOwner}
             onChange={setFOwner}
-            options={team.map((t) => ({ value: t.id, label: t.name }))}
+            options={team.map((m) => ({ value: m.id, label: m.name }))}
           />
           {hasFilters && (
             <Button variant="ghost" size="sm" onClick={clearFilters}>
               <X className="h-3.5 w-3.5" />
-              Limpiar
+              {t.comun.limpiar}
             </Button>
           )}
         </div>
@@ -183,8 +189,8 @@ export function ComercialClient({
         <div className="inline-flex shrink-0 rounded-[var(--radius-md)] border border-border bg-surface p-0.5">
           {(
             [
-              { v: "kanban", icon: LayoutGrid, label: "Kanban" },
-              { v: "list", icon: List, label: "Lista" },
+              { v: "kanban", icon: LayoutGrid, label: t.comercial.kanban },
+              { v: "list", icon: List, label: t.comercial.lista },
             ] as const
           ).map(({ v, icon: Icon, label }) => (
             <button

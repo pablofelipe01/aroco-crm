@@ -7,14 +7,12 @@ import {
   LEAD_STAGE_TONE,
   LEAD_STAGE_WEIGHT,
 } from "@/lib/status";
-import { formatCOP } from "@/lib/utils";
+import { useT, useFormatos } from "@/lib/i18n/provider";
 import { leadDisplayValue, type Market } from "@/lib/calc/lead-value";
 import type { ReferencePrices } from "@/lib/calc/lead-value";
 import type { LeadWithOwner } from "./page";
 
 const ACTIVE_STAGES = LEAD_STAGES.filter((s) => s !== "Descartado");
-
-const fmtTon = (t: number) => `${t.toLocaleString("es-CO", { maximumFractionDigits: 1 })} TM`;
 
 /**
  * Totaliza el pipeline por probabilidad de cierre: por cada etapa (10% … 100%),
@@ -27,6 +25,10 @@ export function PipelineSummary({
   leads: LeadWithOwner[];
   prices: ReferencePrices;
 }) {
+  const t = useT();
+  const f = useFormatos();
+  const ton = (v: number) => `${f.numero(v, 1)} ${t.unidades.tm}`;
+
   const rows = ACTIVE_STAGES.map((stage) => {
     const ls = leads.filter((l) => l.status === stage);
     const tons = ls.reduce((s, l) => s + (l.toneladas ?? 0), 0);
@@ -59,11 +61,11 @@ export function PipelineSummary({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Pipeline por probabilidad</CardTitle>
+        <CardTitle>{t.comercial.pipelineProbabilidad}</CardTitle>
         <span className="text-xs text-fg-subtle">
-          Valor esperado:{" "}
+          {t.comercial.valorEsperado}{" "}
           <span className="font-mono tnum font-semibold text-fg">
-            {formatCOP(total.weighted)}
+            {f.cop(total.weighted)}
           </span>
         </span>
       </CardHeader>
@@ -72,12 +74,24 @@ export function PipelineSummary({
           <table className="w-full min-w-[560px] text-sm">
             <thead>
               <tr className="border-b border-border text-xs uppercase tracking-wide text-fg-subtle">
-                <th className="px-4 py-3 text-left font-medium">Etapa</th>
-                <th className="px-4 py-3 text-right font-medium">Prob.</th>
-                <th className="px-4 py-3 text-right font-medium">Leads</th>
-                <th className="px-4 py-3 text-right font-medium">Toneladas</th>
-                <th className="px-4 py-3 text-right font-medium">Valor</th>
-                <th className="px-4 py-3 text-right font-medium">Ponderado</th>
+                <th className="px-4 py-3 text-left font-medium">
+                  {t.comercial.etapa}
+                </th>
+                <th className="px-4 py-3 text-right font-medium">
+                  {t.comercial.prob}
+                </th>
+                <th className="px-4 py-3 text-right font-medium">
+                  {t.comercial.leads}
+                </th>
+                <th className="px-4 py-3 text-right font-medium">
+                  {t.comercial.toneladas}
+                </th>
+                <th className="px-4 py-3 text-right font-medium">
+                  {t.comercial.valor}
+                </th>
+                <th className="px-4 py-3 text-right font-medium">
+                  {t.comercial.ponderado}
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -85,7 +99,7 @@ export function PipelineSummary({
                 <tr key={r.stage} className="border-b border-border last:border-0">
                   <td className="px-4 py-2.5">
                     <Badge tone={LEAD_STAGE_TONE[r.stage]} dot>
-                      {r.stage}
+                      {t.etapas[r.stage]}
                     </Badge>
                   </td>
                   <td className="px-4 py-2.5 text-right font-mono tnum font-semibold text-accent-soft-fg">
@@ -95,32 +109,32 @@ export function PipelineSummary({
                     {r.count}
                   </td>
                   <td className="px-4 py-2.5 text-right font-mono tnum text-fg">
-                    {r.tons > 0 ? fmtTon(r.tons) : "—"}
+                    {r.tons > 0 ? ton(r.tons) : "—"}
                   </td>
                   <td className="px-4 py-2.5 text-right font-mono tnum text-fg">
-                    {r.value > 0 ? formatCOP(r.value) : "—"}
+                    {r.value > 0 ? f.cop(r.value) : "—"}
                   </td>
                   <td className="px-4 py-2.5 text-right font-mono tnum text-fg">
-                    {r.weighted > 0 ? formatCOP(r.weighted) : "—"}
+                    {r.weighted > 0 ? f.cop(r.weighted) : "—"}
                   </td>
                 </tr>
               ))}
             </tbody>
             <tfoot>
               <tr className="border-t border-border-strong font-semibold">
-                <td className="px-4 py-2.5 text-fg">Total</td>
+                <td className="px-4 py-2.5 text-fg">{t.comun.total}</td>
                 <td className="px-4 py-2.5" />
                 <td className="px-4 py-2.5 text-right font-mono tnum text-fg-muted">
                   {total.count}
                 </td>
                 <td className="px-4 py-2.5 text-right font-mono tnum text-fg">
-                  {total.tons > 0 ? fmtTon(total.tons) : "—"}
+                  {total.tons > 0 ? ton(total.tons) : "—"}
                 </td>
                 <td className="px-4 py-2.5 text-right font-mono tnum text-fg">
-                  {total.value > 0 ? formatCOP(total.value) : "—"}
+                  {total.value > 0 ? f.cop(total.value) : "—"}
                 </td>
                 <td className="px-4 py-2.5 text-right font-mono tnum text-fg">
-                  {total.weighted > 0 ? formatCOP(total.weighted) : "—"}
+                  {total.weighted > 0 ? f.cop(total.weighted) : "—"}
                 </td>
               </tr>
             </tfoot>

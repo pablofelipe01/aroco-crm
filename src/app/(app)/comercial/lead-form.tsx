@@ -8,7 +8,7 @@ import { Field, Input, Select, Textarea } from "@/components/ui/input";
 import { useToast } from "@/components/ui/toast";
 import { LEAD_STAGES } from "@/lib/status";
 import { MARKETS, LEAD_TYPES } from "@/lib/schemas/lead";
-import { formatCOP } from "@/lib/utils";
+import { useT, useFormatos } from "@/lib/i18n/provider";
 import {
   leadValueForMarket,
   pickReferencePrice,
@@ -78,6 +78,8 @@ export function LeadForm({
   onSaved: () => void;
 }) {
   const { toast } = useToast();
+  const t = useT();
+  const f = useFormatos();
   const { register, handleSubmit, reset, watch, formState } = useForm<FormValues>({
     defaultValues: toValues(initial),
   });
@@ -113,12 +115,16 @@ export function LeadForm({
       ? await updateLead(initial.id, payload)
       : await createLead(payload);
     if (!res.ok) {
-      toast({ tone: "error", title: "No se pudo guardar", description: res.error });
+      toast({
+        tone: "error",
+        title: t.comercial.noSeGuardo,
+        description: res.error,
+      });
       return;
     }
     toast({
       tone: "success",
-      title: initial ? "Lead actualizado" : "Lead creado",
+      title: initial ? t.comercial.leadActualizado : t.comercial.leadCreado,
     });
     onSaved();
   });
@@ -128,30 +134,36 @@ export function LeadForm({
       open={open}
       onClose={onClose}
       size="lg"
-      title={initial ? "Editar lead" : "Nuevo lead"}
+      title={initial ? t.comercial.editarLead : t.comercial.nuevoLead}
       footer={
         <>
           <Button variant="secondary" size="sm" onClick={onClose}>
-            Cancelar
+            {t.comun.cancelar}
           </Button>
           <Button
             size="sm"
             onClick={onSubmit}
             loading={formState.isSubmitting}
           >
-            {initial ? "Guardar cambios" : "Crear lead"}
+            {initial ? t.comercial.guardarCambios : t.comercial.crearLead}
           </Button>
         </>
       }
     >
       <form onSubmit={onSubmit} className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Field label="Empresa *" className="sm:col-span-2">
-          <Input {...register("company", { required: true })} placeholder="Nombre de la empresa" />
+        <Field label={`${t.comercial.empresa} *`} className="sm:col-span-2">
+          <Input
+            {...register("company", { required: true })}
+            placeholder={t.comercial.nombreEmpresa}
+          />
         </Field>
-        <Field label="Contacto">
-          <Input {...register("contact_name")} placeholder="Nombre de la persona" />
+        <Field label={t.comercial.contacto}>
+          <Input {...register("contact_name")} placeholder={t.comercial.nombrePersona} />
         </Field>
-        <Field label="Correo" error={formState.errors.contact_email?.message}>
+        <Field
+          label={t.comercial.correo}
+          error={formState.errors.contact_email?.message}
+        >
           <Input
             type="email"
             inputMode="email"
@@ -162,12 +174,15 @@ export function LeadForm({
               // el esquema de Zod vuelve a validarlo del otro lado.
               pattern: {
                 value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
-                message: "Correo inválido.",
+                message: t.comercial.correoInvalido,
               },
             })}
           />
         </Field>
-        <Field label="Teléfono" error={formState.errors.contact_phone?.message}>
+        <Field
+          label={t.comercial.telefono}
+          error={formState.errors.contact_phone?.message}
+        >
           <Input
             type="tel"
             inputMode="tel"
@@ -178,102 +193,102 @@ export function LeadForm({
               validate: (v) =>
                 !v ||
                 v.replace(/\D/g, "").length >= 7 ||
-                "El teléfono es muy corto.",
+                t.comercial.telefonoCorto,
             })}
           />
         </Field>
-        <Field label="Responsable">
+        <Field label={t.comercial.responsable}>
           <Select {...register("commercial_owner")} defaultValue="">
-            <option value="">Sin asignar</option>
-            {team.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name}
+            <option value="">{t.comercial.sinAsignar}</option>
+            {team.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.name}
               </option>
             ))}
           </Select>
         </Field>
-        <Field label="País">
+        <Field label={t.comercial.pais}>
           <Input {...register("country")} />
         </Field>
-        <Field label="Ciudad / Región">
+        <Field label={t.comercial.ciudadRegion}>
           <Input {...register("city")} />
         </Field>
-        <Field label="Mercado">
+        <Field label={t.comercial.mercado}>
           <Select {...register("market")} defaultValue="">
             <option value="">—</option>
             {MARKETS.map((m) => (
               <option key={m} value={m}>
-                {m}
+                {t.mercados[m]}
               </option>
             ))}
           </Select>
         </Field>
-        <Field label="Tipo">
+        <Field label={t.comercial.tipo}>
           <Select {...register("type")} defaultValue="">
             <option value="">—</option>
-            {LEAD_TYPES.map((t) => (
-              <option key={t} value={t}>
-                {t}
+            {LEAD_TYPES.map((tipo) => (
+              <option key={tipo} value={tipo}>
+                {t.tiposLead[tipo]}
               </option>
             ))}
           </Select>
         </Field>
-        <Field label="Estado">
+        <Field label={t.comercial.estado}>
           <Select {...register("status")}>
             {LEAD_STAGES.map((s) => (
               <option key={s} value={s}>
-                {s}
+                {t.etapas[s]}
               </option>
             ))}
           </Select>
         </Field>
-        <Field label="Volumen (descriptivo)">
-          <Input {...register("volume")} placeholder="p. ej. 25 MT/mes" />
+        <Field label={t.comercial.volumenDescriptivo}>
+          <Input {...register("volume")} placeholder={t.comercial.ejemploVolumen} />
         </Field>
-        <Field label="Toneladas (TM)">
+        <Field label={t.comercial.toneladasTm}>
           <Input
             type="number"
             step="any"
             min="0"
             {...register("toneladas")}
-            placeholder="p. ej. 25"
+            placeholder={t.comercial.ejemplo25}
             className="font-mono tnum"
           />
         </Field>
         <div className="sm:col-span-2">
-          <Field label="Valor total (COP)">
+          <Field label={t.comercial.valorTotalCop}>
             <Input
               type="number"
               step="any"
               min="0"
               {...register("potential_value_cop")}
-              placeholder="p. ej. 120000000"
+              placeholder={t.comercial.ejemploValor}
               className="font-mono tnum"
               disabled={valorPreview != null}
             />
           </Field>
           {valorPreview != null ? (
             <p className="mt-1 text-xs text-fg-muted">
-              ≈ <span className="font-mono tnum text-fg">{formatCOP(valorPreview)}</span>{" "}
-              · {ton.toLocaleString("es-CO")} TM × {formatCOP(refPrice ?? 0)}/kg (
+              ≈ <span className="font-mono tnum text-fg">{f.cop(valorPreview)}</span>{" "}
+              · {f.numero(ton, 1)} {t.unidades.tm} × {f.cop(refPrice ?? 0)}/kg (
               {market === "Nacional" ? "Luker" : "ICE"})
             </p>
           ) : (
             <p className="mt-1 text-xs text-fg-subtle">
-              Indica toneladas y mercado para calcularlo automáticamente, o escríbelo a mano.
+              {t.comercial.calcularAuto}
             </p>
           )}
         </div>
-        <Field label="Producto / Interés" className="sm:col-span-2">
+        <Field label={t.comercial.interesProducto} className="sm:col-span-2">
           <Input {...register("product_interest")} />
         </Field>
-        <Field label="Próxima acción">
+        <Field label={t.comercial.proximaAccion}>
           <Input {...register("next_action")} />
         </Field>
-        <Field label="Fecha próxima acción">
+        <Field label={t.comercial.fechaProximaAccion}>
           <Input type="date" {...register("next_action_date")} />
         </Field>
-        <Field label="Notas" className="sm:col-span-2">
+        <Field label={t.comercial.notas} className="sm:col-span-2">
           <Textarea {...register("notes")} rows={3} />
         </Field>
       </form>

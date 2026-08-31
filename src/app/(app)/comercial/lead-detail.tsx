@@ -22,7 +22,8 @@ import { useToast } from "@/components/ui/toast";
 import { createClient } from "@/lib/supabase/client";
 import { LEAD_STAGE_TONE, type LeadStage } from "@/lib/status";
 import { ACTIVITY_TYPES } from "@/lib/schemas/lead";
-import { formatDate, formatCOP, initials } from "@/lib/utils";
+import { initials } from "@/lib/utils";
+import { useT, useFormatos } from "@/lib/i18n/provider";
 import type { TeamMember, LeadActivity, ActivityType } from "@/lib/types/database";
 import type { LeadWithOwner } from "./page";
 import { addActivity, deleteLead } from "./actions";
@@ -53,6 +54,8 @@ export function LeadDetail({
 }) {
   const router = useRouter();
   const { toast } = useToast();
+  const t = useT();
+  const f = useFormatos();
   const [activities, setActivities] = React.useState<LeadActivity[]>([]);
   const [loading, setLoading] = React.useState(false);
   const [type, setType] = React.useState<ActivityType>("Nota");
@@ -94,7 +97,11 @@ export function LeadDetail({
     const res = await addActivity({ lead_id: lead.id, type, description: desc.trim() });
     setSaving(false);
     if (!res.ok) {
-      toast({ tone: "error", title: "No se pudo guardar", description: res.error });
+      toast({
+        tone: "error",
+        title: t.comercial.noSeGuardo,
+        description: res.error,
+      });
       return;
     }
     setDesc("");
@@ -108,10 +115,14 @@ export function LeadDetail({
       return;
     const res = await deleteLead(lead.id);
     if (!res.ok) {
-      toast({ tone: "error", title: "No se pudo eliminar", description: res.error });
+      toast({
+        tone: "error",
+        title: t.comercial.noSeElimino,
+        description: res.error,
+      });
       return;
     }
-    toast({ tone: "success", title: "Lead eliminado" });
+    toast({ tone: "success", title: t.comercial.leadEliminado });
     onClose();
     router.refresh();
   }
@@ -119,9 +130,9 @@ export function LeadDetail({
   // El correo y el teléfono se muestran como enlaces: desde el celular abre
   // el marcador o el cliente de correo sin copiar y pegar.
   const detailRows: [string, React.ReactNode | null][] = [
-    ["Contacto", lead.contact_name],
+    [t.comercial.contacto, lead.contact_name],
     [
-      "Correo",
+      t.comercial.correo,
       lead.contact_email ? (
         <a
           href={`mailto:${lead.contact_email}`}
@@ -132,7 +143,7 @@ export function LeadDetail({
       ) : null,
     ],
     [
-      "Teléfono",
+      t.comercial.telefono,
       lead.contact_phone ? (
         <a
           href={`tel:${lead.contact_phone}`}
@@ -142,20 +153,29 @@ export function LeadDetail({
         </a>
       ) : null,
     ],
-    ["Ubicación", [lead.country, lead.city].filter(Boolean).join(" · ") || null],
-    ["Tipo", lead.type],
-    ["Interés", lead.product_interest],
-    ["Volumen", lead.volume],
     [
-      "Toneladas",
-      lead.toneladas != null ? `${lead.toneladas.toLocaleString("es-CO")} TM` : null,
+      t.comercial.ubicacion,
+      [lead.country, lead.city].filter(Boolean).join(" · ") || null,
     ],
     [
-      "Valor total",
-      lead.potential_value_cop != null ? formatCOP(lead.potential_value_cop) : null,
+      t.comercial.tipo,
+      lead.type ? (t.tiposLead[lead.type as keyof typeof t.tiposLead] ?? lead.type) : null,
     ],
-    ["Próxima acción", lead.next_action],
-    ["Fecha próxima acción", lead.next_action_date ? formatDate(lead.next_action_date) : null],
+    [t.comercial.interes, lead.product_interest],
+    [t.comercial.volumen, lead.volume],
+    [
+      t.comercial.toneladas,
+      lead.toneladas != null ? `${f.numero(lead.toneladas, 1)} ${t.unidades.tm}` : null,
+    ],
+    [
+      t.comercial.valorTotal,
+      lead.potential_value_cop != null ? f.cop(lead.potential_value_cop) : null,
+    ],
+    [t.comercial.proximaAccion, lead.next_action],
+    [
+      t.comercial.fechaProximaAccion,
+      lead.next_action_date ? f.fecha(lead.next_action_date) : null,
+    ],
   ];
 
   return (
@@ -172,9 +192,13 @@ export function LeadDetail({
       subtitle={
         <div className="flex flex-wrap items-center gap-2">
           <Badge tone={LEAD_STAGE_TONE[lead.status as LeadStage]} dot>
-            {lead.status}
+            {t.etapas[lead.status as LeadStage]}
           </Badge>
-          {lead.market && <Badge tone="neutral">{lead.market}</Badge>}
+          {lead.market && (
+            <Badge tone="neutral">
+              {t.mercados[lead.market as keyof typeof t.mercados] ?? lead.market}
+            </Badge>
+          )}
           {lead.owner && (
             <span className="flex items-center gap-1.5 text-xs text-fg-muted">
               <span
@@ -193,11 +217,11 @@ export function LeadDetail({
           <>
             <Button variant="ghost" size="sm" onClick={onDelete}>
               <Trash2 className="h-4 w-4 text-danger" />
-              Eliminar
+              {t.comun.eliminar}
             </Button>
             <Button variant="secondary" size="sm" onClick={() => onEdit(lead)}>
               <Pencil className="h-4 w-4" />
-              Editar
+              {t.comun.editar}
             </Button>
           </>
         )
@@ -221,7 +245,7 @@ export function LeadDetail({
         {lead.notes && (
           <div className="rounded-[var(--radius-md)] bg-bg-subtle/60 p-3">
             <p className="text-[11px] font-medium uppercase tracking-wide text-fg-subtle">
-              Notas
+              {t.comercial.notas}
             </p>
             <p className="mt-1 text-sm text-fg-muted">{lead.notes}</p>
           </div>
@@ -236,26 +260,26 @@ export function LeadDetail({
                 onChange={(e) => setType(e.target.value as ActivityType)}
                 className="w-40 shrink-0"
               >
-                {ACTIVITY_TYPES.filter((t) => t !== "Cambio de estado").map(
-                  (t) => (
-                    <option key={t} value={t}>
-                      {t}
-                    </option>
-                  ),
-                )}
+                {ACTIVITY_TYPES.filter((a) => a !== "Cambio de estado").map((a) => (
+                  <option key={a} value={a}>
+                    {t.tiposActividad[a]}
+                  </option>
+                ))}
               </Select>
-              <span className="text-xs text-fg-subtle">Registrar actividad</span>
+              <span className="text-xs text-fg-subtle">
+                {t.comercial.registrarActividad}
+              </span>
             </div>
             <Textarea
               value={desc}
               onChange={(e) => setDesc(e.target.value)}
-              placeholder="¿Qué pasó? (llamada, correo, acuerdo…)"
+              placeholder={t.comercial.quePaso}
               rows={2}
             />
             <div className="flex justify-end">
               <Button type="submit" size="sm" loading={saving} disabled={!desc.trim()}>
                 <Send className="h-3.5 w-3.5" />
-                Agregar
+                {t.comercial.agregar}
               </Button>
             </div>
           </form>
@@ -264,12 +288,12 @@ export function LeadDetail({
         {/* Timeline */}
         <div>
           <h3 className="mb-3 text-xs font-medium uppercase tracking-wide text-fg-subtle">
-            Bitácora
+            {t.comercial.bitacora}
           </h3>
           {loading ? (
-            <p className="text-sm text-fg-subtle">Cargando…</p>
+            <p className="text-sm text-fg-subtle">{t.comun.cargando}</p>
           ) : activities.length === 0 ? (
-            <p className="text-sm text-fg-subtle">Sin actividad registrada.</p>
+            <p className="text-sm text-fg-subtle">{t.comercial.sinActividad}</p>
           ) : (
             <ol className="relative space-y-4 border-l border-border pl-5">
               {activities.map((a) => {
@@ -281,10 +305,10 @@ export function LeadDetail({
                     </span>
                     <div className="flex items-baseline justify-between gap-2">
                       <span className="text-xs font-medium text-fg">
-                        {a.type}
+                        {t.tiposActividad[a.type]}
                       </span>
                       <span className="font-mono text-[10px] text-fg-subtle">
-                        {formatDate(a.created_at)}
+                        {f.fecha(a.created_at)}
                       </span>
                     </div>
                     <p className="mt-0.5 text-sm text-fg-muted">

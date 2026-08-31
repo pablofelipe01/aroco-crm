@@ -2,7 +2,8 @@
 
 import { MapPin, Package } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { cn, initials, formatCOP } from "@/lib/utils";
+import { cn, initials } from "@/lib/utils";
+import { useT, useFormatos } from "@/lib/i18n/provider";
 import { LEAD_STAGE_WEIGHT, type LeadStage } from "@/lib/status";
 import type { LeadWithOwner } from "./page";
 
@@ -15,6 +16,8 @@ export function LeadCard({
   onClick?: () => void;
   dragging?: boolean;
 }) {
+  const t = useT();
+  const f = useFormatos();
   const prob = Math.round((LEAD_STAGE_WEIGHT[lead.status as LeadStage] ?? 0) * 100);
   return (
     <div
@@ -56,17 +59,17 @@ export function LeadCard({
         <div className="min-w-0">
           {lead.potential_value_cop != null && (
             <p className="font-mono text-xs font-semibold tnum text-fg">
-              {formatCOP(lead.potential_value_cop)}
+              {f.cop(lead.potential_value_cop)}
             </p>
           )}
           {lead.toneladas != null && (
             <p className="font-mono text-[11px] tnum text-fg-subtle">
-              {lead.toneladas.toLocaleString("es-CO")} TM
+              {f.numero(lead.toneladas, 1)} {t.unidades.tm}
             </p>
           )}
         </div>
         <span
-          title="Probabilidad de cierre"
+          title={t.comercial.probabilidadCierre}
           className="shrink-0 rounded-full bg-accent-soft px-2 py-0.5 font-mono text-[11px] font-semibold tnum text-accent-soft-fg"
         >
           {prob}%
@@ -82,7 +85,7 @@ export function LeadCard({
         )}
         {lead.market && (
           <Badge tone={lead.market === "Internacional" ? "info" : "neutral"}>
-            {lead.market}
+            {t.mercados[lead.market as keyof typeof t.mercados] ?? lead.market}
           </Badge>
         )}
       </div>
