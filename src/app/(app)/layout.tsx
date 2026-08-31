@@ -3,6 +3,7 @@ import { AppShell, type ShellUser } from "@/components/layout/app-shell";
 import { getSessionContext, isOnboarded } from "@/lib/auth";
 import { proveedorEnSesion } from "@/lib/proveedor-sesion";
 import { hasSupabaseEnv } from "@/lib/env";
+import { normalizarIdioma } from "@/lib/i18n";
 
 /**
  * Authenticated app layout. Loads the profile server-side and enforces the
@@ -40,5 +41,11 @@ export default async function AppLayout({
     permisos: { ve_mercado: profile.ve_mercado },
   };
 
-  return <AppShell user={user}>{children}</AppShell>;
+  // El perfil manda sobre la cookie: es lo que sigue a la persona de un
+  // dispositivo a otro. La cookie solo cubre las pantallas que corren sin él.
+  return (
+    <AppShell user={user} idioma={normalizarIdioma(profile.idioma)}>
+      {children}
+    </AppShell>
+  );
 }

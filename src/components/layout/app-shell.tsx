@@ -9,6 +9,8 @@ import { Topbar } from "@/components/layout/topbar";
 import { CommandPaletteProvider } from "@/components/layout/command-palette";
 import { AssistantProvider } from "@/components/assistant/assistant-panel";
 import { NAV_ITEMS, type Department, type Permisos } from "@/lib/nav";
+import { IdiomaProvider, useT } from "@/lib/i18n/provider";
+import { IDIOMA_POR_DEFECTO, type Idioma } from "@/lib/i18n";
 import { ease } from "@/lib/motion";
 
 export interface ShellUser {
@@ -21,15 +23,37 @@ export interface ShellUser {
 /** Resolve the page title/subtitle from the current route. */
 function useRouteMeta() {
   const pathname = usePathname();
+  const t = useT();
   const match = NAV_ITEMS.find(
     (i) => pathname === i.href || pathname.startsWith(i.href + "/"),
   );
   return {
-    title: match?.label ?? "AROCO",
+    title: match ? t.nav[match.llave] : "AROCO",
   };
 }
 
+/**
+ * El proveedor de idioma envuelve al shell en vez de vivir dentro de él: los
+ * hooks del diccionario se usan aquí mismo (el título de la ruta), y un hook no
+ * ve un contexto que su propio componente declara.
+ */
 export function AppShell({
+  user,
+  idioma = IDIOMA_POR_DEFECTO,
+  children,
+}: {
+  user: ShellUser;
+  idioma?: Idioma;
+  children: React.ReactNode;
+}) {
+  return (
+    <IdiomaProvider idioma={idioma}>
+      <ShellInterno user={user}>{children}</ShellInterno>
+    </IdiomaProvider>
+  );
+}
+
+function ShellInterno({
   user,
   children,
 }: {

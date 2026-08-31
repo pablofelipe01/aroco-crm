@@ -8,6 +8,7 @@ import { ChevronLeft } from "lucide-react";
 import { navForUser, type Department, type Permisos } from "@/lib/nav";
 import type { UserRole } from "@/lib/types/database";
 import { Wordmark, Logo } from "@/components/brand";
+import { useT } from "@/lib/i18n/provider";
 import { cn } from "@/lib/utils";
 
 export function Sidebar({
@@ -28,6 +29,7 @@ export function Sidebar({
   onNavigate?: () => void;
 }) {
   const pathname = usePathname();
+  const t = useT();
   const items = navForUser(department, role, permisos);
 
   return (
@@ -41,7 +43,7 @@ export function Sidebar({
         )}
         <button
           onClick={onToggleCollapse}
-          aria-label={collapsed ? "Expandir menú" : "Colapsar menú"}
+          aria-label={collapsed ? t.shell.expandir : t.shell.colapsar}
           className={cn(
             "hidden rounded-[var(--radius-sm)] p-1.5 text-fg-subtle transition-colors hover:bg-bg-subtle hover:text-fg lg:block",
             collapsed && "absolute",
@@ -66,7 +68,7 @@ export function Sidebar({
               key={item.href}
               href={item.href}
               onClick={onNavigate}
-              title={collapsed ? item.label : undefined}
+              title={collapsed ? t.nav[item.llave] : undefined}
               className={cn(
                 "group relative flex items-center gap-3 rounded-[var(--radius-md)] px-3 py-2 text-sm font-medium transition-colors",
                 active
@@ -84,7 +86,9 @@ export function Sidebar({
               )}
               <item.icon className="relative z-10 h-[18px] w-[18px] shrink-0" />
               {!collapsed && (
-                <span className="relative z-10 truncate">{item.label}</span>
+                <span className="relative z-10 truncate">
+                  {t.nav[item.llave]}
+                </span>
               )}
             </Link>
           );

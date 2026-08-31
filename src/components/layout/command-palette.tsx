@@ -12,6 +12,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { NAV_ITEMS } from "@/lib/nav";
+import { useT } from "@/lib/i18n/provider";
 import { cn } from "@/lib/utils";
 import { ease } from "@/lib/motion";
 import { createClient } from "@/lib/supabase/client";
@@ -21,6 +22,8 @@ interface Command {
   id: string;
   label: string;
   hint?: string;
+  /** Texto extra que el buscador tiene en cuenta pero no se muestra. */
+  buscable?: string;
   group: string;
   icon?: React.ReactNode;
   run: () => void;
@@ -54,6 +57,7 @@ export function CommandPaletteProvider({
   const [searching, setSearching] = React.useState(false);
   const inputRef = React.useRef<HTMLInputElement>(null);
 
+  const t = useT();
   const open = React.useCallback(() => setIsOpen(true), []);
   const close = React.useCallback(() => setIsOpen(false), []);
   const toggle = React.useCallback(() => setIsOpen((v) => !v), []);
@@ -63,8 +67,13 @@ export function CommandPaletteProvider({
   const commands = React.useMemo<Command[]>(() => {
     const navCommands: Command[] = NAV_ITEMS.map((item) => ({
       id: `nav:${item.href}`,
-      label: `Ir a ${item.label}`,
-      group: "Navegación",
+      label: `${t.paleta.irA} ${t.nav[item.llave]}`,
+      // El nombre en español viaja en el buscador aunque la vista esté en
+      // inglés: quien trabaja en inglés sigue oyendo «Despachos» en las
+      // reuniones, y teclear eso tiene que llevarlo al módulo.
+      hint: undefined,
+      buscable: item.label,
+      group: t.paleta.navegacion,
       icon: <item.icon className="h-4 w-4" />,
       run: () => router.push(item.href),
     }));
@@ -72,35 +81,37 @@ export function CommandPaletteProvider({
     const createCommands: Command[] = [
       {
         id: "new:lead",
-        label: "Nuevo lead",
-        hint: "Comercial",
-        group: "Crear",
+        label: t.paleta.nuevoLead,
+        hint: t.nav.comercial,
+        group: t.paleta.crear,
         run: () => router.push("/comercial?new=1"),
       },
       {
         id: "new:quote",
-        label: "Nueva cotización",
-        hint: "Cotizaciones",
-        group: "Crear",
+        label: t.paleta.nuevaCotizacion,
+        hint: t.nav.cotizaciones,
+        group: t.paleta.crear,
         run: () => router.push("/cotizaciones?new=1"),
       },
       {
         id: "new:task",
-        label: "Nueva tarea",
-        hint: "Tareas",
-        group: "Crear",
+        label: t.paleta.nuevaTarea,
+        hint: t.nav.tareas,
+        group: t.paleta.crear,
         run: () => router.push("/tareas?new=1"),
       },
     ];
 
     return [...navCommands, ...createCommands];
-  }, [router]);
+  }, [router, t]);
 
   const staticFiltered = React.useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return commands;
     return commands.filter((c) =>
-      `${c.label} ${c.hint ?? ""} ${c.group}`.toLowerCase().includes(q),
+      `${c.label} ${c.hint ?? ""} ${c.buscable ?? ""} ${c.group}`
+        .toLowerCase()
+        .includes(q),
     );
   }, [commands, query]);
 
@@ -251,7 +262,7 @@ export function CommandPaletteProvider({
             <motion.div
               role="dialog"
               aria-modal="true"
-              aria-label="Paleta de comandos"
+              aria-label={t.paleta.titulo}
               className="relative w-full max-w-xl overflow-hidden rounded-[var(--radius-lg)] border border-border bg-surface-raised shadow-[var(--shadow-soft-lg)]"
               initial={{ opacity: 0, scale: 0.98, y: -8 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -265,7 +276,7 @@ export function CommandPaletteProvider({
                   value={query}
                   onChange={(e) => onQueryChange(e.target.value)}
                   onKeyDown={onInputKey}
-                  placeholder="Buscar o saltar a…"
+                  placeholder={t.paleta.placeholder}
                   className="h-12 w-full bg-transparent text-sm text-fg placeholder:text-fg-subtle focus:outline-none"
                 />
                 {searching ? (
@@ -279,7 +290,7 @@ export function CommandPaletteProvider({
               <div className="max-h-[50vh] overflow-y-auto p-2">
                 {groups.length === 0 && (
                   <p className="px-3 py-6 text-center text-sm text-fg-subtle">
-                    Sin resultados para “{query}”.
+                    {t.paleta.sinResultados} “{query}”.
                   </p>
                 )}
                 {groups.map(([group, items]) => (

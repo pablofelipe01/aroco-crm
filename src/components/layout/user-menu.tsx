@@ -2,9 +2,12 @@
 
 import * as React from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { LogOut, ChevronDown } from "lucide-react";
-import { initials } from "@/lib/utils";
+import { LogOut, ChevronDown, Languages, Check } from "lucide-react";
+import { initials, cn } from "@/lib/utils";
 import type { UserRole } from "@/lib/types/database";
+import { useIdioma, useT } from "@/lib/i18n/provider";
+import { cambiarIdioma } from "@/lib/i18n/actions";
+import { IDIOMAS, type Idioma } from "@/lib/i18n";
 import { ease } from "@/lib/motion";
 
 export function UserMenu({
@@ -18,6 +21,19 @@ export function UserMenu({
 }) {
   const [open, setOpen] = React.useState(false);
   const ref = React.useRef<HTMLDivElement>(null);
+  const t = useT();
+  const idioma = useIdioma();
+  const [cambiando, setCambiando] = React.useState<Idioma | null>(null);
+
+  async function elegirIdioma(nuevo: Idioma) {
+    if (nuevo === idioma) return setOpen(false);
+    setCambiando(nuevo);
+    await cambiarIdioma(nuevo);
+    // No se apaga `cambiando`: la acción revalida el layout y este componente
+    // se vuelve a montar con el idioma nuevo. Apagarlo aquí solo alcanzaría a
+    // parpadear.
+    setOpen(false);
+  }
 
   React.useEffect(() => {
     const onClick = (e: MouseEvent) => {
@@ -66,10 +82,36 @@ export function UserMenu({
               <p className="text-xs text-fg-muted">{department ?? "—"}</p>
               {role && (
                 <span className="mt-1.5 inline-block rounded-full bg-accent-soft px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-accent-soft-fg">
-                  {role === "admin" ? "Administrador" : "Miembro"}
+                  {role === "admin" ? t.shell.administrador : t.shell.miembro}
                 </span>
               )}
             </div>
+            <div className="border-b border-border py-1.5">
+              <p className="flex items-center gap-2 px-3 py-1 text-[11px] uppercase tracking-wide text-fg-subtle">
+                <Languages className="h-3.5 w-3.5" />
+                {t.shell.idioma}
+              </p>
+              {IDIOMAS.map((cod) => (
+                <button
+                  key={cod}
+                  type="button"
+                  role="menuitemradio"
+                  aria-checked={cod === idioma}
+                  disabled={cambiando !== null}
+                  onClick={() => elegirIdioma(cod)}
+                  className={cn(
+                    "flex w-full items-center justify-between px-3 py-2 text-left text-sm transition-colors hover:bg-bg-subtle disabled:opacity-60",
+                    cod === idioma ? "text-fg" : "text-fg-muted",
+                  )}
+                >
+                  {cod === "es" ? t.shell.espanol : t.shell.ingles}
+                  {cod === idioma && (
+                    <Check className="h-3.5 w-3.5 text-accent-soft-fg" />
+                  )}
+                </button>
+              ))}
+            </div>
+
             <form action="/auth/signout" method="post">
               <button
                 type="submit"
@@ -77,7 +119,7 @@ export function UserMenu({
                 className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-sm text-fg transition-colors hover:bg-bg-subtle"
               >
                 <LogOut className="h-4 w-4 text-fg-subtle" />
-                Cerrar sesión
+                {t.shell.salir}
               </button>
             </form>
           </motion.div>
