@@ -2,6 +2,7 @@
 
 import { Menu, Search, Sparkles, Command } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { LanguageToggle } from "@/components/layout/language-toggle";
 import { useCommandPalette } from "@/components/layout/command-palette";
 import { UserMenu } from "@/components/layout/user-menu";
 import type { UserRole } from "@/lib/types/database";
@@ -73,6 +74,8 @@ export function Topbar({
         </button>
 
         <NotificationsBell />
+
+        <LanguageToggle />
 
         <ThemeToggle />
 
