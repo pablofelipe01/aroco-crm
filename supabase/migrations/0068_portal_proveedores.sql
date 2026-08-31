@@ -138,6 +138,7 @@ create unique index if not exists proveedores_insumos_email_key
 create index if not exists proveedores_insumos_estado_idx
   on public.proveedores_insumos (estado, created_at desc);
 
+drop trigger if exists proveedores_insumos_set_updated_at on public.proveedores_insumos;
 create trigger proveedores_insumos_set_updated_at
   before update on public.proveedores_insumos
   for each row execute function public.set_updated_at();
@@ -193,6 +194,7 @@ create index if not exists cuentas_cobro_prov_idx
 create index if not exists cuentas_cobro_estado_idx
   on public.cuentas_cobro (estado, created_at desc);
 
+drop trigger if exists cuentas_cobro_set_updated_at on public.cuentas_cobro;
 create trigger cuentas_cobro_set_updated_at
   before update on public.cuentas_cobro
   for each row execute function public.set_updated_at();
@@ -268,6 +270,7 @@ begin
 end;
 $$;
 
+drop trigger if exists proveedores_insumos_guard on public.proveedores_insumos;
 create trigger proveedores_insumos_guard
   before update on public.proveedores_insumos
   for each row execute function public.guard_proveedor_estado();
@@ -289,6 +292,7 @@ begin
 end;
 $$;
 
+drop trigger if exists proveedores_insumos_nombre on public.proveedores_insumos;
 create trigger proveedores_insumos_nombre
   before insert or update on public.proveedores_insumos
   for each row execute function public.guard_proveedor_nombre();
@@ -324,6 +328,7 @@ begin
 end;
 $$;
 
+drop trigger if exists cuentas_cobro_guard on public.cuentas_cobro;
 create trigger cuentas_cobro_guard
   before update on public.cuentas_cobro
   for each row execute function public.guard_cuenta_cobro();
@@ -337,39 +342,47 @@ alter table public.cuentas_cobro enable row level security;
 alter table public.cuenta_cobro_items enable row level security;
 
 -- Ficha: el proveedor ve la suya; el equipo las ve todas.
+drop policy if exists "proveedores_insumos_select" on public.proveedores_insumos;
 create policy "proveedores_insumos_select" on public.proveedores_insumos
   for select to authenticated
   using (auth_user_id = auth.uid() or public.is_active_member());
 
 -- Registro: cada quien crea SU ficha, atada a su propia cuenta.
+drop policy if exists "proveedores_insumos_insert" on public.proveedores_insumos;
 create policy "proveedores_insumos_insert" on public.proveedores_insumos
   for insert to authenticated
   with check (auth_user_id = auth.uid());
 
+drop policy if exists "proveedores_insumos_update" on public.proveedores_insumos;
 create policy "proveedores_insumos_update" on public.proveedores_insumos
   for update to authenticated
   using (auth_user_id = auth.uid() or public.verifica_proveedores())
   with check (auth_user_id = auth.uid() or public.verifica_proveedores());
 
 -- Documentos: los suyos.
+drop policy if exists "proveedor_insumo_docs_select" on public.proveedor_insumo_documentos;
 create policy "proveedor_insumo_docs_select" on public.proveedor_insumo_documentos
   for select to authenticated
   using (proveedor_id = public.proveedor_actual() or public.is_active_member());
 
+drop policy if exists "proveedor_insumo_docs_insert" on public.proveedor_insumo_documentos;
 create policy "proveedor_insumo_docs_insert" on public.proveedor_insumo_documentos
   for insert to authenticated
   with check (proveedor_id = public.proveedor_actual());
 
+drop policy if exists "proveedor_insumo_docs_delete" on public.proveedor_insumo_documentos;
 create policy "proveedor_insumo_docs_delete" on public.proveedor_insumo_documentos
   for delete to authenticated
   using (proveedor_id = public.proveedor_actual() or public.verifica_proveedores());
 
 -- Cuentas de cobro: solo un proveedor ACTIVO puede radicar. Si no se ha
 -- verificado, no debería poder cobrar.
+drop policy if exists "cuentas_cobro_select" on public.cuentas_cobro;
 create policy "cuentas_cobro_select" on public.cuentas_cobro
   for select to authenticated
   using (proveedor_id = public.proveedor_actual() or public.is_active_member());
 
+drop policy if exists "cuentas_cobro_insert" on public.cuentas_cobro;
 create policy "cuentas_cobro_insert" on public.cuentas_cobro
   for insert to authenticated
   with check (
@@ -380,12 +393,14 @@ create policy "cuentas_cobro_insert" on public.cuentas_cobro
     )
   );
 
+drop policy if exists "cuentas_cobro_update" on public.cuentas_cobro;
 create policy "cuentas_cobro_update" on public.cuentas_cobro
   for update to authenticated
   using (proveedor_id = public.proveedor_actual() or public.verifica_proveedores())
   with check (proveedor_id = public.proveedor_actual() or public.verifica_proveedores());
 
 -- Ítems: cuelgan de su cuenta.
+drop policy if exists "cuenta_cobro_items_select" on public.cuenta_cobro_items;
 create policy "cuenta_cobro_items_select" on public.cuenta_cobro_items
   for select to authenticated
   using (
@@ -396,6 +411,7 @@ create policy "cuenta_cobro_items_select" on public.cuenta_cobro_items
     )
   );
 
+drop policy if exists "cuenta_cobro_items_insert" on public.cuenta_cobro_items;
 create policy "cuenta_cobro_items_insert" on public.cuenta_cobro_items
   for insert to authenticated
   with check (
@@ -407,6 +423,7 @@ create policy "cuenta_cobro_items_insert" on public.cuenta_cobro_items
     )
   );
 
+drop policy if exists "cuenta_cobro_items_delete" on public.cuenta_cobro_items;
 create policy "cuenta_cobro_items_delete" on public.cuenta_cobro_items
   for delete to authenticated
   using (
@@ -419,34 +436,45 @@ create policy "cuenta_cobro_items_delete" on public.cuenta_cobro_items
   );
 
 -- ── Archivos ────────────────────────────────────────────────────────────────
+-- Bucket APARTE, no el `proveedores` que ya existe. Ese guarda los documentos
+-- de los 239 proveedores de cacao y sus políticas se llaman igual que las que
+-- este portal necesitaba —por eso falló la primera corrida.
+--
+-- No es solo evitar el choque de nombres: las políticas permisivas se combinan
+-- con OR, así que dos poblaciones distintas compartiendo bucket significa que
+-- cada política nueva hay que pensarla contra las dos. Separarlos deja que cada
+-- una tenga sus reglas sin efectos cruzados.
 insert into storage.buckets (id, name, public)
-values ('proveedores', 'proveedores', false)
+values ('proveedores-insumos', 'proveedores-insumos', false)
 on conflict (id) do nothing;
 
 -- Cada proveedor escribe SOLO en su carpeta, que se llama como su ficha. Sin
 -- esta comprobación, cualquiera con cuenta podría subir archivos a la carpeta
 -- de otro o sobrescribir sus documentos.
-create policy "proveedores_files_insert" on storage.objects
+drop policy if exists "prov_insumos_files_insert" on storage.objects;
+create policy "prov_insumos_files_insert" on storage.objects
   for insert to authenticated
   with check (
-    bucket_id = 'proveedores'
+    bucket_id = 'proveedores-insumos'
     and (storage.foldername(name))[1] = public.proveedor_actual()::text
   );
 
-create policy "proveedores_files_select" on storage.objects
+drop policy if exists "prov_insumos_files_select" on storage.objects;
+create policy "prov_insumos_files_select" on storage.objects
   for select to authenticated
   using (
-    bucket_id = 'proveedores'
+    bucket_id = 'proveedores-insumos'
     and (
       (storage.foldername(name))[1] = public.proveedor_actual()::text
       or public.is_active_member()
     )
   );
 
-create policy "proveedores_files_delete" on storage.objects
+drop policy if exists "prov_insumos_files_delete" on storage.objects;
+create policy "prov_insumos_files_delete" on storage.objects
   for delete to authenticated
   using (
-    bucket_id = 'proveedores'
+    bucket_id = 'proveedores-insumos'
     and (
       (storage.foldername(name))[1] = public.proveedor_actual()::text
       or public.verifica_proveedores()
