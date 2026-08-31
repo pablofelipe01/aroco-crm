@@ -2,6 +2,7 @@ import {
   ShoppingCart,
   TrendingUp,
   HelpCircle,
+  Store,
   CandlestickChart,
   LayoutDashboard,
   Users,
@@ -71,6 +72,12 @@ export const NAV_ITEMS: NavItem[] = [
   // Tolimax): 60,8 kg en dos filas.
   // La ruta, la tabla y el sync diario siguen vivos — para reponerlo basta con
   // devolver esta entrada al menú.
+  {
+    href: "/proveedores",
+    label: "Proveedores",
+    icon: Store,
+    departments: ["Dirección", "Financiero", "Administrativo"],
+  },
   {
     href: "/compras",
     label: "Compras",

@@ -12,6 +12,8 @@ import {
   ShoppingCart,
   ClipboardCheck,
   RefreshCwOff,
+  Store,
+  Receipt,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { hasSupabaseEnv } from "@/lib/env";
@@ -26,6 +28,8 @@ const ICON: Record<string, React.ElementType> = {
   compra_aprobacion: ShoppingCart,
   compra_decision: ClipboardCheck,
   sync_error: RefreshCwOff,
+  proveedor_nuevo: Store,
+  cuenta_cobro: Receipt,
 };
 
 /**
@@ -38,6 +42,8 @@ const RUTA: Record<string, string> = {
   tasks: "/tareas",
   meetings: "/actas",
   price_history: "/precios",
+  proveedores_insumos: "/proveedores",
+  cuentas_cobro: "/proveedores",
 };
 
 const SEV_COLOR: Record<string, string> = {
