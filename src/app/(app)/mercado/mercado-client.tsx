@@ -18,15 +18,8 @@ import { StatCard } from "@/components/ui/stat-card";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { staggerContainer } from "@/lib/motion";
-import { formatNumber, formatCOP, formatDate } from "@/lib/utils";
+import { useT, useFormatos, useIdioma, useLocale } from "@/lib/i18n/provider";
 import type { DatosMercado } from "./riesgo-data";
-
-const usd = (n: number | null) =>
-  n === null ? "—" : `US$ ${n.toLocaleString("es-CO", { maximumFractionDigits: 2 })}`;
-
-/** Millones de pesos: en pesos crudos la cifra deja de leerse. */
-const cop = (n: number | null) =>
-  n === null ? "—" : Math.abs(n) >= 1_000_000 ? `$ ${formatNumber(n / 1_000_000, 1)} M` : formatCOP(n);
 
 export function MercadoClient({
   datos: d,
@@ -37,6 +30,21 @@ export function MercadoClient({
 }) {
   const router = useRouter();
   const { toast } = useToast();
+  const t = useT();
+  const f = useFormatos();
+  const idioma = useIdioma();
+  const locale = useLocale();
+
+  const usd = (n: number | null) => (n === null ? "—" : `US$ ${f.numero(n, 2)}`);
+
+  /** Millones de pesos: en pesos crudos la cifra deja de leerse. */
+  const cop = (n: number | null) =>
+    n === null
+      ? "—"
+      : Math.abs(n) >= 1_000_000
+        ? `$ ${f.numero(n / 1_000_000, 1)} M`
+        : f.cop(n);
+
   const [sincronizando, setSincronizando] = React.useState(false);
   const [tableroOpen, setTableroOpen] = React.useState(false);
   const [leyendo, setLeyendo] = React.useState(false);
@@ -76,17 +84,17 @@ export function MercadoClient({
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Mercado"
-        description="Posición física, cobertura y exposición al precio"
+        title={t.mercado.titulo}
+        description={t.mercado.descripcion}
         actions={
           <div className="flex gap-2">
             <Button size="sm" variant="ghost" onClick={() => setTableroOpen(true)}>
               <ImageUp className="h-4 w-4" />
-              Cargar tablero
+              {t.mercado.cargarTablero}
             </Button>
             <Button size="sm" variant="secondary" onClick={alSincronizar} loading={sincronizando}>
               <RefreshCw className="h-4 w-4" />
-              Sincronizar ahora
+              {t.mercado.sincronizarAhora}
             </Button>
           </div>
         }
@@ -96,7 +104,7 @@ export function MercadoClient({
           Decirlo evita que alguien crea que se colgó y recargue a la mitad. */}
       {sincronizando && (
         <p className="text-xs text-fg-subtle">
-          Consultando StoneX, Barchart y la TRM. Puede tomar un par de minutos.
+          {t.mercado.sincronizando}
         </p>
       )}
 
@@ -104,19 +112,21 @@ export function MercadoClient({
         <div role="alert" className="flex items-start gap-3 rounded-[var(--radius-md)] border border-danger/40 bg-danger-soft p-4">
           <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-danger" />
           <div className="min-w-0">
-            <p className="text-sm font-medium text-danger">No se pudo cargar la posición</p>
+            <p className="text-sm font-medium text-danger">
+              {t.mercado.errorPosicion}
+            </p>
             <p className="mt-1 font-mono text-xs text-fg-subtle">{d.error}</p>
           </div>
         </div>
       )}
 
       <motion.div variants={staggerContainer} initial="hidden" animate="show" className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="En bodega" value={r.toneladasFisicas} decimals={2} suffix=" t" icon={Boxes}
-          hint={`${d.totales.lotes_con_saldo} lotes · costo ${formatCOP(d.totales.costo_promedio_cop_kg ?? 0)}/kg`} />
-        <StatCard label="Descubierto" value={r.toneladasDescubiertas} decimals={2} suffix=" t" icon={ShieldAlert}
-          hint={r.coberturaPct === 0 ? "Sin ninguna cobertura" : `${r.coberturaPct.toFixed(1)}% cubierto`} />
+        <StatCard label={t.mercado.enBodega} value={r.toneladasFisicas} decimals={2} suffix=" t" icon={Boxes}
+          hint={`${d.totales.lotes_con_saldo} ${t.mercado.lotes} · ${t.mercado.costo} ${f.cop(d.totales.costo_promedio_cop_kg ?? 0)}/kg`} />
+        <StatCard label={t.mercado.descubierto} value={r.toneladasDescubiertas} decimals={2} suffix=" t" icon={ShieldAlert}
+          hint={r.coberturaPct === 0 ? t.mercado.sinCobertura : `${r.coberturaPct.toFixed(1)}% ${t.mercado.cubierto}`} />
         <StatCard
-          label="Cacao hoy"
+          label={t.mercado.cacaoHoy}
           value={r.precioMercadoCopKg ?? 0}
           prefix="$ "
           suffix="/kg"
@@ -130,12 +140,14 @@ export function MercadoClient({
           }
           hint={
             d.mercado.precioUsdT
-              ? `${usd(d.mercado.precioUsdT)}/t${d.mercado.fuente === "vivo" ? " · en vivo" : ""}`
-              : "Sin precio"
+              ? `${usd(d.mercado.precioUsdT)}/t${
+                  d.mercado.fuente === "vivo" ? ` · ${t.mercado.enVivo}` : ""
+                }`
+              : t.mercado.sinPrecio
           }
         />
-        <StatCard label="Valorización" value={Math.round((r.pnlFisicoCop ?? 0) / 1_000_000)} prefix="$ " suffix=" M" icon={Coins}
-          hint="Contra el costo de compra" />
+        <StatCard label={t.mercado.valorizacion} value={Math.round((r.pnlFisicoCop ?? 0) / 1_000_000)} prefix="$ " suffix=" M" icon={Coins}
+          hint={t.mercado.contraCosto} />
       </motion.div>
 
       {/* La exposición es el número que importa. Si está descubierta, tiene que
@@ -144,13 +156,17 @@ export function MercadoClient({
         <div className="rounded-[var(--radius-md)] border border-warn/50 bg-warn-soft p-4">
           <p className="text-sm font-medium text-warn">
             {r.coberturaPct === 0
-              ? `Las ${formatNumber(r.toneladasFisicas, 2)} toneladas en bodega están expuestas al precio`
-              : `${formatNumber(r.toneladasDescubiertas, 2)} de ${formatNumber(r.toneladasFisicas, 2)} toneladas sin cobertura`}
+              ? `${t.mercado.expuestasPrefijo} ${f.numero(r.toneladasFisicas, 2)} ${t.mercado.expuestasSufijo}`
+              : `${f.numero(r.toneladasDescubiertas, 2)} ${t.mercado.sinCoberturaDe} ${f.numero(r.toneladasFisicas, 2)} ${t.mercado.sinCoberturaSufijo}`}
           </p>
           <p className="mt-1 text-sm text-fg-muted">
-            No hay puts comprados ni futuros vendidos que protejan de una caída.
+            {t.mercado.nadaProtege}
             {r.pnlFisicoCop !== null && r.pnlFisicoCop > 0 && (
-              <> Hoy el inventario vale <strong>{cop(r.pnlFisicoCop)}</strong> más de lo que costó; esa diferencia es lo que está en juego.</>
+              <>
+                {" "}
+                {t.mercado.hoyValePrefijo} <strong>{cop(r.pnlFisicoCop)}</strong>{" "}
+                {t.mercado.hoyValeSufijo}
+              </>
             )}
           </p>
         </div>
@@ -159,42 +175,45 @@ export function MercadoClient({
       {r.faltantes.length > 0 && (
         <div className="rounded-[var(--radius-md)] border border-info/40 bg-info-soft p-4">
           <p className="text-sm text-info">
-            El cálculo está incompleto: falta {r.faltantes.join(", ")}. Las cifras que
-            dependen de eso salen en blanco en vez de en cero.
+            {t.mercado.calculoIncompleto} {r.faltantes.join(", ")}.{" "}
+            {t.mercado.calculoIncompletoNota}
           </p>
         </div>
       )}
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Card>
-          <CardHeader><CardTitle>Cobertura</CardTitle></CardHeader>
+          <CardHeader>
+            <CardTitle>{t.mercado.cobertura}</CardTitle>
+          </CardHeader>
           <CardBody className="space-y-3">
             <div className="h-3 w-full overflow-hidden rounded-full bg-bg-muted">
               <div className="h-full rounded-full bg-accent" style={{ width: `${Math.min(100, r.coberturaPct)}%` }} />
             </div>
             <dl className="grid grid-cols-2 gap-3 text-sm">
-              <Dato k="Puts comprados" v={`${r.contratos.putsLargos} contratos`} />
-              <Dato k="Calls vendidos" v={`${r.contratos.callsCortos} contratos`} />
-              <Dato k="Futuros vendidos" v={`${r.contratos.futurosCortos} contratos`} />
-              <Dato k="Futuros comprados" v={`${r.contratos.futurosLargos} contratos`} />
+              <Dato k={t.mercado.putsComprados} v={`${r.contratos.putsLargos} ${t.mercado.contratos}`} />
+              <Dato k={t.mercado.callsVendidos} v={`${r.contratos.callsCortos} ${t.mercado.contratos}`} />
+              <Dato k={t.mercado.futurosVendidos} v={`${r.contratos.futurosCortos} ${t.mercado.contratos}`} />
+              <Dato k={t.mercado.futurosComprados} v={`${r.contratos.futurosLargos} ${t.mercado.contratos}`} />
             </dl>
             {d.cobertura && (
               <div className="rounded-[var(--radius-md)] border border-border p-3 text-sm">
                 <p className="text-fg">
-                  Cobertura efectiva:{" "}
+                  {t.mercado.coberturaEfectiva}{" "}
                   <span className="font-mono tnum font-semibold">
-                    {formatNumber(d.cobertura.efectivaT, 2)} t
+                    {f.numero(d.cobertura.efectivaT, 2)} t
                   </span>{" "}
-                  de {formatNumber(r.toneladasCubiertas, 2)} t nominales
+                  {t.comun.de} {f.numero(r.toneladasCubiertas, 2)} {t.mercado.nominales}
                 </p>
                 {/* Contar contratos sobreestima la protección: un put muy fuera
                     de dinero cubre en el papel y casi nada en la práctica. */}
                 <p className="mt-1 text-xs text-fg-subtle">
-                  Ponderada por delta. Los contratos nominales suponen protección
-                  total; el delta dice cuánto se mueve la opción de verdad cuando
-                  cae el precio.
+                  {t.mercado.ponderadaDelta}
                   {d.cobertura.sinDeltaT > 0 && (
-                    <> {formatNumber(d.cobertura.sinDeltaT, 2)} t sin delta en el tablero cargado.</>
+                    <>
+                      {" "}
+                      {f.numero(d.cobertura.sinDeltaT, 2)} {t.mercado.sinDelta}
+                    </>
                   )}
                 </p>
               </div>
@@ -202,14 +221,17 @@ export function MercadoClient({
 
             {r.collar ? (
               <p className="rounded-[var(--radius-md)] border border-border p-3 text-sm text-fg-muted">
-                Collar armado entre <span className="font-mono tnum text-fg">{usd(r.collar.piso)}</span> y{" "}
-                <span className="font-mono tnum text-fg">{usd(r.collar.techo)}</span> por tonelada.
+                {t.mercado.collarPrefijo}{" "}
+                <span className="font-mono tnum text-fg">{usd(r.collar.piso)}</span>{" "}
+                {t.mercado.collarY}{" "}
+                <span className="font-mono tnum text-fg">{usd(r.collar.techo)}</span>{" "}
+                {t.mercado.collarSufijo}
               </p>
             ) : (
               <p className="text-xs text-fg-subtle">
-                No hay collar: haría falta un put comprado y un call vendido a la vez.
+                {t.mercado.sinCollar}
                 {!d.cobertura && r.contratos.putsLargos > 0 && (
-                  <> Carga el tablero para ver cuánto cubren de verdad esos puts.</>
+                  <> {t.mercado.cargaTablero}</>
                 )}
               </p>
             )}
@@ -220,19 +242,19 @@ export function MercadoClient({
           <CardHeader>
             <CardTitle>
               <span className="inline-flex items-center gap-2">
-                <Landmark className="h-4 w-4 text-fg-subtle" /> Cuenta del broker
+                <Landmark className="h-4 w-4 text-fg-subtle" /> {t.mercado.cuentaBroker}
               </span>
             </CardTitle>
           </CardHeader>
           <CardBody>
             {!d.broker ? (
-              <EmptyState title="Sin estados de cuenta cargados" />
+              <EmptyState title={t.mercado.sinEstados} />
             ) : (
               <dl className="grid grid-cols-2 gap-3 text-sm">
-                <Dato k="Cuenta" v={d.broker.cuenta ?? "—"} />
-                <Dato k="Equity" v={usd(d.broker.equity)} />
-                <Dato k="Margen inicial" v={usd(d.broker.margenInicial)} />
-                <Dato k={`P&L realizado (${d.broker.moneda})`} v={usd(d.broker.pnlYtd)} tono={(d.broker.pnlYtd ?? 0) < 0 ? "danger" : undefined} />
+                <Dato k={t.mercado.cuenta} v={d.broker.cuenta ?? "—"} />
+                <Dato k={t.mercado.equity} v={usd(d.broker.equity)} />
+                <Dato k={t.mercado.margenInicial} v={usd(d.broker.margenInicial)} />
+                <Dato k={`${t.mercado.pnlRealizado} (${d.broker.moneda})`} v={usd(d.broker.pnlYtd)} tono={(d.broker.pnlYtd ?? 0) < 0 ? "danger" : undefined} />
               </dl>
             )}
           </CardBody>
@@ -241,24 +263,32 @@ export function MercadoClient({
 
       {d.escenarios.length > 0 && (
         <Card>
-          <CardHeader><CardTitle>Si el precio se mueve</CardTitle></CardHeader>
+          <CardHeader>
+            <CardTitle>{t.mercado.siElPrecio}</CardTitle>
+          </CardHeader>
           <CardBody>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border text-left text-[11px] uppercase tracking-wide text-fg-subtle">
-                    <th className="pb-2 pr-3 font-medium">Escenario</th>
-                    <th className="pb-2 pr-3 text-right font-medium">Cacao COP/kg</th>
-                    <th className="pb-2 text-right font-medium">Valorización del inventario</th>
+                    <th className="pb-2 pr-3 font-medium">{t.mercado.escenario}</th>
+                    <th className="pb-2 pr-3 text-right font-medium">
+                      {t.mercado.cacaoCopKg}
+                    </th>
+                    <th className="pb-2 text-right font-medium">
+                      {t.mercado.valorizacionInventario}
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
                   {d.escenarios.map((e) => (
                     <tr key={e.variacion} className="border-b border-border/60 last:border-0">
                       <td className="py-2 pr-3 text-fg">
-                        {e.variacion === 0 ? "Precio de hoy" : `${e.variacion > 0 ? "+" : ""}${(e.variacion * 100).toFixed(0)}%`}
+                        {e.variacion === 0
+                          ? t.mercado.precioHoy
+                          : `${e.variacion > 0 ? "+" : ""}${(e.variacion * 100).toFixed(0)}%`}
                       </td>
-                      <td className="py-2 pr-3 text-right font-mono tnum text-fg-muted">{formatCOP(e.precioCopKg)}</td>
+                      <td className="py-2 pr-3 text-right font-mono tnum text-fg-muted">{f.cop(e.precioCopKg)}</td>
                       <td className={"py-2 text-right font-mono tnum " + (e.pnlCop < 0 ? "text-danger" : "text-fg")}>{cop(e.pnlCop)}</td>
                     </tr>
                   ))}
@@ -266,9 +296,7 @@ export function MercadoClient({
               </table>
             </div>
             <p className="mt-3 text-xs text-fg-subtle">
-              Solo la pata física. El efecto de la cobertura depende de strikes y
-              primas, y Barchart no entrega las griegas: calcularlo sin ellas daría
-              una cifra que parece precisa y no lo es.
+              {t.mercado.soloFisica}
             </p>
           </CardBody>
         </Card>
@@ -282,24 +310,29 @@ export function MercadoClient({
           <CardHeader>
             <CardTitle>
               <span className="inline-flex items-center gap-2">
-                <ArrowLeftRight className="h-4 w-4 text-fg-subtle" /> Futuros y arbitraje
+                <ArrowLeftRight className="h-4 w-4 text-fg-subtle" />{" "}
+                {t.mercado.futurosArbitraje}
               </span>
             </CardTitle>
           </CardHeader>
           <CardBody>
             <dl className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-              {d.ratios.futuros.map((f) => {
-                const cambio = f.valor_anterior === null ? null : f.valor - f.valor_anterior;
-                const simbolo = f.moneda === "GBP" ? "£" : f.moneda === "EUR" ? "€" : "$";
+              {d.ratios.futuros.map((fut) => {
+                const cambio =
+                  fut.valor_anterior === null ? null : fut.valor - fut.valor_anterior;
+                const simbolo =
+                  fut.moneda === "GBP" ? "£" : fut.moneda === "EUR" ? "€" : "$";
                 return (
-                  <div key={f.contrato} className="rounded-[var(--radius-md)] border border-border p-3">
+                  <div key={fut.contrato} className="rounded-[var(--radius-md)] border border-border p-3">
                     <dt className="text-[11px] uppercase tracking-wide text-fg-subtle">
-                      {f.contrato === "ARBITRAGE" ? "Arbitraje NY − Londres" : f.contrato}
+                      {fut.contrato === "ARBITRAGE"
+                        ? t.mercado.arbitrajeNyLondres
+                        : fut.contrato}
                     </dt>
                     <dd className="mt-0.5 font-mono tnum text-lg text-fg">
-                      {f.valor < 0 ? "−" : ""}
+                      {fut.valor < 0 ? "−" : ""}
                       {simbolo}
-                      {formatNumber(Math.abs(f.valor))}
+                      {f.numero(Math.abs(fut.valor))}
                     </dd>
                     {cambio !== null && cambio !== 0 && (
                       <p
@@ -310,7 +343,7 @@ export function MercadoClient({
                       >
                         {cambio > 0 ? "+" : "−"}
                         {simbolo}
-                        {formatNumber(Math.abs(cambio))} en la semana
+                        {f.numero(Math.abs(cambio))} {t.mercado.enLaSemana}
                       </p>
                     )}
                   </div>
@@ -318,8 +351,8 @@ export function MercadoClient({
               })}
             </dl>
             <p className="mt-3 text-xs text-fg-subtle">
-              Reporte del {d.ratios.fecha ? formatDate(d.ratios.fecha) : "—"}. El arbitraje
-              es la diferencia entre el contrato de Nueva York y el de Londres.
+              {t.mercado.reporteDel}{" "}
+              {d.ratios.fecha ? f.fecha(d.ratios.fecha) : "—"}. {t.mercado.arbitrajeNota}
             </p>
           </CardBody>
         </Card>
@@ -331,15 +364,13 @@ export function MercadoClient({
           <CardHeader>
             <CardTitle>
               <span className="inline-flex items-center gap-2">
-                <Factory className="h-4 w-4 text-fg-subtle" /> Ratios de producto
+                <Factory className="h-4 w-4 text-fg-subtle" /> {t.mercado.ratiosProducto}
               </span>
             </CardTitle>
           </CardHeader>
           <CardBody>
             <p className="mb-3 text-xs text-fg-subtle">
-              Cuántas veces el precio del futuro vale cada derivado. Un ratio de 1,74
-              significa que ese producto se cotiza a 1,74 veces el grano — es lo que
-              dice si conviene vender cacao o transformarlo.
+              {t.mercado.ratiosNota}
             </p>
             <div className="space-y-4">
               {["Liquor", "Butter", "Powder", "Combined"].map((cat) => {
@@ -348,28 +379,35 @@ export function MercadoClient({
                 return (
                   <div key={cat}>
                     <h4 className="mb-1.5 text-[11px] uppercase tracking-wide text-fg-subtle">
-                      {cat === "Liquor" ? "Licor" : cat === "Butter" ? "Manteca"
-                        : cat === "Powder" ? "Polvo" : "Combinado"}
+                      {cat === "Liquor"
+                        ? t.mercado.licor
+                        : cat === "Butter"
+                          ? t.mercado.manteca
+                          : cat === "Powder"
+                            ? t.mercado.polvo
+                            : t.mercado.combinado}
                     </h4>
                     <ul className="space-y-1">
-                      {filas.map((f) => {
+                      {filas.map((fila) => {
                         const cambio =
-                          f.ratio_anterior === null
+                          fila.ratio_anterior === null
                             ? null
-                            : Math.round((f.ratio - f.ratio_anterior) * 100) / 100;
+                            : Math.round((fila.ratio - fila.ratio_anterior) * 100) / 100;
                         return (
                           <li
-                            key={`${f.producto}-${f.incoterm ?? ""}`}
+                            key={`${fila.producto}-${fila.incoterm ?? ""}`}
                             className="flex flex-wrap items-baseline justify-between gap-2 border-b border-border/50 pb-1 text-sm last:border-0"
                           >
                             <span className="min-w-0 text-fg">
-                              {f.producto}
-                              {f.mercado && (
-                                <span className="ml-1.5 text-xs text-fg-subtle">{f.mercado}</span>
+                              {fila.producto}
+                              {fila.mercado && (
+                                <span className="ml-1.5 text-xs text-fg-subtle">
+                                  {fila.mercado}
+                                </span>
                               )}
                             </span>
                             <span className="shrink-0 font-mono tnum text-fg-muted">
-                              {f.ratio.toFixed(2)}
+                              {fila.ratio.toFixed(2)}
                               {cambio !== null && cambio !== 0 && (
                                 <span className={cambio > 0 ? "text-success" : "text-danger"}>
                                   {" "}
@@ -377,9 +415,9 @@ export function MercadoClient({
                                   {cambio.toFixed(2)}
                                 </span>
                               )}
-                              {f.precio_usd && (
+                              {fila.precio_usd && (
                                 <span className="ml-2 text-fg-subtle">
-                                  US$ {formatNumber(f.precio_usd)}
+                                  US$ {f.numero(fila.precio_usd)}
                                 </span>
                               )}
                             </span>
@@ -400,7 +438,8 @@ export function MercadoClient({
           <CardHeader>
             <CardTitle>
               <span className="inline-flex items-center gap-2">
-                <Balanza className="h-4 w-4 text-fg-subtle" /> Diferenciales por origen
+                <Balanza className="h-4 w-4 text-fg-subtle" />{" "}
+                {t.mercado.diferencialesOrigen}
               </span>
             </CardTitle>
           </CardHeader>
@@ -409,36 +448,40 @@ export function MercadoClient({
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border text-left text-[11px] uppercase tracking-wide text-fg-subtle">
-                    <th className="pb-2 pr-3 font-medium">Origen</th>
-                    <th className="pb-2 pr-3 text-right font-medium">Sobre ICE</th>
-                    <th className="pb-2 font-medium">Fuente</th>
+                    <th className="pb-2 pr-3 font-medium">{t.mercado.origen}</th>
+                    <th className="pb-2 pr-3 text-right font-medium">
+                      {t.mercado.sobreIce}
+                    </th>
+                    <th className="pb-2 font-medium">{t.mercado.fuente}</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {d.diferenciales.filas.map((f) => {
-                    const esEstimacion = f.fuente !== "stonex";
+                  {d.diferenciales.filas.map((fila) => {
+                    const esEstimacion = fila.fuente !== "stonex";
                     return (
                       <tr
-                        key={`${f.origen}-${f.grado ?? ""}-${f.fuente}`}
+                        key={`${fila.origen}-${fila.grado ?? ""}-${fila.fuente}`}
                         className={
                           "border-b border-border/60 last:border-0 " +
                           (esEstimacion ? "bg-warn-soft/40" : "")
                         }
                       >
                         <td className="py-2 pr-3 text-fg">
-                          {f.origen}
-                          {f.grado && <span className="text-fg-subtle"> · {f.grado}</span>}
+                          {fila.origen}
+                          {fila.grado && (
+                            <span className="text-fg-subtle"> · {fila.grado}</span>
+                          )}
                         </td>
                         <td className="py-2 pr-3 text-right font-mono tnum text-fg">
-                          {f.valor > 0 ? "+" : ""}
-                          {formatNumber(f.valor)} {f.unidad}
+                          {fila.valor > 0 ? "+" : ""}
+                          {f.numero(fila.valor)} {fila.unidad}
                         </td>
                         <td className="py-2 text-xs">
                           {esEstimacion ? (
                             /* Una fila que pusimos nosotros no puede verse igual
                                que una cotización: alguien la citaría en una
                                negociación como si fuera precio de mercado. */
-                            <Badge tone="warn">estimación AROCO</Badge>
+                            <Badge tone="warn">{t.mercado.estimacionAroco}</Badge>
                           ) : (
                             <span className="text-fg-subtle">StoneX</span>
                           )}
@@ -455,7 +498,8 @@ export function MercadoClient({
               </p>
             )}
             <p className="mt-1 text-xs text-fg-subtle">
-              Reporte del {d.diferenciales.fecha ? formatDate(d.diferenciales.fecha) : "—"}.
+              {t.mercado.reporteDel}{" "}
+              {d.diferenciales.fecha ? f.fecha(d.diferenciales.fecha) : "—"}.
             </p>
           </CardBody>
         </Card>
@@ -466,7 +510,8 @@ export function MercadoClient({
           <CardHeader>
             <CardTitle>
               <span className="inline-flex items-center gap-2">
-                <Newspaper className="h-4 w-4 text-fg-subtle" /> Qué está pasando en el mercado
+                <Newspaper className="h-4 w-4 text-fg-subtle" />{" "}
+                {t.mercado.queEstaPasando}
               </span>
             </CardTitle>
           </CardHeader>
@@ -477,13 +522,17 @@ export function MercadoClient({
                   <div className="flex items-baseline justify-between gap-3">
                     <p className="min-w-0 text-sm font-medium text-fg">{a.title}</p>
                     <span className="shrink-0 font-mono tnum text-xs text-fg-subtle">
-                      {formatDate(a.published_at)}
+                      {f.fecha(a.published_at)}
                     </span>
                   </div>
                   {/* El resumen en español es lo que se lee; el original en
                       inglés queda a un clic para quien quiera la fuente. */}
                   <p className="mt-1 text-sm text-fg-muted">
-                    {a.resumen ?? a.abstract ?? "Sin resumen disponible."}
+                    {/* En inglés se prefiere el original de StoneX: el resumen
+                        traducido al español no le sirve a quien lee en inglés. */}
+                    {(idioma === "en"
+                      ? (a.abstract ?? a.resumen)
+                      : (a.resumen ?? a.abstract)) ?? t.mercado.sinResumen}
                   </p>
                   {a.url && (
                     <a
@@ -492,7 +541,7 @@ export function MercadoClient({
                       rel="noopener noreferrer"
                       className="mt-1 inline-flex items-center gap-1 text-xs text-accent hover:underline"
                     >
-                      Leer en StoneX <ExternalLink className="h-3 w-3" />
+                      {t.mercado.leerEnStoneX} <ExternalLink className="h-3 w-3" />
                     </a>
                   )}
                 </li>
@@ -503,20 +552,26 @@ export function MercadoClient({
       )}
 
       <Card>
-        <CardHeader><CardTitle>Lotes en bodega</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle>{t.mercado.lotesEnBodega}</CardTitle>
+        </CardHeader>
         <CardBody>
           {d.lotes.length === 0 ? (
-            <EmptyState title="No hay cacao en bodega" />
+            <EmptyState title={t.mercado.sinCacao} />
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border text-left text-[11px] uppercase tracking-wide text-fg-subtle">
-                    <th className="pb-2 pr-3 font-medium">Lote</th>
-                    <th className="pb-2 pr-3 font-medium">Ingreso</th>
-                    <th className="pb-2 pr-3 text-right font-medium">Disponible</th>
-                    <th className="pb-2 pr-3 text-right font-medium">Costo/kg</th>
-                    <th className="pb-2 text-right font-medium">Valor</th>
+                    <th className="pb-2 pr-3 font-medium">{t.mercado.lote}</th>
+                    <th className="pb-2 pr-3 font-medium">{t.mercado.ingreso}</th>
+                    <th className="pb-2 pr-3 text-right font-medium">
+                      {t.mercado.disponible}
+                    </th>
+                    <th className="pb-2 pr-3 text-right font-medium">
+                      {t.mercado.costoKg}
+                    </th>
+                    <th className="pb-2 text-right font-medium">{t.mercado.valor}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -526,10 +581,10 @@ export function MercadoClient({
                         <span className="text-fg">{l.code}</span>
                         {l.calidad && <Badge tone="neutral" className="ml-2">{l.calidad}</Badge>}
                       </td>
-                      <td className="py-2 pr-3 font-mono tnum text-xs text-fg-muted">{l.fecha ? formatDate(l.fecha) : "—"}</td>
-                      <td className="py-2 pr-3 text-right font-mono tnum text-fg">{formatNumber(l.kg_disponible)} kg</td>
-                      <td className="py-2 pr-3 text-right font-mono tnum text-fg-muted">{l.precio_compra_cop_kg ? formatCOP(l.precio_compra_cop_kg) : "—"}</td>
-                      <td className="py-2 text-right font-mono tnum text-fg-muted">{l.valor_cop ? formatCOP(l.valor_cop) : "—"}</td>
+                      <td className="py-2 pr-3 font-mono tnum text-xs text-fg-muted">{l.fecha ? f.fecha(l.fecha) : "—"}</td>
+                      <td className="py-2 pr-3 text-right font-mono tnum text-fg">{f.kg(l.kg_disponible)}</td>
+                      <td className="py-2 pr-3 text-right font-mono tnum text-fg-muted">{l.precio_compra_cop_kg ? f.cop(l.precio_compra_cop_kg) : "—"}</td>
+                      <td className="py-2 text-right font-mono tnum text-fg-muted">{l.valor_cop ? f.cop(l.valor_cop) : "—"}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -549,28 +604,36 @@ export function MercadoClient({
       {/* De cuándo es cada cifra. Sin esto, un dato de hace tres días se ve
           idéntico a uno de hoy. */}
       <p className="text-xs text-fg-subtle">
-        Inventario al día · cacao{" "}
+        {t.mercado.inventarioAlDia}{" "}
         {d.mercado.momento
-          ? new Date(d.mercado.momento).toLocaleString("es-CO", { dateStyle: "medium", timeStyle: "short" })
+          ? new Date(d.mercado.momento).toLocaleString(locale, {
+              dateStyle: "medium",
+              timeStyle: "short",
+            })
           : d.mercado.fecha
-            ? formatDate(d.mercado.fecha)
-            : "sin dato"}{" "}
-        (ICE NY) ·
-        TRM {d.trm.fecha ? `${formatDate(d.trm.fecha)} $ ${formatNumber(d.trm.valor ?? 0, 2)}` : "sin dato"} ·
-        broker {d.broker?.fecha ? formatDate(d.broker.fecha) : "sin estado"}
+            ? f.fecha(d.mercado.fecha)
+            : t.mercado.sinDato}{" "}
+        (ICE NY) · TRM{" "}
+        {d.trm.fecha
+          ? `${f.fecha(d.trm.fecha)} $ ${f.numero(d.trm.valor ?? 0, 2)}`
+          : t.mercado.sinDato}{" "}
+        · broker {d.broker?.fecha ? f.fecha(d.broker.fecha) : t.mercado.sinEstado}
         {/* De dónde salió el precio. Un valor de hace días presentado igual que
             uno en vivo es lo que hace valorar el inventario con un precio que
             ya no existe. */}
         {d.mercado.fuente === "guardado" && (
-          <span className="text-warn"> · precio del último cierre guardado, no en vivo</span>
+          <span className="text-warn">{t.mercado.precioGuardado}</span>
         )}
         {d.mercado.fuente === "paridad" && (
-          <span className="text-warn"> · precio deducido del tablero, no cotizado</span>
+          <span className="text-warn">{t.mercado.precioParidad}</span>
         )}
         {sync && (
           <>
-            {" · "}última sincronización {formatDate(sync.ran_at)}
-            {sync.status !== "ok" && <span className="text-danger"> (falló)</span>}
+            {" · "}
+            {t.mercado.ultimaSync} {f.fecha(sync.ran_at)}
+            {sync.status !== "ok" && (
+              <span className="text-danger"> {t.mercado.fallo}</span>
+            )}
           </>
         )}
       </p>
@@ -589,34 +652,33 @@ function ModalTablero({
   onSubmit: (e: React.FormEvent<HTMLFormElement>) => void;
   leyendo: boolean;
 }) {
+  const t = useT();
   return (
     <Modal
       open={open}
       onClose={onClose}
-      title="Cargar tablero de opciones"
-      description="Una captura del tablero del bróker. Se lee y se descarta: la imagen no se guarda."
+      title={t.mercado.modalTitulo}
+      description={t.mercado.modalDescripcion}
       footer={
         <>
           <Button variant="ghost" size="sm" onClick={onClose}>
-            Cancelar
+            {t.comun.cancelar}
           </Button>
           <Button type="submit" form="form-tablero" size="sm" loading={leyendo}>
-            Leer tablero
+            {t.mercado.leerTablero}
           </Button>
         </>
       }
     >
       <form id="form-tablero" onSubmit={onSubmit} className="space-y-4">
-        <Field label="Captura del tablero *">
+        <Field label={t.mercado.capturaTablero}>
           <Input type="file" name="imagen" accept="image/png,image/jpeg,image/webp" required />
         </Field>
-        <Field label="Fecha del tablero" hint="Si se deja vacía, hoy.">
+        <Field label={t.mercado.fechaTablero} hint={t.mercado.fechaTableroHint}>
           <Input type="date" name="fecha" defaultValue={new Date().toISOString().slice(0, 10)} />
         </Field>
         <p className="text-xs text-fg-subtle">
-          De aquí salen delta y volatilidad, que Barchart no entrega. Sin delta no
-          se puede decir cuánto protege de verdad una cobertura: un put muy fuera
-          de dinero cubre en el papel y casi nada en la práctica.
+          {t.mercado.modalNota}
         </p>
       </form>
     </Modal>
