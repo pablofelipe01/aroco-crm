@@ -464,6 +464,207 @@ export type Database = {
         };
         Relationships: [];
       };
+      proveedores_insumos: {
+        Row: {
+          id: string;
+          codigo: string;
+          auth_user_id: string | null;
+          tipo_persona: Database["public"]["Enums"]["persona_tipo"];
+          tipo_documento: Database["public"]["Enums"]["documento_tipo"];
+          numero_documento: string;
+          nombres: string | null;
+          apellidos: string | null;
+          razon_social: string | null;
+          email: string;
+          telefono: string;
+          direccion: string | null;
+          departamento: string | null;
+          municipio: string | null;
+          categorias: Database["public"]["Enums"]["compra_categoria"][];
+          descripcion: string | null;
+          banco: string | null;
+          tipo_cuenta: string | null;
+          numero_cuenta: string | null;
+          titular_cuenta: string | null;
+          documento_titular: string | null;
+          estado: Database["public"]["Enums"]["proveedor_insumo_estado"];
+          motivo_rechazo: string | null;
+          verificado_por: string | null;
+          verificado_en: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          codigo?: string;
+          auth_user_id?: string | null;
+          tipo_persona?: Database["public"]["Enums"]["persona_tipo"];
+          tipo_documento?: Database["public"]["Enums"]["documento_tipo"];
+          numero_documento?: string;
+          nombres?: string | null;
+          apellidos?: string | null;
+          razon_social?: string | null;
+          email?: string;
+          telefono?: string;
+          direccion?: string | null;
+          departamento?: string | null;
+          municipio?: string | null;
+          categorias?: Database["public"]["Enums"]["compra_categoria"][];
+          descripcion?: string | null;
+          banco?: string | null;
+          tipo_cuenta?: string | null;
+          numero_cuenta?: string | null;
+          titular_cuenta?: string | null;
+          documento_titular?: string | null;
+          estado?: Database["public"]["Enums"]["proveedor_insumo_estado"];
+          motivo_rechazo?: string | null;
+          verificado_por?: string | null;
+          verificado_en?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          codigo?: string;
+          auth_user_id?: string | null;
+          tipo_persona?: Database["public"]["Enums"]["persona_tipo"];
+          tipo_documento?: Database["public"]["Enums"]["documento_tipo"];
+          numero_documento?: string;
+          nombres?: string | null;
+          apellidos?: string | null;
+          razon_social?: string | null;
+          email?: string;
+          telefono?: string;
+          direccion?: string | null;
+          departamento?: string | null;
+          municipio?: string | null;
+          categorias?: Database["public"]["Enums"]["compra_categoria"][];
+          descripcion?: string | null;
+          banco?: string | null;
+          tipo_cuenta?: string | null;
+          numero_cuenta?: string | null;
+          titular_cuenta?: string | null;
+          documento_titular?: string | null;
+          estado?: Database["public"]["Enums"]["proveedor_insumo_estado"];
+          motivo_rechazo?: string | null;
+          verificado_por?: string | null;
+          verificado_en?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      proveedor_insumo_documentos: {
+        Row: {
+          id: string;
+          proveedor_id: string;
+          tipo: Database["public"]["Enums"]["documento_proveedor_tipo"];
+          archivo_path: string;
+          archivo_nombre: string | null;
+          vence_el: string | null;
+          subido_en: string;
+        };
+        Insert: {
+          id?: string;
+          proveedor_id?: string;
+          tipo?: Database["public"]["Enums"]["documento_proveedor_tipo"];
+          archivo_path?: string;
+          archivo_nombre?: string | null;
+          vence_el?: string | null;
+          subido_en?: string;
+        };
+        Update: {
+          id?: string;
+          proveedor_id?: string;
+          tipo?: Database["public"]["Enums"]["documento_proveedor_tipo"];
+          archivo_path?: string;
+          archivo_nombre?: string | null;
+          vence_el?: string | null;
+          subido_en?: string;
+        };
+        Relationships: [];
+      };
+      cuentas_cobro: {
+        Row: {
+          id: string;
+          consecutivo: string;
+          proveedor_id: string;
+          solicitud_id: string | null;
+          fecha: string;
+          concepto: string | null;
+          estado: Database["public"]["Enums"]["cuenta_cobro_estado"];
+          motivo_rechazo: string | null;
+          decidida_por: string | null;
+          decidida_en: string | null;
+          pagada_en: string | null;
+          pago_referencia: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          consecutivo?: string;
+          proveedor_id?: string;
+          solicitud_id?: string | null;
+          fecha?: string;
+          concepto?: string | null;
+          estado?: Database["public"]["Enums"]["cuenta_cobro_estado"];
+          motivo_rechazo?: string | null;
+          decidida_por?: string | null;
+          decidida_en?: string | null;
+          pagada_en?: string | null;
+          pago_referencia?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          consecutivo?: string;
+          proveedor_id?: string;
+          solicitud_id?: string | null;
+          fecha?: string;
+          concepto?: string | null;
+          estado?: Database["public"]["Enums"]["cuenta_cobro_estado"];
+          motivo_rechazo?: string | null;
+          decidida_por?: string | null;
+          decidida_en?: string | null;
+          pagada_en?: string | null;
+          pago_referencia?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      cuenta_cobro_items: {
+        Row: {
+          id: string;
+          cuenta_id: string;
+          orden: number;
+          descripcion: string;
+          cantidad: number;
+          valor_unitario: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          cuenta_id?: string;
+          orden?: number;
+          descripcion?: string;
+          cantidad?: number;
+          valor_unitario?: number;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          cuenta_id?: string;
+          orden?: number;
+          descripcion?: string;
+          cantidad?: number;
+          valor_unitario?: number;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
       market_intel: {
         Row: {
           id: string;
@@ -2273,6 +2474,7 @@ export type Database = {
           active: boolean;
           aprueba_compras: boolean;
           ve_mercado: boolean;
+          verifica_proveedores: boolean;
           created_at: string;
           department: Database["public"]["Enums"]["department"] | null;
           email: string;
@@ -2286,6 +2488,7 @@ export type Database = {
           active?: boolean;
           aprueba_compras?: boolean;
           ve_mercado?: boolean;
+          verifica_proveedores?: boolean;
           created_at?: string;
           department?: Database["public"]["Enums"]["department"] | null;
           email: string;
@@ -2299,6 +2502,7 @@ export type Database = {
           active?: boolean;
           aprueba_compras?: boolean;
           ve_mercado?: boolean;
+          verifica_proveedores?: boolean;
           created_at?: string;
           department?: Database["public"]["Enums"]["department"] | null;
           email?: string;
@@ -2651,6 +2855,16 @@ export type Database = {
         | "Tecnología"
         | "Otro";
       compra_estado: "Borrador" | "Pendiente" | "Aprobada" | "Rechazada";
+      proveedor_insumo_estado: "Pendiente" | "Activo" | "Rechazado" | "Inactivo";
+      persona_tipo: "Natural" | "Jurídica";
+      documento_tipo: "CC" | "CE" | "NIT" | "PA";
+      cuenta_cobro_estado: "Radicada" | "Aprobada" | "Rechazada" | "Pagada";
+      documento_proveedor_tipo:
+        | "RUT"
+        | "Documento de identidad"
+        | "Certificado bancario"
+        | "Cámara de comercio"
+        | "Otro";
       pregunta_estado: "Pendiente" | "Respondida" | "Descartada";
       pregunta_prioridad: "Alta" | "Media" | "Baja";
       activity_type:
@@ -2735,6 +2949,10 @@ export type Dispatch = Tables<"dispatches">;
 export type CompraSolicitud = Tables<"compra_solicitudes">;
 export type Pregunta = Tables<"preguntas">;
 export type Venta = Tables<"ventas">;
+export type ProveedorInsumo = Tables<"proveedores_insumos">;
+export type CuentaCobro = Tables<"cuentas_cobro">;
+export type CuentaCobroItem = Tables<"cuenta_cobro_items">;
+export type ProveedorInsumoDocumento = Tables<"proveedor_insumo_documentos">;
 export type CompraCotizacion = Tables<"compra_cotizaciones">;
 export type PriceHistory = Tables<"price_history">;
 export type Notification = Tables<"notifications">;

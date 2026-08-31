@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { AppShell, type ShellUser } from "@/components/layout/app-shell";
 import { getSessionContext, isOnboarded } from "@/lib/auth";
+import { proveedorEnSesion } from "@/lib/proveedor-sesion";
 import { hasSupabaseEnv } from "@/lib/env";
 
 /**
@@ -24,7 +25,12 @@ export default async function AppLayout({
 
   const session = await getSessionContext();
   if (!session) redirect("/login");
-  if (!isOnboarded(session.profile)) redirect("/onboarding");
+  if (!isOnboarded(session.profile)) {
+    // Un proveedor no tiene perfil a propósito, así que caería aquí. Va a su
+    // portal, no al onboarding del equipo.
+    if (await proveedorEnSesion()) redirect("/portal");
+    redirect("/onboarding");
+  }
 
   const profile = session.profile!;
   const user: ShellUser = {

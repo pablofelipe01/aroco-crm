@@ -9,7 +9,18 @@ import { hasSupabaseEnv } from "@/lib/env";
 // /api/posicion igual: lo consume CacaoQ con su propio token y sin sesión. Sin
 // esta excepción el middleware le devuelve un 307 a /login, que para un cliente
 // que espera JSON se ve como una respuesta vacía y no como «no autorizado».
-const PUBLIC_PREFIXES = ["/login", "/auth", "/onboarding", "/api/cron", "/api/posicion"];
+// `/portal` es el sitio de los proveedores: tiene su propio registro y su
+// propio inicio de sesión, y quien llega ahí normalmente no tiene cuenta
+// todavía. Mandarlo al login del CRM sería mandarlo a una puerta que no es la
+// suya.
+const PUBLIC_PREFIXES = [
+  "/login",
+  "/auth",
+  "/onboarding",
+  "/portal",
+  "/api/cron",
+  "/api/posicion",
+];
 
 function isPublic(pathname: string) {
   return PUBLIC_PREFIXES.some(
