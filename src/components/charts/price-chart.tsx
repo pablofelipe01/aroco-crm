@@ -10,6 +10,7 @@ import {
   CartesianGrid,
   Legend,
 } from "recharts";
+import { useT, useFormatos } from "@/lib/i18n/provider";
 
 export interface PriceSeriesPoint {
   date: string;
@@ -24,9 +25,9 @@ function isIntl(company: string): boolean {
 }
 
 /** Shorten the long company labels for the legend/tooltip. */
-function shortName(company: string): string {
+function shortName(company: string, intl: string): string {
   const c = company.toUpperCase();
-  if (c.includes("INTERNACIONAL")) return "Internacional (ICE)";
+  if (c.includes("INTERNACIONAL")) return intl;
   if (c.includes("LUKER")) return c.includes("ALTO") ? "Casa Luker (Alto Cd)" : "Casa Luker";
   if (c.includes("IBAGU")) return "Nal. Chocolate Ibagué";
   if (c.includes("NACIONAL") || c.includes("BTA") || c.includes("BOGOT"))
@@ -41,6 +42,8 @@ export function PriceChart({
   data: PriceSeriesPoint[];
   companies: string[];
 }) {
+  const t = useT();
+  const f = useFormatos();
   return (
     <ResponsiveContainer width="100%" height={280}>
       <LineChart data={data} margin={{ top: 8, right: 16, left: 4, bottom: 0 }}>
@@ -69,15 +72,17 @@ export function PriceChart({
             color: "var(--fg)",
           }}
           formatter={(value: unknown, name: unknown) => [
-            `${new Intl.NumberFormat("es-CO").format(Number(value))} COP/kg`,
-            shortName(String(name)),
+            `${f.numero(Number(value))} COP/kg`,
+            shortName(String(name), t.precios.internacionalSerie),
           ]}
         />
         <Legend
           wrapperStyle={{ fontSize: 11, color: "var(--fg-muted)", paddingTop: 8 }}
           iconType="plainline"
           formatter={(value: unknown) => (
-            <span style={{ color: "var(--fg-muted)" }}>{shortName(String(value))}</span>
+            <span style={{ color: "var(--fg-muted)" }}>
+              {shortName(String(value), t.precios.internacionalSerie)}
+            </span>
           )}
         />
         {companies.map((c, i) => (

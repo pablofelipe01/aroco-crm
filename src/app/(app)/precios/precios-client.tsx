@@ -19,7 +19,8 @@ import { Field, Input } from "@/components/ui/input";
 import { EmptyState } from "@/components/ui/empty-state";
 import { useToast } from "@/components/ui/toast";
 import { PriceChart, type PriceSeriesPoint } from "@/components/charts/price-chart";
-import { formatNumber, formatDate, cn } from "@/lib/utils";
+import { cn } from "@/lib/utils";
+import { useT, useFormatos, useLocale } from "@/lib/i18n/provider";
 import type { PriceHistory } from "@/lib/types/database";
 import { addPrices, deletePriceDate } from "./actions";
 
@@ -29,13 +30,6 @@ const PREFERRED_ORDER = [
   "Nacional de Chocolates",
 ];
 
-const INTL = "Internacional (ICE)";
-
-function shortDate(iso: string) {
-  return new Intl.DateTimeFormat("es-CO", { day: "2-digit", month: "short" }).format(
-    new Date(iso),
-  );
-}
 
 export function PreciosClient({
   prices,
@@ -48,6 +42,20 @@ export function PreciosClient({
 }) {
   const router = useRouter();
   const { toast } = useToast();
+  const t = useT();
+  const f = useFormatos();
+  const locale = useLocale();
+
+  // El nombre de la serie internacional es además su clave en los puntos del
+  // gráfico, así que tiene que traducirse aquí y no al pintar la leyenda.
+  const INTL = t.precios.internacionalSerie;
+  const shortDate = React.useCallback(
+    (iso: string) =>
+      new Intl.DateTimeFormat(locale, { day: "2-digit", month: "short" }).format(
+        new Date(iso),
+      ),
+    [locale],
+  );
   const [open, setOpen] = React.useState(false);
   const [date, setDate] = React.useState(new Date().toISOString().slice(0, 10));
   const [vals, setVals] = React.useState<Record<string, string>>({});
@@ -80,7 +88,7 @@ export function PreciosClient({
       const intl = international[d];
       return { date: shortDate(d), ...row, ...(intl != null ? { [INTL]: intl } : {}) };
     });
-  }, [byDate, international]);
+  }, [byDate, international, shortDate, INTL]);
 
   // Latest + delta per company.
   const latest = React.useMemo(() => {
@@ -133,12 +141,16 @@ export function PreciosClient({
       });
       const data = await res.json();
       if (!res.ok) {
-        toast({ tone: "error", title: "No se pudo analizar", description: data.error });
+        toast({
+          tone: "error",
+          title: t.precios.noSeAnalizo,
+          description: data.error,
+        });
         return;
       }
       setAnalysis(data.analysis);
     } catch {
-      toast({ tone: "error", title: "Error de conexión" });
+      toast({ tone: "error", title: t.precios.errorConexion });
     } finally {
       setAnalyzing(false);
     }
@@ -152,27 +164,31 @@ export function PreciosClient({
     const res = await addPrices({ date, entries });
     setSaving(false);
     if (!res.ok) {
-      toast({ tone: "error", title: "No se pudo guardar", description: res.error });
+      toast({
+        tone: "error",
+        title: t.precios.noSeGuardo,
+        description: res.error,
+      });
       return;
     }
-    toast({ tone: "success", title: "Precios registrados" });
+    toast({ tone: "success", title: t.precios.preciosRegistrados });
     setOpen(false);
     setVals({});
     router.refresh();
   }
 
   async function onDeleteDate(d: string) {
-    if (!confirm(`¿Eliminar los precios del ${formatDate(d)}?`)) return;
+    if (!confirm(`${t.precios.confirmarEliminar} ${f.fecha(d)}?`)) return;
     for (const c of companies) await deletePriceDate(c, d);
-    toast({ tone: "success", title: "Precios eliminados" });
+    toast({ tone: "success", title: t.precios.preciosEliminados });
     router.refresh();
   }
 
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Histórico de precios"
-        description="Precios de referencia semanales por compañía (COP/kg)."
+        title={t.precios.titulo}
+        description={t.precios.descripcion}
         actions={
           canWrite && (
             <Button
@@ -184,7 +200,7 @@ export function PreciosClient({
               }}
             >
               <Plus className="h-4 w-4" />
-              Cargar precios
+              {t.precios.cargarPrecios}
             </Button>
           )
         }
@@ -196,7 +212,7 @@ export function PreciosClient({
             <CardBody>
               <p className="text-xs font-medium text-fg-muted">{l.company}</p>
               <p className="mt-1 font-mono text-2xl font-bold text-fg tnum">
-                {l.cur != null ? formatNumber(l.cur) : "—"}
+                {l.cur != null ? f.numero(l.cur) : "—"}
                 <span className="text-sm font-normal text-fg-subtle"> COP/kg</span>
               </p>
               {l.delta != null && (
@@ -211,7 +227,7 @@ export function PreciosClient({
                   ) : (
                     <TrendingDown className="h-3.5 w-3.5" />
                   )}
-                  {Math.abs(l.delta).toFixed(1)}% vs. anterior
+                  {Math.abs(l.delta).toFixed(1)}% {t.precios.vsAnterior}
                 </span>
               )}
             </CardBody>
@@ -222,10 +238,10 @@ export function PreciosClient({
             <CardBody>
               <p className="flex items-center gap-1.5 text-xs font-medium text-fg-muted">
                 <Globe className="h-3.5 w-3.5" />
-                Internacional (ICE → COP/kg)
+                {t.precios.internacionalIce}
               </p>
               <p className="mt-1 font-mono text-2xl font-bold text-fg tnum">
-                {formatNumber(gap.intl)}
+                {f.numero(gap.intl)}
                 <span className="text-sm font-normal text-fg-subtle"> COP/kg</span>
               </p>
               <span
@@ -235,8 +251,8 @@ export function PreciosClient({
                 )}
               >
                 {gap.diff >= 0 ? "+" : ""}
-                {formatNumber(gap.diff)} ({gap.pct >= 0 ? "+" : ""}
-                {gap.pct.toFixed(1)}%) vs. nacional
+                {f.numero(gap.diff)} ({gap.pct >= 0 ? "+" : ""}
+                {gap.pct.toFixed(1)}%) {t.precios.vsNacional}
               </span>
             </CardBody>
           </Card>
@@ -245,33 +261,33 @@ export function PreciosClient({
 
       <Card>
         <CardHeader>
-          <CardTitle>Tendencia · nacional vs internacional</CardTitle>
+          <CardTitle>{t.precios.tendencia}</CardTitle>
           <Button size="sm" variant="secondary" onClick={onAnalyze} loading={analyzing}>
             <Sparkles className="h-4 w-4 text-accent" />
-            Analizar con IA
+            {t.precios.analizarIa}
           </Button>
         </CardHeader>
         <CardBody>
           {series.length > 0 ? (
             <PriceChart data={series} companies={chartCompanies} />
           ) : (
-            <EmptyState title="Sin datos de precios" />
+            <EmptyState title={t.precios.sinDatos} />
           )}
           {!hasIntl && series.length > 0 && (
             <p className="mt-2 text-xs text-fg-subtle">
-              No se pudo cargar el precio internacional en este momento.
+              {t.precios.sinInternacional}
             </p>
           )}
           {(analyzing || analysis) && (
             <div className="mt-4 rounded-[var(--radius-md)] border border-accent/40 bg-accent-soft/20 p-4">
               <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-accent-soft-fg">
                 <Sparkles className="h-3.5 w-3.5" />
-                Análisis IA
+                {t.precios.analisisIa}
               </p>
               {analyzing ? (
                 <p className="flex items-center gap-2 text-sm text-fg-muted">
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  Analizando precios…
+                  {t.precios.analizando}
                 </p>
               ) : (
                 <p className="whitespace-pre-wrap text-sm leading-relaxed text-fg">
@@ -285,11 +301,15 @@ export function PreciosClient({
 
       <Card>
         <CardHeader>
-          <CardTitle>Registros ({byDate.length} fechas)</CardTitle>
+          <CardTitle>
+            {t.precios.registros} ({byDate.length} {t.precios.fechas})
+          </CardTitle>
         </CardHeader>
         <CardBody className="p-0">
           {byDate.length === 0 ? (
-            <p className="px-5 py-8 text-center text-sm text-fg-subtle">Sin registros.</p>
+            <p className="px-5 py-8 text-center text-sm text-fg-subtle">
+              {t.precios.sinRegistros}
+            </p>
           ) : (
             <>
             {/* Mobile: cards */}
@@ -301,13 +321,13 @@ export function PreciosClient({
                 >
                   <div className="flex items-center justify-between">
                     <span className="font-mono text-xs font-medium text-fg-subtle">
-                      {formatDate(d)}
+                      {f.fecha(d)}
                     </span>
                     {canWrite && (
                       <button
                         onClick={() => onDeleteDate(d)}
                         className="rounded p-1 text-fg-subtle hover:bg-danger-soft hover:text-danger"
-                        aria-label="Eliminar fecha"
+                        aria-label={t.precios.eliminarFecha}
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>
@@ -318,15 +338,17 @@ export function PreciosClient({
                       <div key={c} className="flex items-center justify-between gap-2 text-sm">
                         <dt className="min-w-0 truncate text-fg-muted">{c}</dt>
                         <dd className="shrink-0 font-mono tnum text-fg">
-                          {row[c] != null ? formatNumber(row[c]) : "—"}
+                          {row[c] != null ? f.numero(row[c]) : "—"}
                         </dd>
                       </div>
                     ))}
                     {hasIntl && (
                       <div className="flex items-center justify-between gap-2 border-t border-border pt-1 text-sm">
-                        <dt className="min-w-0 truncate text-accent-soft-fg">Cacao (ICE)</dt>
+                        <dt className="min-w-0 truncate text-accent-soft-fg">
+                          {t.precios.cacaoIce}
+                        </dt>
                         <dd className="shrink-0 font-mono tnum text-accent-soft-fg">
-                          {international[d] != null ? formatNumber(international[d]) : "—"}
+                          {international[d] != null ? f.numero(international[d]) : "—"}
                         </dd>
                       </div>
                     )}
@@ -340,7 +362,9 @@ export function PreciosClient({
               <table className="w-full min-w-[560px] text-sm">
                 <thead>
                   <tr className="border-b border-border text-xs uppercase tracking-wide text-fg-subtle">
-                    <th className="px-4 py-3 text-left font-medium">Fecha</th>
+                    <th className="px-4 py-3 text-left font-medium">
+                      {t.comun.fecha}
+                    </th>
                     {companies.map((c) => (
                       <th key={c} className="px-4 py-3 text-right font-medium">
                         {c}
@@ -348,7 +372,7 @@ export function PreciosClient({
                     ))}
                     {hasIntl && (
                       <th className="border-l border-border px-4 py-3 text-right font-medium text-accent-soft-fg">
-                        Cacao (ICE)
+                        {t.precios.cacaoIce}
                       </th>
                     )}
                     <th className="px-4 py-3" />
@@ -358,16 +382,16 @@ export function PreciosClient({
                   {byDate.slice(0, 30).map(([d, row]) => (
                     <tr key={d} className="border-b border-border last:border-0 hover:bg-bg-subtle/50">
                       <td className="px-4 py-2.5 font-mono text-xs text-fg-subtle">
-                        {formatDate(d)}
+                        {f.fecha(d)}
                       </td>
                       {companies.map((c) => (
                         <td key={c} className="px-4 py-2.5 text-right font-mono tnum text-fg">
-                          {row[c] != null ? formatNumber(row[c]) : "—"}
+                          {row[c] != null ? f.numero(row[c]) : "—"}
                         </td>
                       ))}
                       {hasIntl && (
                         <td className="border-l border-border px-4 py-2.5 text-right font-mono tnum text-accent-soft-fg">
-                          {international[d] != null ? formatNumber(international[d]) : "—"}
+                          {international[d] != null ? f.numero(international[d]) : "—"}
                         </td>
                       )}
                       <td className="px-4 py-2.5 text-right">
@@ -375,7 +399,7 @@ export function PreciosClient({
                           <button
                             onClick={() => onDeleteDate(d)}
                             className="rounded p-1.5 text-fg-subtle hover:bg-danger-soft hover:text-danger"
-                            aria-label="Eliminar fecha"
+                            aria-label={t.precios.eliminarFecha}
                           >
                             <Trash2 className="h-4 w-4" />
                           </button>
@@ -394,20 +418,20 @@ export function PreciosClient({
       <Modal
         open={open}
         onClose={() => setOpen(false)}
-        title="Cargar precios"
+        title={t.precios.cargarPrecios}
         footer={
           <>
             <Button variant="secondary" size="sm" onClick={() => setOpen(false)}>
-              Cancelar
+              {t.comun.cancelar}
             </Button>
             <Button size="sm" onClick={onSubmit} loading={saving}>
-              Guardar
+              {t.comun.guardar}
             </Button>
           </>
         }
       >
         <div className="space-y-4">
-          <Field label="Fecha">
+          <Field label={t.comun.fecha}>
             <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
           </Field>
           {companies.map((c) => (
