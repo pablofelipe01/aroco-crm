@@ -10,7 +10,8 @@ import { Select } from "@/components/ui/input";
 import { EmptyState } from "@/components/ui/empty-state";
 import { useToast } from "@/components/ui/toast";
 import { QUOTE_STATUS_META } from "@/lib/status";
-import { formatUSD, formatDate } from "@/lib/utils";
+import { formatUSD } from "@/lib/utils";
+import { useT, useFormatos } from "@/lib/i18n/provider";
 import type { QuoteStatus } from "@/lib/types/database";
 import type { QuoteWithLead } from "./page";
 import { QuoteCalculator } from "./quote-calculator";
@@ -29,6 +30,8 @@ export function CotizacionesClient({
 }) {
   const router = useRouter();
   const { toast } = useToast();
+  const t = useT();
+  const f = useFormatos();
   const [open, setOpen] = React.useState(false);
   const [editing, setEditing] = React.useState<QuoteWithLead | null>(null);
 
@@ -53,30 +56,49 @@ export function CotizacionesClient({
   async function onStatus(id: string, status: QuoteStatus) {
     const res = await setQuoteStatus(id, status);
     if (!res.ok) {
-      toast({ tone: "error", title: "No se pudo actualizar", description: res.error });
+      toast({
+        tone: "error",
+        title: t.cotizaciones.noSeActualizo,
+        description: res.error,
+      });
       return;
     }
     if (status === "enviada")
-      toast({ tone: "success", title: "Cotización enviada", description: "El lead se movió a “Enviado”." });
+      toast({
+        tone: "success",
+        title: t.cotizaciones.enviada,
+        description: t.cotizaciones.leadMovido,
+      });
     router.refresh();
   }
 
   async function onDelete(q: QuoteWithLead) {
-    if (!confirm(`¿Eliminar ${q.quote_number ?? "esta cotización"}?`)) return;
+    if (
+      !confirm(
+        `${t.cotizaciones.confirmarEliminar} ${
+          q.quote_number ?? t.cotizaciones.estaCotizacion
+        }?`,
+      )
+    )
+      return;
     const res = await deleteQuote(q.id);
     if (!res.ok) {
-      toast({ tone: "error", title: "No se pudo eliminar", description: res.error });
+      toast({
+        tone: "error",
+        title: t.cotizaciones.noSeElimino,
+        description: res.error,
+      });
       return;
     }
-    toast({ tone: "success", title: "Cotización eliminada" });
+    toast({ tone: "success", title: t.cotizaciones.eliminada });
     router.refresh();
   }
 
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Cotizaciones"
-        description={`${initialQuotes.length} cotizaciones en el historial`}
+        title={t.cotizaciones.titulo}
+        description={`${initialQuotes.length} ${t.cotizaciones.enHistorial}`}
         actions={
           canWrite && (
             <Button
@@ -87,7 +109,7 @@ export function CotizacionesClient({
               }}
             >
               <Plus className="h-4 w-4" />
-              Nueva cotización
+              {t.cotizaciones.nueva}
             </Button>
           )
         }
@@ -96,13 +118,13 @@ export function CotizacionesClient({
       {initialQuotes.length === 0 ? (
         <EmptyState
           icon={<FileText className="h-6 w-6" />}
-          title="Sin cotizaciones"
-          description="Crea la primera con la calculadora del cotizador."
+          title={t.cotizaciones.sinCotizaciones}
+          description={t.cotizaciones.creaPrimera}
           action={
             canWrite && (
               <Button size="sm" onClick={() => setOpen(true)}>
                 <Plus className="h-4 w-4" />
-                Nueva cotización
+                {t.cotizaciones.nueva}
               </Button>
             )
           }
@@ -133,10 +155,10 @@ export function CotizacionesClient({
                     {q.precio_final_usd_tm != null ? formatUSD(q.precio_final_usd_tm) : "—"}
                   </p>
                   <p className="text-xs text-fg-subtle">
-                    Utilidad{" "}
+                    {t.cotizaciones.utilidad}{" "}
                     {q.utilidad_pct != null ? `${(q.utilidad_pct * 100).toFixed(2)}%` : "—"}
                     {" · "}
-                    {formatDate(q.created_at)}
+                    {f.fecha(q.created_at)}
                   </p>
                 </div>
                 {canWrite ? (
@@ -147,7 +169,7 @@ export function CotizacionesClient({
                   >
                     {STATUSES.map((st) => (
                       <option key={st} value={st}>
-                        {QUOTE_STATUS_META[st].label}
+                        {t.cotizacionEstados[st]}
                       </option>
                     ))}
                   </Select>
@@ -163,7 +185,7 @@ export function CotizacionesClient({
                   target="_blank"
                   rel="noopener noreferrer"
                   className="rounded p-1.5 text-fg-subtle hover:bg-bg-subtle hover:text-fg"
-                  title="Exportar PDF"
+                  title={t.cotizaciones.exportarPdf}
                 >
                   <FileDown className="h-4 w-4" />
                 </a>
@@ -175,14 +197,14 @@ export function CotizacionesClient({
                         setOpen(true);
                       }}
                       className="rounded p-1.5 text-fg-subtle hover:bg-bg-subtle hover:text-fg"
-                      title="Editar"
+                      title={t.comun.editar}
                     >
                       <Pencil className="h-4 w-4" />
                     </button>
                     <button
                       onClick={() => onDelete(q)}
                       className="rounded p-1.5 text-fg-subtle hover:bg-danger-soft hover:text-danger"
-                      title="Eliminar"
+                      title={t.comun.eliminar}
                     >
                       <Trash2 className="h-4 w-4" />
                     </button>
@@ -198,13 +220,23 @@ export function CotizacionesClient({
           <table className="w-full min-w-[820px] text-sm">
             <thead>
               <tr className="border-b border-border text-xs uppercase tracking-wide text-fg-subtle">
-                <th className="px-4 py-3 text-left font-medium">Número</th>
-                <th className="px-4 py-3 text-left font-medium">Cliente</th>
-                <th className="px-4 py-3 text-left font-medium">Incoterm</th>
-                <th className="px-4 py-3 text-right font-medium">Precio final</th>
-                <th className="px-4 py-3 text-right font-medium">Utilidad</th>
-                <th className="px-4 py-3 text-left font-medium">Estado</th>
-                <th className="px-4 py-3 text-left font-medium">Fecha</th>
+                <th className="px-4 py-3 text-left font-medium">
+                  {t.cotizaciones.numero}
+                </th>
+                <th className="px-4 py-3 text-left font-medium">
+                  {t.cotizaciones.cliente}
+                </th>
+                <th className="px-4 py-3 text-left font-medium">
+                  {t.cotizaciones.incoterm}
+                </th>
+                <th className="px-4 py-3 text-right font-medium">
+                  {t.cotizaciones.precioFinal}
+                </th>
+                <th className="px-4 py-3 text-right font-medium">
+                  {t.cotizaciones.utilidad}
+                </th>
+                <th className="px-4 py-3 text-left font-medium">{t.comun.estado}</th>
+                <th className="px-4 py-3 text-left font-medium">{t.comun.fecha}</th>
                 <th className="px-4 py-3" />
               </tr>
             </thead>
@@ -235,7 +267,7 @@ export function CotizacionesClient({
                       >
                         {STATUSES.map((st) => (
                           <option key={st} value={st}>
-                            {QUOTE_STATUS_META[st].label}
+                            {t.cotizacionEstados[st]}
                           </option>
                         ))}
                       </Select>
@@ -246,7 +278,7 @@ export function CotizacionesClient({
                     )}
                   </td>
                   <td className="px-4 py-3 font-mono text-xs text-fg-subtle">
-                    {formatDate(q.created_at)}
+                    {f.fecha(q.created_at)}
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center justify-end gap-1">
@@ -255,7 +287,7 @@ export function CotizacionesClient({
                         target="_blank"
                         rel="noopener noreferrer"
                         className="rounded p-1.5 text-fg-subtle hover:bg-bg-subtle hover:text-fg"
-                        title="Exportar PDF"
+                        title={t.cotizaciones.exportarPdf}
                       >
                         <FileDown className="h-4 w-4" />
                       </a>
@@ -267,14 +299,14 @@ export function CotizacionesClient({
                               setOpen(true);
                             }}
                             className="rounded p-1.5 text-fg-subtle hover:bg-bg-subtle hover:text-fg"
-                            title="Editar"
+                            title={t.comun.editar}
                           >
                             <Pencil className="h-4 w-4" />
                           </button>
                           <button
                             onClick={() => onDelete(q)}
                             className="rounded p-1.5 text-fg-subtle hover:bg-danger-soft hover:text-danger"
-                            title="Eliminar"
+                            title={t.comun.eliminar}
                           >
                             <Trash2 className="h-4 w-4" />
                           </button>
