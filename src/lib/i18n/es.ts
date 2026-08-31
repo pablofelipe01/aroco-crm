@@ -204,6 +204,7 @@ export const es = {
     crearLead: "Crear lead",
     nombreEmpresa: "Nombre de la empresa",
     nombrePersona: "Nombre de la persona",
+    placeholderCorreo: "nombre@empresa.com",
     correoInvalido: "Correo inválido.",
     telefonoCorto: "El teléfono es muy corto.",
     sinAsignar: "Sin asignar",
@@ -317,6 +318,9 @@ export const es = {
   mercado: {
     titulo: "Mercado",
     descripcion: "Posición física, cobertura y exposición al precio",
+    accesoRestringido: "Acceso restringido",
+    accesoRestringidoNota:
+      "Posiciones, cobertura y P&L solo los ve quien tiene el permiso de Mercado.",
     cargarTablero: "Cargar tablero",
     sincronizarAhora: "Sincronizar ahora",
     sincronizando: "Consultando StoneX, Barchart y la TRM. Puede tomar un par de minutos.",

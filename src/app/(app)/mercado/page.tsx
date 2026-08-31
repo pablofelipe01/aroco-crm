@@ -1,6 +1,7 @@
 import { ShieldAlert } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getSessionContext } from "@/lib/auth";
+import { diccionario, normalizarIdioma } from "@/lib/i18n";
 import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
 import { cargarMercado } from "./riesgo-data";
@@ -19,13 +20,16 @@ export default async function MercadoPage() {
   // Esconder el módulo del menú no es un control de acceso: la ruta se puede
   // escribir a mano. El candado real está aquí.
   if (!session?.profile?.ve_mercado) {
+    // Componente de servidor: no hay hooks, así que el diccionario se resuelve
+    // a mano desde el perfil que ya se cargó.
+    const t = diccionario(normalizarIdioma(session?.profile?.idioma));
     return (
       <div>
-        <PageHeader title="Mercado" />
+        <PageHeader title={t.nav.mercado} />
         <EmptyState
           icon={<ShieldAlert className="h-6 w-6" />}
-          title="Acceso restringido"
-          description="Posiciones, cobertura y P&L solo los ve quien tiene el permiso de Mercado."
+          title={t.mercado.accesoRestringido}
+          description={t.mercado.accesoRestringidoNota}
         />
       </div>
     );

@@ -204,6 +204,7 @@ export const en: Diccionario = {
     crearLead: "Create lead",
     nombreEmpresa: "Company name",
     nombrePersona: "Person's name",
+    placeholderCorreo: "name@company.com",
     correoInvalido: "Invalid email.",
     telefonoCorto: "That phone number is too short.",
     sinAsignar: "Unassigned",
@@ -317,6 +318,9 @@ export const en: Diccionario = {
   mercado: {
     titulo: "Market",
     descripcion: "Physical position, hedging and price exposure",
+    accesoRestringido: "Access restricted",
+    accesoRestringidoNota:
+      "Positions, hedging and P&L are only visible to those with the Market permission.",
     cargarTablero: "Upload board",
     sincronizarAhora: "Sync now",
     sincronizando: "Querying StoneX, Barchart and the TRM. This can take a couple of minutes.",

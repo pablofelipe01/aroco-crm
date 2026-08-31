@@ -168,7 +168,7 @@ export function LeadForm({
             type="email"
             inputMode="email"
             autoComplete="email"
-            placeholder="nombre@empresa.com"
+            placeholder={t.comercial.placeholderCorreo}
             {...register("contact_email", {
               // Se valida en el navegador para no perder el viaje al servidor;
               // el esquema de Zod vuelve a validarlo del otro lado.
