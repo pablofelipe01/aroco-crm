@@ -19,6 +19,7 @@ export default function RegistroProveedor() {
   const [error, setError] = React.useState<string | null>(null);
   const [enviando, setEnviando] = React.useState(false);
   const [listo, setListo] = React.useState(false);
+  const [aviso, setAviso] = React.useState<string | null>(null);
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -37,6 +38,9 @@ export default function RegistroProveedor() {
       setEnviando(false);
       return;
     }
+    // El registro pudo salir bien y un archivo no. Decirlo evita que alguien
+    // crea que ya subió el RUT cuando no quedó.
+    if (res.error) setAviso(res.error);
 
     // Se entra de una vez: pedirle que vuelva a escribir lo que acaba de
     // elegir, después de llenar un formulario largo, es fricción sin motivo.
@@ -56,10 +60,15 @@ export default function RegistroProveedor() {
         <CheckCircle2 className="mx-auto mb-4 h-12 w-12 text-success" />
         <h1 className="text-2xl font-semibold text-fg">Registro enviado</h1>
         <p className="mt-2 text-sm text-fg-muted">
-          Ya tienes cuenta. AROCO va a revisar tus datos y tus documentos; mientras
-          tanto puedes subirlos desde tu panel. Cuando quede verificado podrás
+          Ya tienes cuenta. AROCO va a revisar tus datos y tus documentos; los que
+          falten los puedes subir desde tu panel. Cuando quede verificado podrás
           radicar cuentas de cobro.
         </p>
+        {aviso && (
+          <p className="mt-3 rounded-[var(--radius-md)] border border-warn/40 bg-warn-soft p-3 text-sm text-warn">
+            {aviso}
+          </p>
+        )}
         <Button className="mt-6" onClick={() => router.push("/portal")}>
           Ir a mi panel
         </Button>
@@ -74,7 +83,8 @@ export default function RegistroProveedor() {
       <h1 className="text-2xl font-semibold text-fg">Registro de proveedor</h1>
       <p className="mt-1 text-sm text-fg-muted">
         Para proveedores de insumos y servicios: oficina, finca, cultivo, bodega,
-        transporte y demás. Los documentos se suben después, desde tu panel.
+        transporte y demás. Puedes adjuntar el RUT y el certificado bancario aquí
+        mismo.
       </p>
 
       <form onSubmit={onSubmit} className="mt-6 space-y-6">
@@ -216,6 +226,31 @@ export default function RegistroProveedor() {
             </Field>
             <Field label="Documento del titular" className="sm:col-span-2">
               <Input name="documento_titular" />
+            </Field>
+          </CardBody>
+        </Card>
+
+        <Card>
+          <CardBody className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <h2 className="text-sm font-medium text-fg sm:col-span-2">Tus documentos</h2>
+            <p className="text-xs text-fg-subtle sm:col-span-2">
+              Súbelos ahora si los tienes a mano — es lo que hace falta para
+              verificarte. Si no, puedes hacerlo después desde tu panel, junto con
+              el resto (cédula o NIT, cámara de comercio).
+            </p>
+
+            <Field label="RUT" hint="PDF o imagen, máximo 10 MB.">
+              <Input type="file" name="rut" accept=".pdf,image/*" />
+            </Field>
+            <Field label="Vence el" hint="Si no tiene vigencia, déjalo vacío.">
+              <Input type="date" name="rut_vence" />
+            </Field>
+
+            <Field label="Certificado bancario" hint="El de la cuenta a la que te pagamos.">
+              <Input type="file" name="certificado_bancario" accept=".pdf,image/*" />
+            </Field>
+            <Field label="Vence el">
+              <Input type="date" name="certificado_bancario_vence" />
             </Field>
           </CardBody>
         </Card>

@@ -54,6 +54,15 @@ function leerFicha(fd: FormData) {
   };
 }
 
+/** Tipos y tamaño que se aceptan como documento. */
+function revisarArchivo(a: unknown): { ok: true; file: File } | { ok: false; error: string } {
+  if (!(a instanceof File) || a.size === 0) return { ok: false, error: "Archivo vacío." };
+  if (a.size > 10 * 1024 * 1024) return { ok: false, error: "Pesa más de 10 MB." };
+  const permitidos = ["application/pdf", "image/png", "image/jpeg", "image/webp"];
+  if (!permitidos.includes(a.type)) return { ok: false, error: "Solo PDF o imágenes." };
+  return { ok: true, file: a };
+}
+
 /**
  * Alta de un proveedor: cuenta de acceso + ficha.
  *
@@ -138,7 +147,52 @@ export async function registrarProveedor(fd: FormData): Promise<Resultado> {
     return { ok: false, error: legible(eFicha.message) };
   }
 
-  return { ok: true, id: ficha.id };
+  // ── Documentos del registro ───────────────────────────────────────────────
+  // Se suben con el cliente admin porque el proveedor todavía no tiene sesión:
+  // acaba de crearse la cuenta y aún no ha iniciado. La ruta la arma el
+  // servidor a partir de la ficha recién creada, así que quien registra no
+  // puede influir en dónde se guarda.
+  //
+  // Un documento que falle NO deshace el registro: la ficha ya vale, y perderla
+  // por un PDF corrupto obligaría a llenar todo el formulario otra vez. Se
+  // reporta cuál faltó para que lo suba desde su panel.
+  const avisos: string[] = [];
+  for (const [campo, tipo] of [
+    ["rut", "RUT"],
+    ["certificado_bancario", "Certificado bancario"],
+  ] as const) {
+    const revisado = revisarArchivo(fd.get(campo));
+    if (!("ok" in revisado) || !revisado.ok) {
+      // Sin archivo no es un error: son opcionales en el registro.
+      if (fd.get(campo) instanceof File && (fd.get(campo) as File).size > 0) {
+        avisos.push(`${tipo}: ${(revisado as { error: string }).error}`);
+      }
+      continue;
+    }
+    const limpio = revisado.file.name.replace(/[^\w.\-]+/g, "_").slice(-80);
+    const ruta = `${ficha.id}/${Date.now()}-${limpio}`;
+    const { error: eUp } = await admin.storage
+      .from("proveedores-insumos")
+      .upload(ruta, revisado.file, { contentType: revisado.file.type });
+    if (eUp) {
+      avisos.push(`${tipo}: no se pudo subir.`);
+      continue;
+    }
+    const vence = String(fd.get(`${campo}_vence`) ?? "").trim();
+    await admin.from("proveedor_insumo_documentos").insert({
+      proveedor_id: ficha.id,
+      tipo: tipo as TipoDoc,
+      archivo_path: ruta,
+      archivo_nombre: revisado.file.name,
+      vence_el: /^\d{4}-\d{2}-\d{2}$/.test(vence) ? vence : null,
+    });
+  }
+
+  return {
+    ok: true,
+    id: ficha.id,
+    error: avisos.length ? `Quedó registrado, pero: ${avisos.join(" · ")}` : undefined,
+  };
 }
 
 /** Edita la ficha. Cambiar la cuenta bancaria la devuelve a verificación. */
@@ -203,17 +257,9 @@ export async function subirDocumento(fd: FormData): Promise<Resultado> {
     return { ok: false, error: meta.error.issues[0]?.message ?? "Datos inválidos." };
   }
 
-  const archivo = fd.get("archivo");
-  if (!(archivo instanceof File) || archivo.size === 0) {
-    return { ok: false, error: "Elige un archivo." };
-  }
-  if (archivo.size > 10 * 1024 * 1024) {
-    return { ok: false, error: "El archivo pesa más de 10 MB." };
-  }
-  const permitidos = ["application/pdf", "image/png", "image/jpeg", "image/webp"];
-  if (!permitidos.includes(archivo.type)) {
-    return { ok: false, error: "Solo se aceptan PDF o imágenes." };
-  }
+  const revisado = revisarArchivo(fd.get("archivo"));
+  if (!revisado.ok) return { ok: false, error: revisado.error };
+  const archivo = revisado.file;
 
   const supabase = await createClient();
   const limpio = archivo.name.replace(/[^\w.\-]+/g, "_").slice(-80);

@@ -18,6 +18,8 @@ const PUBLIC_PREFIXES = [
   "/auth",
   "/onboarding",
   "/portal",
+  "/registro",
+  "/proveedor",
   "/api/cron",
   "/api/posicion",
 ];
