@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/types/database";
 import { llamarHerramienta, type McpConfig } from "@/lib/mcp/client";
 import { parsearMatriz, estimarColombia, POSICION_COLOMBIA, type Matriz } from "./diferenciales";
+import { parsearRatios } from "./ratios";
 
 /**
  * Trae los diferenciales semanales de StoneX por el agente del servidor.
@@ -21,6 +22,7 @@ export type ResultadoDiferenciales = {
   colombia: number | null;
   ignoradas: number;
   aviso: string | null;
+  ratios: { report_date: string | null; filas: number; futuros: number } | null;
 };
 
 type Tabla = { published_date?: string; pdf_url?: string; matrix?: Matriz; rows?: Matriz };
@@ -40,7 +42,7 @@ export async function sincronizarDiferenciales(
   const r = await llamarHerramienta(mcp, "get_cocoa_tables", {}, 90_000);
   if (typeof r === "string") throw new Error(r);
 
-  const payload = r as { differentials?: Tabla; missing?: string[] };
+  const payload = r as { differentials?: Tabla; ratios?: Tabla; missing?: string[] };
   const t = payload.differentials;
   // `missing` es la señal del propio agente de que no alcanzó el reporte en el
   // scroll. Es distinto de un fallo: hay que decirlo, no reintentar a ciegas.
@@ -137,11 +139,76 @@ export async function sincronizarDiferenciales(
     colombia = est.valor;
   }
 
+  // ── Ratios ────────────────────────────────────────────────────────────────
+  // Vienen en la misma llamada, así que no cuesta una segunda vuelta al MCP.
+  // Se guardan aunque los diferenciales hayan fallado en algo: son reportes
+  // distintos y uno no invalida al otro.
+  const ratios = await guardarRatios(db, payload.ratios);
+
   return {
     report_date: reportDate,
     filas: filas.length,
     colombia,
     ignoradas: ignoradas.length,
     aviso,
+    ratios,
   };
+}
+
+/**
+ * Guarda el reporte de ratios y su bloque de futuros.
+ *
+ * Las filas se reemplazan por reporte en vez de hacer upsert: si un producto
+ * deja de cotizarse, dejarlo vivo mostraría un ratio de la semana pasada como
+ * si fuera de esta.
+ */
+async function guardarRatios(
+  db: SupabaseClient<Database>,
+  t: Tabla | undefined,
+): Promise<{ report_date: string | null; filas: number; futuros: number } | null> {
+  const matriz = t?.matrix ?? t?.rows;
+  if (!Array.isArray(matriz) || matriz.length === 0) return null;
+
+  const fechaR = fecha(t?.published_date) ?? new Date().toISOString().slice(0, 10);
+
+  await db.from("cocoa_report_tables").upsert(
+    { reporte: "ratios", report_date: fechaR, pdf_url: t?.pdf_url ?? null, matriz },
+    { onConflict: "reporte,report_date" },
+  );
+
+  const { ratios, futuros } = parsearRatios(matriz);
+  if (ratios.length === 0) return { report_date: fechaR, filas: 0, futuros: 0 };
+
+  await db.from("cocoa_ratios").delete().eq("report_date", fechaR);
+  const { error: eR } = await db.from("cocoa_ratios").insert(
+    ratios.map((r) => ({
+      report_date: fechaR,
+      categoria: r.categoria,
+      producto: r.producto,
+      incoterm: r.incoterm,
+      mercado: r.mercado,
+      ratio: r.ratio,
+      ratio_anterior: r.ratioAnterior,
+      precio_usd: r.precioUsd,
+      precio_gbp: r.precioGbp,
+      precio_eur: r.precioEur,
+    })),
+  );
+  if (eR) throw new Error(`cocoa_ratios: ${eR.message}`);
+
+  if (futuros.length > 0) {
+    await db.from("cocoa_futuros").delete().eq("report_date", fechaR);
+    const { error: eF } = await db.from("cocoa_futuros").insert(
+      futuros.map((f) => ({
+        report_date: fechaR,
+        contrato: f.contrato,
+        valor: f.valor,
+        valor_anterior: f.valorAnterior,
+        moneda: f.moneda,
+      })),
+    );
+    if (eF) throw new Error(`cocoa_futuros: ${eF.message}`);
+  }
+
+  return { report_date: fechaR, filas: ratios.length, futuros: futuros.length };
 }

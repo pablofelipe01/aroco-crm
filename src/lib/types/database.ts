@@ -377,6 +377,81 @@ export type Database = {
         };
         Relationships: [];
       };
+      cocoa_ratios: {
+        Row: {
+          id: string;
+          report_date: string;
+          categoria: string;
+          producto: string;
+          incoterm: string | null;
+          mercado: string | null;
+          ratio: number;
+          ratio_anterior: number | null;
+          precio_usd: number | null;
+          precio_gbp: number | null;
+          precio_eur: number | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          report_date?: string;
+          categoria?: string;
+          producto?: string;
+          incoterm?: string | null;
+          mercado?: string | null;
+          ratio?: number;
+          ratio_anterior?: number | null;
+          precio_usd?: number | null;
+          precio_gbp?: number | null;
+          precio_eur?: number | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          report_date?: string;
+          categoria?: string;
+          producto?: string;
+          incoterm?: string | null;
+          mercado?: string | null;
+          ratio?: number;
+          ratio_anterior?: number | null;
+          precio_usd?: number | null;
+          precio_gbp?: number | null;
+          precio_eur?: number | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      cocoa_futuros: {
+        Row: {
+          id: string;
+          report_date: string;
+          contrato: string;
+          valor: number;
+          valor_anterior: number | null;
+          moneda: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          report_date?: string;
+          contrato?: string;
+          valor?: number;
+          valor_anterior?: number | null;
+          moneda?: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          report_date?: string;
+          contrato?: string;
+          valor?: number;
+          valor_anterior?: number | null;
+          moneda?: string;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
       cocoa_report_tables: {
         Row: {
           id: string;

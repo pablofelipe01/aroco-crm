@@ -23,7 +23,7 @@
     },
     {
       "path": "/api/cron/sync-mercado?diferenciales=1&dias=2",
-      "schedule": "0 14 * * 1"
+      "schedule": "0 14 * * 4"
     }
   ]
 }
