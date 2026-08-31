@@ -372,13 +372,18 @@ export function ActasClient({
                   <FileDown className="h-4 w-4" />
                 </button>
               )}
-              <button
-                onClick={() => onDelete(m)}
-                className="rounded p-1.5 text-fg-subtle hover:bg-danger-soft hover:text-danger"
-                title="Eliminar"
-              >
-                <Trash2 className="h-4 w-4" />
-              </button>
+              {/* Desde 0076 solo borra quien administra el acta o quien la
+                  subió. Se esconde a los demás: mostrarlo prometía algo que la
+                  base iba a rechazar en silencio. */}
+              {m.puedeEditar && (
+                <button
+                  onClick={() => onDelete(m)}
+                  className="rounded p-1.5 text-fg-subtle hover:bg-danger-soft hover:text-danger"
+                  title="Eliminar"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              )}
             </li>
           ))}
         </ul>

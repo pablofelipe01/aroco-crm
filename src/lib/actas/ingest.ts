@@ -1,6 +1,6 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { extractActaTasks, type ActaContent } from "@/lib/ai/actas";
+import { agruparActaPorTemas, extractActaTasks, type ActaContent } from "@/lib/ai/actas";
 import { hasGmailEnv, listActaMessageIds, fetchEmail } from "@/lib/gmail";
 import { serverEnv } from "@/lib/env";
 
@@ -227,12 +227,15 @@ export async function ingestActasFromGmail(): Promise<IngestSummary> {
         };
       });
 
+      let idsTareas: string[] = [];
+
       if (prepared.length > 0) {
         const { data: inserted, error: tErr } = await db
           .from("tasks")
           .insert(prepared.map((p) => p.row))
           .select("id");
         if (tErr) throw new Error(tErr.message);
+        idsTareas = (inserted ?? []).map((t) => t.id);
 
         // `insert` conserva el orden de entrada, así que los ids casan 1:1.
         const links = (inserted ?? []).flatMap((task, i) =>
@@ -244,6 +247,55 @@ export async function ingestActasFromGmail(): Promise<IngestSummary> {
         if (links.length > 0) {
           const { error: aErr } = await db.from("task_assignees").insert(links);
           if (aErr) throw new Error(aErr.message);
+        }
+      }
+
+      // ── Agrupación por tema ────────────────────────────────────────────
+      //
+      //  Va dentro de su propio try: si la agrupación falla, el acta y sus
+      //  tareas ya están guardadas y eso es lo que no se puede perder. Sin
+      //  temas el acta se lee como antes, y siempre se puede reagrupar a mano
+      //  desde el CRM.
+      if (cuerpo.length >= 20) {
+        try {
+          const temas = await agruparActaPorTemas(
+            cuerpo,
+            prepared.map((p) => ({ nombre: p.row.name })),
+          );
+          if (temas.length > 0) {
+            const { data: creados } = await db
+              .from("meeting_temas")
+              .insert(
+                temas.map((t, i) => ({
+                  meeting_id: meeting.id,
+                  titulo: t.titulo,
+                  resumen: t.resumen || null,
+                  orden: i,
+                })),
+              )
+              .select("id");
+
+            await Promise.all(
+              (creados ?? []).map((tema, i) => {
+                const ids = (temas[i]?.tareas ?? [])
+                  .map((n) => idsTareas[n])
+                  .filter((x): x is string => !!x);
+                if (ids.length === 0) return Promise.resolve();
+                return db
+                  .from("tasks")
+                  .update({ tema_id: tema.id })
+                  .in("id", ids)
+                  .then(() => undefined);
+              }),
+            );
+          }
+        } catch (e) {
+          summary.errors.push({
+            emailId,
+            error: `acta guardada, pero no se pudo agrupar por tema: ${
+              e instanceof Error ? e.message : String(e)
+            }`,
+          });
         }
       }
 

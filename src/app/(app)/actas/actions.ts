@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { getSessionContext } from "@/lib/auth";
+import { agruparActaPorTemas } from "@/lib/ai/actas";
 
 export type ActaResult = { ok: boolean; error?: string; count?: number };
 
@@ -86,8 +87,23 @@ export async function deleteMeeting(id: string): Promise<ActaResult> {
     .eq("id", id)
     .maybeSingle();
 
-  const { error } = await supabase.from("meetings").delete().eq("id", id);
+  // `.select()` para saber si de verdad se borró. Desde 0076 solo puede
+  // borrar quien administra el acta o quien la creó, y una fila que la RLS no
+  // deja tocar NO produce error: la operación afecta cero filas y devuelve ok.
+  // Sin esta comprobación, a quien no tiene permiso le saldría «acta
+  // eliminada» y el acta seguiría en la lista al recargar.
+  const { data: borradas, error } = await supabase
+    .from("meetings")
+    .delete()
+    .eq("id", id)
+    .select("id");
   if (error) return { ok: false, error: error.message };
+  if (!borradas || borradas.length === 0) {
+    return {
+      ok: false,
+      error: "No puedes eliminar esta acta: solo pueden hacerlo quienes la administran o quien la subió.",
+    };
+  }
   if (meeting?.file_path) {
     await supabase.storage.from("actas").remove([meeting.file_path]);
   }
@@ -249,4 +265,218 @@ export async function removeMeetingViewer(attendeeId: string): Promise<ActaResul
   }
   revalidatePath("/actas");
   return { ok: true };
+}
+
+// ── Editar el acta ──────────────────────────────────────────────────────────
+
+const actaSchema = z.object({
+  id: z.string().uuid(),
+  title: z.string().trim().min(1, "El acta necesita un título."),
+  meeting_date: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "Fecha inválida.")
+    .nullable()
+    .optional(),
+  notes: z.string().nullable().optional(),
+});
+
+/**
+ * Guarda los cambios del acta: título, fecha y cuerpo.
+ *
+ * Quién puede lo decide la base (`puede_editar_acta`, 0076): quien administra
+ * el acta o quien la subió. Aquí se comprueba que el update haya tocado la
+ * fila, porque una escritura bloqueada por RLS no devuelve error — devuelve
+ * cero filas, y sin mirarlas el formulario diría «guardado» sin haber guardado.
+ */
+export async function actualizarActa(input: unknown): Promise<ActaResult> {
+  const parsed = actaSchema.safeParse(input);
+  if (!parsed.success)
+    return { ok: false, error: parsed.error.issues[0]?.message ?? "Datos inválidos." };
+
+  const session = await getSessionContext();
+  if (!session) return { ok: false, error: "Sesión expirada." };
+
+  const { id, title, meeting_date, notes } = parsed.data;
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from("meetings")
+    .update({
+      title,
+      meeting_date: meeting_date || null,
+      notes: notes?.trim() ? notes : null,
+    })
+    .eq("id", id)
+    .select("id");
+
+  if (error) return { ok: false, error: error.message };
+  if (!data || data.length === 0)
+    return {
+      ok: false,
+      error: "No puedes editar esta acta: solo pueden hacerlo quienes la administran o quien la subió.",
+    };
+
+  revalidatePath("/actas");
+  return { ok: true };
+}
+
+// ── Temas ───────────────────────────────────────────────────────────────────
+
+const temaSchema = z.object({
+  id: z.string().uuid(),
+  titulo: z.string().trim().min(1, "El tema necesita un título."),
+  resumen: z.string().nullable().optional(),
+});
+
+/** Renombra un tema o corrige su resumen. */
+export async function guardarTema(input: unknown): Promise<ActaResult> {
+  const parsed = temaSchema.safeParse(input);
+  if (!parsed.success)
+    return { ok: false, error: parsed.error.issues[0]?.message ?? "Datos inválidos." };
+
+  const session = await getSessionContext();
+  if (!session) return { ok: false, error: "Sesión expirada." };
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("meeting_temas")
+    .update({
+      titulo: parsed.data.titulo,
+      resumen: parsed.data.resumen?.trim() ? parsed.data.resumen : null,
+    })
+    .eq("id", parsed.data.id)
+    .select("id");
+
+  if (error) return { ok: false, error: error.message };
+  if (!data || data.length === 0)
+    return { ok: false, error: "No puedes editar los temas de esta acta." };
+
+  revalidatePath("/actas");
+  return { ok: true };
+}
+
+/**
+ * Mueve una tarea de un tema a otro, o la deja sin tema (`null`).
+ *
+ * Es la salida cuando la IA reparte mal: corregir a mano es más rápido que
+ * volver a agrupar el acta entera, y no arriesga los temas que sí quedaron
+ * bien.
+ */
+export async function moverTareaDeTema(
+  taskId: string,
+  temaId: string | null,
+): Promise<ActaResult> {
+  const session = await getSessionContext();
+  if (!session) return { ok: false, error: "Sesión expirada." };
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("tasks")
+    .update({ tema_id: temaId })
+    .eq("id", taskId)
+    .select("id");
+
+  if (error) return { ok: false, error: error.message };
+  if (!data || data.length === 0)
+    return { ok: false, error: "No se pudo mover la tarea." };
+
+  revalidatePath("/actas");
+  return { ok: true };
+}
+
+/**
+ * Agrupa un acta por temas usando la IA.
+ *
+ * Se lanza a mano desde el acta, no automáticamente para las 51 que ya
+ * existen: cada pasada cuesta una llamada al modelo y hay actas viejas que
+ * nadie va a volver a abrir. Las nuevas sí se agrupan solas al llegar.
+ *
+ * Rehacerla es seguro: borra los temas anteriores y vuelve a repartir. Las
+ * tareas sobreviven —`tema_id` es `on delete set null`— así que lo peor que
+ * puede pasar es quedarse otra vez sin agrupación, nunca sin trabajo asignado.
+ */
+export async function agruparActa(meetingId: string): Promise<ActaResult> {
+  const session = await getSessionContext();
+  if (!session) return { ok: false, error: "Sesión expirada." };
+
+  const supabase = await createClient();
+
+  const { data: acta } = await supabase
+    .from("meetings")
+    .select("id, notes")
+    .eq("id", meetingId)
+    .maybeSingle();
+
+  if (!acta) return { ok: false, error: "No se encontró el acta." };
+  if (!acta.notes?.trim())
+    return {
+      ok: false,
+      error: "Esta acta no tiene texto guardado; solo el archivo adjunto. No hay de dónde sacar los temas.",
+    };
+
+  // Se comprueba el permiso ANTES de gastar la llamada al modelo. Al revés
+  // —agrupar y descubrir al escribir que la RLS lo rechaza— el acta se queda
+  // igual y el gasto ya está hecho. Se le pregunta a la misma función que
+  // aplica la política, así que no hay dos reglas que puedan discrepar.
+  const { data: puede } = await supabase.rpc("puede_editar_acta", {
+    p_meeting: meetingId,
+  });
+  if (!puede)
+    return {
+      ok: false,
+      error: "No puedes agrupar esta acta: solo pueden hacerlo quienes la administran o quien la subió.",
+    };
+
+  const { data: tareas } = await supabase
+    .from("tasks")
+    .select("id, name")
+    .eq("meeting_id", meetingId)
+    .order("created_at", { ascending: true });
+
+  const lista = tareas ?? [];
+  const temas = await agruparActaPorTemas(
+    acta.notes,
+    lista.map((t) => ({ nombre: t.name })),
+  );
+
+  if (temas.length === 0)
+    return { ok: false, error: "La IA no encontró temas en esta acta." };
+
+  // Fuera los temas anteriores. Las tareas quedan sueltas un instante y se
+  // vuelven a repartir enseguida; el `on delete set null` evita que se vayan
+  // con ellos.
+  await supabase.from("meeting_temas").delete().eq("meeting_id", meetingId);
+
+  const { data: creados, error: errTemas } = await supabase
+    .from("meeting_temas")
+    .insert(
+      temas.map((t, i) => ({
+        meeting_id: meetingId,
+        titulo: t.titulo,
+        resumen: t.resumen || null,
+        orden: i,
+      })),
+    )
+    .select("id");
+
+  if (errTemas) return { ok: false, error: errTemas.message };
+  if (!creados || creados.length !== temas.length)
+    return { ok: false, error: "No se pudieron guardar los temas." };
+
+  // Reparto de las tareas. Se hace tema por tema y no en lote porque cada
+  // grupo apunta a un id distinto.
+  await Promise.all(
+    temas.map((t, i) => {
+      const ids = t.tareas.map((n) => lista[n]?.id).filter((x): x is string => !!x);
+      if (ids.length === 0) return Promise.resolve();
+      return supabase
+        .from("tasks")
+        .update({ tema_id: creados[i].id })
+        .in("id", ids)
+        .then(() => undefined);
+    }),
+  );
+
+  revalidatePath("/actas");
+  return { ok: true, count: temas.length };
 }

@@ -1,21 +1,33 @@
 "use client";
 
 import * as React from "react";
-import { ClipboardList, FileDown, Lock, Users, X } from "lucide-react";
+import {
+  ClipboardList,
+  FileDown,
+  Layers,
+  Lock,
+  Pencil,
+  Sparkles,
+  Users,
+  X,
+} from "lucide-react";
 import { Drawer } from "@/components/ui/drawer";
 import { Button } from "@/components/ui/button";
-import { Select } from "@/components/ui/input";
+import { Field, Input, Select, Textarea } from "@/components/ui/input";
 import { useToast } from "@/components/ui/toast";
 import { Badge } from "@/components/ui/badge";
 import { createClient } from "@/lib/supabase/client";
 import { formatDate } from "@/lib/utils";
 import { TASK_STATUS_META, type TaskStatus } from "@/lib/status";
-import type { MeetingWithCount, ProfileLite } from "./page";
+import type { MeetingWithCount, MeetingTemaLite, ProfileLite } from "./page";
 import {
   setAttendeeAccess,
   setAttendeeManage,
   addMeetingViewer,
   removeMeetingViewer,
+  actualizarActa,
+  agruparActa,
+  guardarTema,
 } from "./actions";
 
 type MeetingTask = {
@@ -24,6 +36,7 @@ type MeetingTask = {
   status: string;
   due_date: string | null;
   person_name: string | null;
+  tema_id: string | null;
   task_assignees: { team_members: { name: string } | null }[] | null;
 };
 
@@ -183,6 +196,199 @@ function AccessPanel({
   );
 }
 
+
+/** Una tarea de la lista, con su estado y responsables. */
+function FilaTarea({ t }: { t: MeetingTask }) {
+  return (
+    <li className="flex items-center gap-3 rounded-[var(--radius-sm)] border border-border px-3 py-2">
+      <Badge tone={TASK_STATUS_META[t.status as TaskStatus].tone} dot>
+        {TASK_STATUS_META[t.status as TaskStatus].label}
+      </Badge>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm text-fg">{t.name}</p>
+        {responsables(t) && (
+          <p className="truncate text-xs text-fg-subtle">{responsables(t)}</p>
+        )}
+      </div>
+      {t.due_date && (
+        <span className="shrink-0 font-mono text-xs tnum text-fg-subtle">
+          {formatDate(t.due_date)}
+        </span>
+      )}
+    </li>
+  );
+}
+
+/**
+ * Un tema: lo que se dijo del asunto y los compromisos que salieron de él.
+ *
+ * El título se edita en el sitio. Corregir a mano un tema mal nombrado es más
+ * rápido que volver a agrupar el acta entera, y no arriesga los que sí
+ * quedaron bien.
+ */
+function BloqueTema({
+  tema,
+  tareas,
+  puedeEditar,
+  onChanged,
+}: {
+  tema: MeetingTemaLite;
+  tareas: MeetingTask[];
+  puedeEditar: boolean;
+  onChanged: () => void;
+}) {
+  const { toast } = useToast();
+  const [editando, setEditando] = React.useState(false);
+  const [titulo, setTitulo] = React.useState(tema.titulo);
+  const [resumen, setResumen] = React.useState(tema.resumen ?? "");
+  const [guardando, setGuardando] = React.useState(false);
+
+  async function guardar() {
+    setGuardando(true);
+    const res = await guardarTema({ id: tema.id, titulo, resumen });
+    setGuardando(false);
+    if (!res.ok) {
+      toast({ tone: "error", title: "No se pudo guardar", description: res.error });
+      return;
+    }
+    setEditando(false);
+    onChanged();
+  }
+
+  return (
+    <section className="rounded-[var(--radius-md)] border border-border p-3">
+      {editando ? (
+        <div className="space-y-2">
+          <Input
+            value={titulo}
+            onChange={(e) => setTitulo(e.target.value)}
+            className="font-medium"
+          />
+          <Textarea
+            value={resumen}
+            onChange={(e) => setResumen(e.target.value)}
+            rows={3}
+          />
+          <div className="flex justify-end gap-2">
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => {
+                setTitulo(tema.titulo);
+                setResumen(tema.resumen ?? "");
+                setEditando(false);
+              }}
+            >
+              Cancelar
+            </Button>
+            <Button size="sm" loading={guardando} onClick={guardar} disabled={!titulo.trim()}>
+              Guardar
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <>
+          <div className="flex items-start justify-between gap-2">
+            <h4 className="text-sm font-semibold text-fg">{tema.titulo}</h4>
+            <div className="flex shrink-0 items-center gap-1">
+              {tareas.length > 0 && (
+                <Badge tone="neutral">{tareas.length}</Badge>
+              )}
+              {puedeEditar && (
+                <button
+                  type="button"
+                  onClick={() => setEditando(true)}
+                  className="rounded p-1 text-fg-subtle hover:bg-bg-subtle hover:text-fg"
+                  aria-label={`Editar el tema ${tema.titulo}`}
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
+          </div>
+          {tema.resumen && (
+            <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-fg-muted">
+              {tema.resumen}
+            </p>
+          )}
+        </>
+      )}
+
+      {tareas.length > 0 && (
+        <ul className="mt-2.5 space-y-1.5">
+          {tareas.map((t) => (
+            <FilaTarea key={t.id} t={t} />
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+/** Edición del acta: título, fecha y cuerpo. */
+function FormularioActa({
+  meeting,
+  onDone,
+  onCancel,
+}: {
+  meeting: MeetingWithCount;
+  onDone: () => void;
+  onCancel: () => void;
+}) {
+  const { toast } = useToast();
+  const [title, setTitle] = React.useState(meeting.title);
+  const [fecha, setFecha] = React.useState(meeting.meeting_date ?? "");
+  const [notes, setNotes] = React.useState(meeting.notes ?? "");
+  const [guardando, setGuardando] = React.useState(false);
+
+  async function guardar() {
+    setGuardando(true);
+    const res = await actualizarActa({
+      id: meeting.id,
+      title,
+      meeting_date: fecha || null,
+      notes,
+    });
+    setGuardando(false);
+    if (!res.ok) {
+      toast({ tone: "error", title: "No se pudo guardar", description: res.error });
+      return;
+    }
+    toast({ tone: "success", title: "Acta actualizada" });
+    onDone();
+  }
+
+  return (
+    <div className="space-y-4">
+      <Field label="Título">
+        <Input value={title} onChange={(e) => setTitle(e.target.value)} />
+      </Field>
+      <Field label="Fecha de la reunión">
+        <Input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} />
+      </Field>
+      <Field
+        label="Acta"
+        hint="Es el registro de la reunión: corrige errores, no reescribas lo que se dijo."
+      >
+        <Textarea
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          rows={16}
+          className="font-mono text-xs"
+        />
+      </Field>
+      <div className="flex justify-end gap-2">
+        <Button variant="secondary" size="sm" onClick={onCancel}>
+          Cancelar
+        </Button>
+        <Button size="sm" loading={guardando} onClick={guardar} disabled={!title.trim()}>
+          Guardar cambios
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 /**
  * Lectura del acta dentro del CRM. Las actas del correo traen el cuerpo
  * completo en `notes`; las subidas a mano, el archivo.
@@ -209,6 +415,9 @@ export function MeetingDetail({
   // padre), así que no hace falta reiniciar el estado dentro del efecto.
   const [tasks, setTasks] = React.useState<MeetingTask[] | null>(null);
   const loading = tasks === null;
+  const { toast } = useToast();
+  const [editando, setEditando] = React.useState(false);
+  const [agrupando, setAgrupando] = React.useState(false);
 
   const meetingId = meeting?.id;
   React.useEffect(() => {
@@ -219,7 +428,7 @@ export function MeetingDetail({
       const { data } = await supabase
         .from("tasks")
         .select(
-          "id, name, status, due_date, person_name, task_assignees(team_members(name))",
+          "id, name, status, due_date, person_name, tema_id, task_assignees(team_members(name))",
         )
         .eq("meeting_id", meetingId)
         .order("due_date", { ascending: true, nullsFirst: false });
@@ -235,6 +444,31 @@ export function MeetingDetail({
   if (!meeting) return null;
 
   const invitados = meeting.meeting_attendees ?? [];
+  const temas = meeting.temas ?? [];
+  const listaTareas = tasks ?? [];
+  // Las que la agrupación no colocó en ningún tema. Se muestran aparte en vez
+  // de esconderlas: una tarea que desaparece de la pantalla al agrupar es una
+  // tarea que nadie vuelve a mirar.
+  const sueltas = listaTareas.filter(
+    (t) => !t.tema_id || !temas.some((x) => x.id === t.tema_id),
+  );
+
+  async function alAgrupar() {
+    if (!meeting) return;
+    setAgrupando(true);
+    const res = await agruparActa(meeting.id);
+    setAgrupando(false);
+    if (!res.ok) {
+      toast({ tone: "error", title: "No se pudo agrupar", description: res.error });
+      return;
+    }
+    toast({
+      tone: "success",
+      title: `${res.count} tema${res.count === 1 ? "" : "s"}`,
+      description: "El acta quedó agrupada por asunto.",
+    });
+    onChanged();
+  }
 
   return (
     <Drawer
@@ -257,18 +491,36 @@ export function MeetingDetail({
         </div>
       }
       footer={
-        meeting.file_path && (
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => onDownload(meeting.file_path!)}
-          >
-            <FileDown className="h-4 w-4" />
-            Descargar {meeting.file_name ?? "acta"}
-          </Button>
-        )
+        <>
+          {meeting.puedeEditar && !editando && (
+            <Button variant="secondary" size="sm" onClick={() => setEditando(true)}>
+              <Pencil className="h-4 w-4" />
+              Editar acta
+            </Button>
+          )}
+          {meeting.file_path && (
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => onDownload(meeting.file_path!)}
+            >
+              <FileDown className="h-4 w-4" />
+              Descargar {meeting.file_name ?? "acta"}
+            </Button>
+          )}
+        </>
       }
     >
+      {editando ? (
+        <FormularioActa
+          meeting={meeting}
+          onDone={() => {
+            setEditando(false);
+            onChanged();
+          }}
+          onCancel={() => setEditando(false)}
+        />
+      ) : (
       <div className="space-y-6">
         {invitados.length > 0 && !meeting.canManage && (
           <div>
@@ -290,10 +542,58 @@ export function MeetingDetail({
           <AccessPanel meeting={meeting} profiles={profiles} onChanged={onChanged} />
         )}
 
+        {/* ── Por tema ─────────────────────────────────────────────────
+            Lo que pidió Álvaro: leer el acta por asunto y no por el orden en
+            que se habló. Cuando hay temas mandan ellos, y el acta completa
+            queda debajo para quien quiera el texto tal cual se transcribió. */}
+        {temas.length > 0 && (
+          <div>
+            <h3 className="mb-2 flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-fg-subtle">
+              <Layers className="h-3.5 w-3.5" />
+              Por tema
+            </h3>
+            <div className="space-y-2.5">
+              {temas.map((tema) => (
+                <BloqueTema
+                  key={tema.id}
+                  tema={tema}
+                  tareas={listaTareas.filter((t) => t.tema_id === tema.id)}
+                  puedeEditar={meeting.puedeEditar}
+                  onChanged={onChanged}
+                />
+              ))}
+            </div>
+
+            {sueltas.length > 0 && (
+              <div className="mt-3">
+                <h4 className="mb-1.5 text-xs text-fg-subtle">Sin tema asignado</h4>
+                <ul className="space-y-1.5">
+                  {sueltas.map((t) => (
+                    <FilaTarea key={t.id} t={t} />
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
+
         <div>
-          <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-fg-subtle">
-            Acta
-          </h3>
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <h3 className="text-xs font-medium uppercase tracking-wide text-fg-subtle">
+              {temas.length > 0 ? "Acta completa" : "Acta"}
+            </h3>
+            {meeting.puedeEditar && meeting.notes && (
+              <Button
+                size="sm"
+                variant="ghost"
+                loading={agrupando}
+                onClick={alAgrupar}
+              >
+                <Sparkles className="h-3.5 w-3.5 text-accent" />
+                {temas.length > 0 ? "Reagrupar" : "Agrupar por tema"}
+              </Button>
+            )}
+          </div>
           {meeting.notes ? (
             // El acta del correo llega como texto plano con sus saltos de
             // línea; se respetan tal cual en vez de reformatearlos.
@@ -311,53 +611,39 @@ export function MeetingDetail({
           )}
         </div>
 
-        <div>
-          <h3 className="mb-2 flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-fg-subtle">
-            <ClipboardList className="h-3.5 w-3.5" />
-            Tareas generadas
-          </h3>
-          {/* El mismo reparto que el globo de la lista, pero visible sin
-              depender del hover. */}
-          {meeting.taskLoad.length > 0 && (
-            <div className="mb-3 flex flex-wrap gap-1.5">
-              {meeting.taskLoad.map((r) => (
-                <Badge key={r.name} tone="neutral">
-                  {r.name} · {r.count}
-                </Badge>
-              ))}
-            </div>
-          )}
-          {loading ? (
-            <p className="text-sm text-fg-subtle">Cargando…</p>
-          ) : tasks!.length === 0 ? (
-            <p className="text-sm text-fg-subtle">No se crearon tareas desde esta acta.</p>
-          ) : (
-            <ul className="space-y-1.5">
-              {tasks!.map((t) => (
-                <li
-                  key={t.id}
-                  className="flex items-center gap-3 rounded-[var(--radius-sm)] border border-border px-3 py-2"
-                >
-                  <Badge tone={TASK_STATUS_META[t.status as TaskStatus].tone} dot>
-                    {TASK_STATUS_META[t.status as TaskStatus].label}
+        {/* Sin temas, las tareas van en una sola lista, como hasta ahora. */}
+        {temas.length === 0 && (
+          <div>
+            <h3 className="mb-2 flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-fg-subtle">
+              <ClipboardList className="h-3.5 w-3.5" />
+              Tareas generadas
+            </h3>
+            {/* El mismo reparto que el globo de la lista, pero visible sin
+                depender del hover. */}
+            {meeting.taskLoad.length > 0 && (
+              <div className="mb-3 flex flex-wrap gap-1.5">
+                {meeting.taskLoad.map((r) => (
+                  <Badge key={r.name} tone="neutral">
+                    {r.name} · {r.count}
                   </Badge>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm text-fg">{t.name}</p>
-                    {responsables(t) && (
-                      <p className="truncate text-xs text-fg-subtle">{responsables(t)}</p>
-                    )}
-                  </div>
-                  {t.due_date && (
-                    <span className="shrink-0 font-mono text-xs tnum text-fg-subtle">
-                      {formatDate(t.due_date)}
-                    </span>
-                  )}
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
+                ))}
+              </div>
+            )}
+            {loading ? (
+              <p className="text-sm text-fg-subtle">Cargando…</p>
+            ) : listaTareas.length === 0 ? (
+              <p className="text-sm text-fg-subtle">No se crearon tareas desde esta acta.</p>
+            ) : (
+              <ul className="space-y-1.5">
+                {listaTareas.map((t) => (
+                  <FilaTarea key={t.id} t={t} />
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
       </div>
+      )}
     </Drawer>
   );
 }

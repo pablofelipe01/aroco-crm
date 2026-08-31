@@ -2751,6 +2751,36 @@ export type Database = {
         };
         Relationships: [];
       };
+      meeting_temas: {
+        Row: {
+          created_at: string;
+          id: string;
+          meeting_id: string;
+          orden: number;
+          resumen: string | null;
+          titulo: string;
+          updated_at: string;
+        };
+        Insert: {
+          created_at?: string;
+          id?: string;
+          meeting_id: string;
+          orden?: number;
+          resumen?: string | null;
+          titulo: string;
+          updated_at?: string;
+        };
+        Update: {
+          created_at?: string;
+          id?: string;
+          meeting_id?: string;
+          orden?: number;
+          resumen?: string | null;
+          titulo?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       meetings: {
         Row: {
           id: string;
@@ -2822,6 +2852,7 @@ export type Database = {
           name: string;
           notes: string | null;
           person_id: string | null;
+          tema_id: string | null;
           person_name: string | null;
           source: string | null;
           start_date: string | null;
@@ -2838,6 +2869,7 @@ export type Database = {
           name: string;
           notes?: string | null;
           person_id?: string | null;
+          tema_id?: string | null;
           person_name?: string | null;
           source?: string | null;
           start_date?: string | null;
@@ -2854,6 +2886,7 @@ export type Database = {
           name?: string;
           notes?: string | null;
           person_id?: string | null;
+          tema_id?: string | null;
           person_name?: string | null;
           source?: string | null;
           start_date?: string | null;
@@ -2908,6 +2941,10 @@ export type Database = {
     Functions: {
       can_write: {
         Args: { depts: Database["public"]["Enums"]["department"][] };
+        Returns: boolean;
+      };
+      puede_editar_acta: {
+        Args: { p_meeting: string };
         Returns: boolean;
       };
       import_inventory_sheet: {
@@ -3029,6 +3066,7 @@ export type InventoryQuality = Tables<"inventory_quality">;
 export type Dispatch = Tables<"dispatches">;
 export type CompraSolicitud = Tables<"compra_solicitudes">;
 export type Pregunta = Tables<"preguntas">;
+export type MeetingTema = Tables<"meeting_temas">;
 export type Venta = Tables<"ventas">;
 export type ProveedorInsumo = Tables<"proveedores_insumos">;
 export type CuentaCobro = Tables<"cuentas_cobro">;

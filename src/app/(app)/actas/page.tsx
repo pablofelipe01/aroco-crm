@@ -24,8 +24,19 @@ export type MeetingAttendee = {
   attended: boolean;
 };
 
+export type MeetingTemaLite = {
+  id: string;
+  titulo: string;
+  resumen: string | null;
+  orden: number;
+};
+
 export type MeetingWithCount = Meeting & {
   tasks: { count: number }[];
+  /** Asuntos tratados, en el orden en que conviene leerlos. */
+  temas: MeetingTemaLite[];
+  /** ¿Puede editar el acta y sus temas? Administrarla, o haberla subido. */
+  puedeEditar: boolean;
   /** Reparto de las tareas del acta por responsable, de mayor a menor. */
   taskLoad: TaskLoad[];
   /** Invitados y quién de ellos puede verla si está restringida. */
@@ -49,7 +60,7 @@ export default async function ActasPage() {
     supabase
       .from("meetings")
       .select(
-        "*, tasks(id, person_name, task_assignees(team_members(name))), meeting_attendees(id, profile_id, name, email, can_view, can_manage, attended)",
+        "*, tasks(id, person_name, task_assignees(team_members(name))), meeting_attendees(id, profile_id, name, email, can_view, can_manage, attended), meeting_temas(id, titulo, resumen, orden)",
       )
       .order("created_at", { ascending: false }),
     supabase.from("team_members").select("*").eq("active", true).order("name"),
@@ -75,13 +86,17 @@ export default async function ActasPage() {
     person_name: string | null;
     task_assignees: { team_members: { name: string } | null }[] | null;
   };
-  type RawMeeting = Omit<MeetingWithCount, "tasks" | "taskLoad" | "canManage"> & {
+  type RawMeeting = Omit<
+    MeetingWithCount,
+    "tasks" | "taskLoad" | "canManage" | "temas" | "puedeEditar"
+  > & {
     tasks: RawTask[] | null;
+    meeting_temas: MeetingTemaLite[] | null;
   };
 
   const preparadas: MeetingWithCount[] = (
     (meetings ?? []) as unknown as RawMeeting[]
-  ).map(({ tasks, ...m }) => {
+  ).map(({ tasks, meeting_temas, ...m }) => {
     const conteo = new Map<string, number>();
     for (const t of tasks ?? []) {
       const nombres = (t.task_assignees ?? [])
@@ -103,13 +118,20 @@ export default async function ActasPage() {
             (a.email && a.email.toLowerCase() === session.email.toLowerCase())),
       );
 
+    const canManage = esAdmin && (esRaiz || enLaLista);
+
     return {
       ...m,
       tasks: [{ count: (tasks ?? []).length }],
+      temas: [...(meeting_temas ?? [])].sort((a, b) => a.orden - b.orden),
       taskLoad: [...conteo.entries()]
         .map(([name, count]) => ({ name, count }))
         .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name)),
-      canManage: esAdmin && (esRaiz || enLaLista),
+      canManage,
+      // Mismo criterio que `puede_editar_acta` en la base (0076). Aquí solo
+      // decide si se muestran los controles; la RLS lo vuelve a comprobar al
+      // escribir, así que esconderlo es comodidad y no la cerradura.
+      puedeEditar: canManage || m.created_by === session?.userId,
     };
   });
 

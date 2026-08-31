@@ -222,3 +222,134 @@ No inventes tareas que no estén en el acta, pero tampoco descartes ninguna que 
 
   return { tasks, attendees };
 }
+
+// ── Agrupación por tema ─────────────────────────────────────────────────────
+//
+//  Las actas llegan en el orden en que se habló. Un comité operativo trae 24
+//  compromisos seguidos, saltando de precios a bodega y de vuelta a precios,
+//  y para saber de qué se estaba hablando en cada punto hay que releer lo
+//  anterior. Agruparlas por asunto es lo que pidió Álvaro.
+//
+//  Se hace en una pasada aparte, y no dentro de `extractActaTasks`, por dos
+//  razones: se puede aplicar a las 51 actas que ya existen sin volver a crear
+//  sus tareas, y si la agrupación sale mal se rehace sin tocar nada más. El
+//  acta original nunca se modifica; los temas son una vista encima.
+
+export interface TemaExtraido {
+  titulo: string;
+  resumen: string;
+  /** Índices (base 0) de las tareas que caen en este tema. */
+  tareas: number[];
+}
+
+const TEMAS_TOOL: Anthropic.Tool = {
+  name: "agrupar_por_tema",
+  description:
+    "Agrupa el contenido de un acta por asunto tratado, y reparte sus tareas entre esos asuntos.",
+  input_schema: {
+    type: "object",
+    properties: {
+      temas: {
+        type: "array",
+        description:
+          "Asuntos tratados en la reunión, en el orden en que conviene leerlos (del más importante al menos).",
+        items: {
+          type: "object",
+          properties: {
+            titulo: {
+              type: "string",
+              description:
+                "Nombre corto del asunto, 2 a 6 palabras. Concreto: «Básculas en puntos de compra», no «Operaciones».",
+            },
+            resumen: {
+              type: "string",
+              description:
+                "Lo que se dijo y se decidió sobre este asunto, en 1 a 4 frases. Toma el contenido del acta; no inventes.",
+            },
+            tareas: {
+              type: "array",
+              items: { type: "number" },
+              description:
+                "Índices de las tareas de la lista numerada que pertenecen a este asunto. Cada tarea va en UN solo tema. Lista vacía si el asunto no generó compromisos.",
+            },
+          },
+          required: ["titulo", "resumen", "tareas"],
+        },
+      },
+    },
+    required: ["temas"],
+  },
+};
+
+/**
+ * Agrupa un acta por asunto.
+ *
+ * Recibe las tareas ya creadas —numeradas— para que el modelo las reparta por
+ * índice en vez de reescribir sus nombres: así la agrupación no puede alterar
+ * el texto de una tarea que alguien ya tiene asignada.
+ */
+export async function agruparActaPorTemas(
+  notes: string,
+  tareas: { nombre: string }[],
+): Promise<TemaExtraido[]> {
+  const anthropic = new Anthropic({ apiKey: serverEnv.ANTHROPIC_API_KEY });
+
+  const listaTareas = tareas.length
+    ? tareas.map((t, i) => `${i}. ${t.nombre}`).join("\n")
+    : "(esta acta no generó tareas)";
+
+  const instruction = `Esta es un acta de reunión de AROCO (exportadora de cacao). Agrúpala por ASUNTO TRATADO.
+
+Qué se busca: alguien que abra el acta tres semanas después quiere ver de qué se habló, no el orden en que se habló. Una reunión salta de un tema a otro y vuelve al primero; junta todo lo de cada asunto.
+
+Reglas:
+- Entre 2 y 8 temas. Si el acta trata una sola cosa, devuelve un solo tema.
+- Los títulos van en español, concretos y cortos. «Precios de compra en Tumaco» sirve; «Varios» o «Operaciones» no.
+- El resumen de cada tema toma lo que dice el acta: decisiones, cifras y acuerdos. No inventes ni añadas recomendaciones.
+- Reparte las tareas por su ÍNDICE. Cada tarea va en exactamente un tema. Si una no encaja en ninguno, crea el tema que le corresponda.
+- Ignora el encabezado de participantes y las notas de la transcripción.
+
+Tareas ya registradas de esta acta:
+${listaTareas}
+
+--- ACTA ---
+${notes.slice(0, 24000)}`;
+
+  const response = await anthropic.messages.create({
+    model: MODEL,
+    max_tokens: 4000,
+    tools: [TEMAS_TOOL],
+    tool_choice: { type: "tool", name: "agrupar_por_tema" },
+    messages: [{ role: "user", content: instruction }],
+  });
+
+  const block = response.content.find((b) => b.type === "tool_use");
+  if (!block || block.type !== "tool_use") return [];
+
+  const out = block.input as { temas?: unknown };
+  const crudos = Array.isArray(out.temas) ? out.temas : [];
+
+  // Una tarea repartida en dos temas aparecería duplicada en pantalla y haría
+  // dudar de si son dos compromisos distintos. Se queda con la primera.
+  const usadas = new Set<number>();
+
+  return crudos
+    .map((t): TemaExtraido | null => {
+      const o = t as { titulo?: unknown; resumen?: unknown; tareas?: unknown };
+      const titulo = typeof o.titulo === "string" ? o.titulo.trim() : "";
+      if (!titulo) return null;
+      const indices = (Array.isArray(o.tareas) ? o.tareas : [])
+        .map((n) => Number(n))
+        .filter(
+          (n) =>
+            Number.isInteger(n) && n >= 0 && n < tareas.length && !usadas.has(n),
+        );
+      indices.forEach((n) => usadas.add(n));
+      return {
+        titulo,
+        resumen: typeof o.resumen === "string" ? o.resumen.trim() : "",
+        tareas: indices,
+      };
+    })
+    .filter((t): t is TemaExtraido => t !== null);
+}
