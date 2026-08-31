@@ -50,14 +50,19 @@ create index if not exists tasks_tema_idx on public.tasks (tema_id);
 
 -- ── 2. Quién puede editar un acta ───────────────────────────────────────────
 --
---  Hasta ahora `meetings_write` era `for all` a cualquier miembro activo. Como
---  la interfaz no ofrecía editar, en la práctica nadie lo hacía; al habilitar
---  la edición eso deja de ser teórico: cualquiera con sesión podría reescribir
---  el acta de una reunión a la que no fue, y un acta es un registro.
+--  0045 ya había partido `meetings_write` en insert/update/delete, pero dejó
+--  update y delete en `is_active_member()`: cualquier miembro activo puede
+--  cambiar o borrar cualquier acta. Mientras la interfaz no ofreció editar,
+--  eso quedó en teoría; al habilitarlo deja de serlo — cualquiera con sesión
+--  podría reescribir el acta de una reunión a la que no fue, y un acta es un
+--  registro.
 --
 --  Puede editarla quien la administra (SuperAdmin que asistió, o Gerencia) y
 --  quien la creó — normalmente quien la subió a mano, que es quien nota el
 --  error de dedo y debe poder corregirlo sin pedir permiso a nadie.
+--
+--  `meetings_insert` no cambia: subir un acta es aportar, no mandar. Se
+--  recrea igual para que la migración se pueda volver a correr entera.
 create or replace function public.puede_editar_acta(p_meeting uuid)
 returns boolean
 language sql
@@ -76,9 +81,12 @@ $$;
 revoke execute on function public.puede_editar_acta(uuid) from anon;
 grant execute on function public.puede_editar_acta(uuid) to authenticated;
 
--- Se parte el `for all` en piezas: crear la puede cualquiera (subir un acta es
--- aportar, no mandar), pero cambiarla y borrarla no.
+-- Se sueltan las tres de 0045 antes de recrearlas: `create policy` no tiene
+-- `or replace`, y sin el drop la migración falla en la segunda pasada.
 drop policy if exists "meetings_write" on public.meetings;
+drop policy if exists "meetings_insert" on public.meetings;
+drop policy if exists "meetings_update" on public.meetings;
+drop policy if exists "meetings_delete" on public.meetings;
 
 create policy "meetings_insert" on public.meetings
   for insert to authenticated
