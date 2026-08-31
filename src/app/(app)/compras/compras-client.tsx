@@ -18,7 +18,7 @@ import { formatDate } from "@/lib/utils";
 import { DEPARTMENTS } from "@/lib/departments";
 import { COMPRA_ESTADOS, COMPRA_CATEGORIAS, MONEDAS } from "@/lib/schemas/compra";
 import type { SolicitudConCotizaciones } from "./page";
-import { SolicitudDetail, ESTADO_TONE, formatMonto } from "./solicitud-detail";
+import { SolicitudDetail, ESTADO_TONE, formatMonto, type ProveedorOpcion } from "./solicitud-detail";
 import { crearSolicitudConCotizaciones } from "./actions";
 
 /**
@@ -36,8 +36,11 @@ export function ComprasClient({
   error,
   puedeAprobar,
   userId,
+  proveedores,
 }: {
   solicitudes: SolicitudConCotizaciones[];
+  /** Proveedores registrados y verificados, para elegir en vez de escribir. */
+  proveedores: ProveedorOpcion[];
   /** Falla de la consulta. Sin esto, una lista rota se ve como una lista vacía. */
   error?: string | null;
   /** Álvaro, Nicolás y Luis Ernesto. */
@@ -279,6 +282,7 @@ export function ComprasClient({
         onClose={() => setAbierta(null)}
         puedeAprobar={puedeAprobar}
         userId={userId}
+        proveedores={proveedores}
       />
 
       <Modal

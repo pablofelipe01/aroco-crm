@@ -60,7 +60,7 @@ export function ProveedoresClient({
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Proveedores"
+        title="Proveedores Cacao"
         description="Crea, busca y gestiona los proveedores de cacao."
         actions={
           <div className="flex items-center gap-2">

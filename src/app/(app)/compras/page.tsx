@@ -16,7 +16,7 @@ export default async function ComprasPage() {
   const supabase = await createClient();
   const session = await getSessionContext();
 
-  const [{ data: solicitudes, error }, { data: perfiles }] = await Promise.all([
+  const [{ data: solicitudes, error }, { data: perfiles }, { data: proveedores }] = await Promise.all([
     // El `!solicitud_id` no es adorno: hay DOS llaves foráneas entre estas dos
     // tablas —la cotización apunta a su solicitud, y la solicitud apunta a la
     // cotización elegida— y sin decirle cuál seguir, PostgREST no adivina y
@@ -26,6 +26,13 @@ export default async function ComprasPage() {
       .select("*, compra_cotizaciones!solicitud_id(*)")
       .order("created_at", { ascending: false }),
     supabase.from("profiles").select("id, full_name").eq("active", true),
+    // Solo los ACTIVOS: ofrecer uno sin verificar invitaría a cotizar con
+    // alguien cuyos documentos y cuenta bancaria nadie ha revisado.
+    supabase
+      .from("proveedores_insumos")
+      .select("id, tipo_persona, nombres, apellidos, razon_social, numero_documento")
+      .eq("estado", "Activo")
+      .order("razon_social"),
   ]);
 
   const nombre = new Map((perfiles ?? []).map((p) => [p.id, p.full_name]));
@@ -52,6 +59,7 @@ export default async function ComprasPage() {
       // solicitudes». Así fue como una consulta rota pasó por «se guardan pero
       // no se ven»: el error hay que mostrarlo, no tragárselo.
       error={error?.message ?? null}
+      proveedores={proveedores ?? []}
       puedeAprobar={session?.profile?.aprueba_compras ?? false}
       userId={session?.userId ?? ""}
     />

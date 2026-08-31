@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 
 const NAV = [
   { href: "/procesos", label: "Resumen", icon: LayoutDashboard },
-  { href: "/procesos/proveedores", label: "Proveedores", icon: Sprout },
+  { href: "/procesos/proveedores", label: "Proveedores Cacao", icon: Sprout },
   { href: "/procesos/ordenes", label: "Órdenes de compra", icon: ShoppingCart },
   { href: "/procesos/recepcion", label: "Recepción en bodega", icon: Warehouse },
   { href: "/procesos/liquidacion", label: "Liquidación / Pago", icon: Calculator },

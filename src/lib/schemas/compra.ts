@@ -52,6 +52,13 @@ const montoSchema = z
 
 export const cotizacionSchema = z.object({
   solicitud_id: z.string().uuid(),
+  /** Ficha del proveedor registrado. Vacío = proveedor ocasional. */
+  proveedor_id: z
+    .string()
+    .uuid()
+    .nullable()
+    .optional()
+    .or(z.literal("").transform(() => null)),
   proveedor: z.string().trim().min(1, "Falta el proveedor."),
   nit: optionalText,
   descripcion: optionalText,

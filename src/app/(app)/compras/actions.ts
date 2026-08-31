@@ -103,6 +103,7 @@ export async function crearSolicitudConCotizaciones(
 
     const cot = cotizacionSchema.safeParse({
       solicitud_id: data.id,
+      proveedor_id: formData.get(`cot_${i}_proveedor_id`) ?? "",
       proveedor,
       nit: "",
       descripcion: formData.get(`cot_${i}_descripcion`) ?? "",
@@ -184,6 +185,7 @@ export async function subirCotizacion(formData: FormData): Promise<CompraResult>
 
   const parsed = cotizacionSchema.safeParse({
     solicitud_id: formData.get("solicitud_id"),
+    proveedor_id: formData.get("proveedor_id") ?? "",
     proveedor: formData.get("proveedor"),
     nit: formData.get("nit") ?? "",
     descripcion: formData.get("descripcion") ?? "",

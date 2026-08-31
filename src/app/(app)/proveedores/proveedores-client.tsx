@@ -79,8 +79,8 @@ export function ProveedoresClient({
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Proveedores"
-        description="Proveedores de insumos y sus cuentas de cobro"
+        title="Proveedores Insumos"
+        description="Oficina, finca, cultivo, bodega y demás · sus documentos y cuentas de cobro"
       />
 
       {error && (

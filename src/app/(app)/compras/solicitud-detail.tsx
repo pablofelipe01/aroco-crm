@@ -20,6 +20,7 @@ import { Field, Input, Select, Textarea } from "@/components/ui/input";
 import { useToast } from "@/components/ui/toast";
 import { formatCOP, formatDate, formatNumber } from "@/lib/utils";
 import { MONEDAS, COMPRA_CATEGORIAS } from "@/lib/schemas/compra";
+import { nombreProveedor } from "@/lib/schemas/proveedor";
 import { DEPARTMENTS } from "@/lib/departments";
 import type { SolicitudConCotizaciones } from "./page";
 import {
@@ -34,6 +35,16 @@ import {
   registrarPago,
   registrarEntrega,
 } from "./actions";
+
+/** Proveedor registrado y verificado, para elegirlo en vez de escribirlo. */
+export type ProveedorOpcion = {
+  id: string;
+  tipo_persona: string;
+  nombres: string | null;
+  apellidos: string | null;
+  razon_social: string | null;
+  numero_documento: string;
+};
 
 export const ESTADO_TONE: Record<string, BadgeTone> = {
   Borrador: "neutral",
@@ -55,12 +66,14 @@ export function SolicitudDetail({
   onClose,
   puedeAprobar,
   userId,
+  proveedores,
 }: {
   solicitud: SolicitudConCotizaciones | null;
   open: boolean;
   onClose: () => void;
   puedeAprobar: boolean;
   userId: string;
+  proveedores: ProveedorOpcion[];
 }) {
   const router = useRouter();
   const { toast } = useToast();
@@ -233,6 +246,10 @@ export function SolicitudDetail({
                             <Badge tone="info">más económica</Badge>
                           )}
                           {esElegida && <Badge tone="success">elegida</Badge>}
+                          {/* Distinguir una cotización de proveedor verificado
+                              de una de alguien ocasional es lo que permite
+                              pagar sin ir a buscar datos por fuera del CRM. */}
+                          {c.proveedor_id && <Badge tone="info">registrado</Badge>}
                           {/* Si alguien corrigió el monto después de que el
                               aprobador lo leyó, tiene que verse. */}
                           {c.updated_at && c.updated_at !== c.created_at && (
@@ -310,6 +327,7 @@ export function SolicitudDetail({
                     {editandoCot === c.id && editable && (
                       <FormCotizacion
                         cotizacion={c}
+                        proveedores={proveedores}
                         onDone={() => {
                           setEditandoCot(null);
                           router.refresh();
@@ -325,6 +343,7 @@ export function SolicitudDetail({
           {nuevaOpen && editable && (
             <FormCotizacion
               solicitudId={s.id}
+              proveedores={proveedores}
               onDone={() => {
                 setNuevaOpen(false);
                 router.refresh();
@@ -467,15 +486,22 @@ export function SolicitudDetail({
 function FormCotizacion({
   solicitudId,
   cotizacion,
+  proveedores,
   onDone,
 }: {
   solicitudId?: string;
   cotizacion?: SolicitudConCotizaciones["compra_cotizaciones"][number];
+  proveedores: ProveedorOpcion[];
   onDone: () => void;
 }) {
   const { toast } = useToast();
   const [busy, setBusy] = React.useState(false);
   const editando = !!cotizacion;
+  // Si se elige un proveedor registrado, el nombre y el NIT se llenan solos.
+  // Escribirlos a mano al lado de una ficha verificada es cómo aparecen dos
+  // «Alkosto» que después no se pueden cruzar.
+  const [elegido, setElegido] = React.useState<string>(cotizacion?.proveedor_id ?? "");
+  const ficha = proveedores.find((p) => p.id === elegido);
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -503,14 +529,41 @@ function FormCotizacion({
       onSubmit={onSubmit}
       className="mt-3 grid grid-cols-1 gap-3 rounded-[var(--radius-md)] border border-border bg-bg-subtle/40 p-3 sm:grid-cols-2"
     >
+      {proveedores.length > 0 && (
+        <Field
+          label="Proveedor registrado"
+          className="sm:col-span-2"
+          hint="Si está en el portal, elígelo: trae su NIT y su cuenta bancaria verificados."
+        >
+          <Select
+            name="proveedor_id"
+            value={elegido}
+            onChange={(e) => setElegido(e.target.value)}
+          >
+            <option value="">— Proveedor ocasional (escribir a mano) —</option>
+            {proveedores.map((p) => (
+              <option key={p.id} value={p.id}>
+                {nombreProveedor(p)} · {p.numero_documento}
+              </option>
+            ))}
+          </Select>
+        </Field>
+      )}
       <Field label="Proveedor *" className="sm:col-span-2">
         <Input
           name="proveedor"
           required
-          defaultValue={cotizacion?.proveedor ?? ""}
+          // `key` fuerza el remontaje para que el valor por defecto se
+          // actualice al cambiar de ficha; sin él React conserva lo tecleado.
+          key={elegido}
+          defaultValue={ficha ? nombreProveedor(ficha) : (cotizacion?.proveedor ?? "")}
+          readOnly={!!ficha}
           placeholder="Nombre del proveedor"
         />
       </Field>
+      {ficha && (
+        <input type="hidden" name="nit" value={ficha.numero_documento} />
+      )}
       <Field label="Monto *">
         <Input
           name="monto"

@@ -113,6 +113,7 @@ export type Database = {
           notas: string | null;
           proveedor: string;
           solicitud_id: string;
+          proveedor_id: string | null;
           updated_at: string;
           tiempo_entrega: string | null;
           valida_hasta: string | null;
@@ -130,6 +131,7 @@ export type Database = {
           nit?: string | null;
           notas?: string | null;
           proveedor: string;
+          proveedor_id?: string | null;
           solicitud_id: string;
           updated_at?: string;
           tiempo_entrega?: string | null;
@@ -149,6 +151,7 @@ export type Database = {
           notas?: string | null;
           proveedor?: string;
           solicitud_id?: string;
+          proveedor_id?: string | null;
           updated_at?: string;
           tiempo_entrega?: string | null;
           valida_hasta?: string | null;

@@ -74,7 +74,7 @@ export const NAV_ITEMS: NavItem[] = [
   // devolver esta entrada al menú.
   {
     href: "/proveedores",
-    label: "Proveedores",
+    label: "Proveedores Insumos",
     icon: Store,
     departments: ["Dirección", "Financiero", "Administrativo"],
   },
