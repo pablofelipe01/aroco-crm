@@ -7,6 +7,7 @@ import { UserMenu } from "@/components/layout/user-menu";
 import type { UserRole } from "@/lib/types/database";
 import { NotificationsBell } from "@/components/layout/notifications-bell";
 import { useAssistant } from "@/components/assistant/assistant-panel";
+import { useT } from "@/lib/i18n/provider";
 
 export function Topbar({
   title,
@@ -25,6 +26,7 @@ export function Topbar({
     role?: UserRole;
   } | null;
 }) {
+  const t = useT();
   const palette = useCommandPalette();
   const assistant = useAssistant();
 
@@ -32,7 +34,7 @@ export function Topbar({
     <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b border-border bg-surface/80 px-4 backdrop-blur-md supports-[backdrop-filter]:bg-surface/70 lg:px-6">
       <button
         onClick={onOpenMobileNav}
-        aria-label="Abrir menú"
+        aria-label={t.shell.abrirMenu}
         className="rounded-[var(--radius-md)] p-2 text-fg-muted transition-colors hover:bg-bg-subtle hover:text-fg lg:hidden"
       >
         <Menu className="h-5 w-5" />
@@ -53,7 +55,7 @@ export function Topbar({
         className="hidden items-center gap-2 rounded-[var(--radius-md)] border border-border bg-bg-subtle/60 px-3 py-2 text-sm text-fg-subtle transition-colors hover:border-border-strong hover:text-fg-muted md:flex"
       >
         <Search className="h-4 w-4" />
-        <span>Buscar…</span>
+        <span>{t.shell.buscar}</span>
         <kbd className="ml-2 flex items-center gap-0.5 rounded border border-border bg-surface px-1.5 py-0.5 font-mono text-[10px]">
           <Command className="h-2.5 w-2.5" />K
         </kbd>
@@ -64,7 +66,7 @@ export function Topbar({
 
         <button
           onClick={assistant.open}
-          aria-label="Abrir asistente IA"
+          aria-label={t.shell.asistente}
           className="flex h-9 w-9 items-center justify-center rounded-[var(--radius-md)] text-accent transition-colors hover:bg-accent-soft"
         >
           <Sparkles className="h-[18px] w-[18px]" />

@@ -17,7 +17,8 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { hasSupabaseEnv } from "@/lib/env";
-import { cn, formatDate } from "@/lib/utils";
+import { cn } from "@/lib/utils";
+import { useT, useFormatos } from "@/lib/i18n/provider";
 import { ease } from "@/lib/motion";
 import type { Notification } from "@/lib/types/database";
 
@@ -53,6 +54,8 @@ const SEV_COLOR: Record<string, string> = {
 };
 
 export function NotificationsBell() {
+  const t = useT();
+  const f = useFormatos();
   const [open, setOpen] = React.useState(false);
   const [items, setItems] = React.useState<Notification[]>([]);
   const ref = React.useRef<HTMLDivElement>(null);
@@ -107,7 +110,7 @@ export function NotificationsBell() {
           setOpen((v) => !v);
           if (!open) void load();
         }}
-        aria-label="Notificaciones"
+        aria-label={t.shell.notificaciones}
         className="relative flex h-9 w-9 items-center justify-center rounded-[var(--radius-md)] text-fg-muted transition-colors hover:bg-bg-subtle hover:text-fg"
       >
         <Bell className="h-[18px] w-[18px]" />
@@ -128,21 +131,23 @@ export function NotificationsBell() {
             className="absolute right-0 top-12 z-50 w-80 overflow-hidden rounded-[var(--radius-md)] border border-border bg-surface-raised shadow-[var(--shadow-soft-lg)]"
           >
             <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
-              <span className="text-sm font-semibold text-fg">Notificaciones</span>
+              <span className="text-sm font-semibold text-fg">
+                {t.shell.notificaciones}
+              </span>
               {count > 0 && (
                 <button
                   onClick={markAll}
                   className="flex items-center gap-1 text-xs text-accent hover:underline"
                 >
                   <Check className="h-3 w-3" />
-                  Marcar leídas
+                  {t.shell.marcarLeidas}
                 </button>
               )}
             </div>
             <div className="max-h-96 overflow-y-auto">
               {count === 0 ? (
                 <p className="px-4 py-8 text-center text-sm text-fg-subtle">
-                  Sin notificaciones pendientes.
+                  {t.shell.sinNotificaciones}
                 </p>
               ) : (
                 items.map((n) => {
@@ -163,7 +168,7 @@ export function NotificationsBell() {
                           <p className="mt-0.5 text-xs text-fg-muted">{n.body}</p>
                         )}
                         <p className="mt-0.5 font-mono text-[10px] text-fg-subtle">
-                          {formatDate(n.created_at)}
+                          {f.fecha(n.created_at)}
                         </p>
                       </div>
                     </>

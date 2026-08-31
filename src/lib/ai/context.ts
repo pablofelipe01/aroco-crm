@@ -2,6 +2,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/types/database";
 import type { SessionContext } from "@/lib/auth";
+import { normalizarIdioma, type Idioma } from "@/lib/i18n";
 import type { Department } from "@/lib/departments";
 
 type DB = SupabaseClient<Database>;
@@ -32,6 +33,8 @@ export type AgentContext = {
    * rol — un SuperAdmin sin este permiso tampoco lo ve.
    */
   veMercado: boolean;
+  /** En qué idioma tiene puesta la interfaz: el asistente responde en ese. */
+  idioma: Idioma;
 };
 
 /** Resuelve el contexto del asistente para la sesión actual. */
@@ -55,6 +58,7 @@ export async function resolveAgentContext(
     teamMemberId: member?.id ?? null,
     roleTitle: member?.role_title ?? null,
     veMercado: session.profile?.ve_mercado === true,
+    idioma: normalizarIdioma(session.profile?.idioma),
   };
 }
 

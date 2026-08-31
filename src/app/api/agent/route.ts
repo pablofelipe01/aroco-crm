@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getSessionContext } from "@/lib/auth";
 import { serverEnv } from "@/lib/env";
 import { AI_TOOLS, executeTool } from "@/lib/ai/tools";
+import type { Idioma } from "@/lib/i18n";
 import { resolveAgentContext } from "@/lib/ai/context";
 
 export const runtime = "nodejs";
@@ -30,6 +31,7 @@ function systemPrompt(
   department: string | null,
   isAdmin: boolean,
   veMercado: boolean,
+  idioma: Idioma,
 ): string {
   return `Eres el asistente de IA de la plataforma interna de AROCO S.A.S, una exportadora y comercializadora de cacao colombiano. Ayudas al equipo comercial, de bodega, de operaciones y financiero a consultar y entender sus datos.
 
@@ -45,7 +47,7 @@ Qué puedes consultar:
 ${veMercado ? `- Mercado: exposición al precio del cacao, cobertura con opciones y futuros, tablero de opciones y estado de la cuenta en StoneX.
 ` : ""}
 Pautas:
-- Responde en español, de forma concisa y profesional. Usa cifras con separador de miles y unidades (kg, COP, USD, %).
+- Responde ${idioma === "en" ? "EN INGLÉS" : "en español"}, de forma concisa y profesional. Esto no es negociable: la persona tiene el CRM en ${idioma === "en" ? "inglés" : "español"} y una respuesta en el otro idioma la obliga a traducir. Si te escribe en el otro idioma, responde igual en ${idioma === "en" ? "inglés" : "español"}${idioma === "en" ? " (los nombres propios, los estados guardados como «Cotización» o «Pendiente» y los nombres de empresa se dejan como están, y se traduce el resto)" : ""}. Usa cifras con separador de miles ${idioma === "en" ? "en formato inglés (1,250,000.50)" : "en formato colombiano (1.250.000,50)"} y unidades (kg, COP, USD, %).
 - Usa SIEMPRE las herramientas para obtener datos reales antes de afirmar números. Nunca inventes datos.
 - Si necesitas resolver el nombre de una persona antes de buscar sus tareas, usa get_team primero.
 - Las herramientas de tareas recortan el resultado según el rol. Si vienen tareas ocultas por permiso, dilo en una frase en vez de callarlo; no intentes rodear el límite.
@@ -110,6 +112,7 @@ export async function POST(request: NextRequest) {
         agentCtx.department,
         agentCtx.isAdmin,
         agentCtx.veMercado,
+        agentCtx.idioma,
       ),
       cache_control: { type: "ephemeral" },
     },

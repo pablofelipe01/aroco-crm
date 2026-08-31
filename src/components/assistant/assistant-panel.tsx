@@ -21,6 +21,8 @@ import { Drawer } from "@/components/ui/drawer";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/input";
 import { useToast } from "@/components/ui/toast";
+import { useT } from "@/lib/i18n/provider";
+import type { Diccionario } from "@/lib/i18n/es";
 import { cn } from "@/lib/utils";
 import { executeAgentAction, type AgentProposal } from "./actions";
 
@@ -44,14 +46,10 @@ export function useAssistant() {
   return ctx;
 }
 
-const SUGGESTIONS = [
-  "¿Qué leads internacionales están en negociación?",
-  "¿Cuánto cacao queda disponible en bodega?",
-  "¿Cuál es el precio actual de Casa Luker?",
-  "¿Cómo va el pipeline comercial?",
-];
-
-function describeProposal(p: AgentProposal): {
+function describeProposal(
+  p: AgentProposal,
+  t: Diccionario,
+): {
   Icon: React.ElementType;
   title: string;
   detail: string;
@@ -60,33 +58,37 @@ function describeProposal(p: AgentProposal): {
     case "lead_status":
       return {
         Icon: GitBranch,
-        title: `Cambiar estado · ${p.company}`,
+        title: `${t.asistente.cambiarEstado} · ${p.company}`,
         detail: `${p.from ?? "—"} → ${p.status}`,
       };
     case "lead_note":
       return {
         Icon: StickyNote,
-        title: `Agregar nota · ${p.company}`,
+        title: `${t.asistente.agregarNota} · ${p.company}`,
         detail: `“${p.note}”`,
       };
     case "create_task":
       return {
         Icon: ListChecks,
-        title: "Crear tarea",
+        title: t.asistente.crearTarea,
         detail: `${p.name}${p.person_name ? ` · ${p.person_name}` : ""}${
-          p.due_date ? ` · vence ${p.due_date}` : ""
+          p.due_date ? ` · ${t.asistente.vence} ${p.due_date}` : ""
         }`,
       };
     case "inventory_movement":
       return {
         Icon: Boxes,
-        title: `${p.movement === "salida" ? "Salida" : "Entrada"} · ${p.code}`,
-        detail: `${p.qty_kg} kg${p.available != null ? ` (disp. ${p.available})` : ""}`,
+        title: `${
+          p.movement === "salida" ? t.asistente.salida : t.asistente.entrada
+        } · ${p.code}`,
+        detail: `${p.qty_kg} kg${
+          p.available != null ? ` (${t.asistente.disp} ${p.available})` : ""
+        }`,
       };
     case "create_lead":
       return {
         Icon: Users,
-        title: "Crear lead",
+        title: t.asistente.crearLead,
         detail: `${p.company}${p.owner_name ? ` · ${p.owner_name}` : ""}${
           p.market ? ` · ${p.market}` : ""
         }`,
@@ -94,7 +96,7 @@ function describeProposal(p: AgentProposal): {
     case "create_quote":
       return {
         Icon: FileText,
-        title: "Crear cotización (borrador)",
+        title: t.asistente.crearCotizacion,
         detail: `${p.incoterm} · ${p.company}${
           p.preview_usd_tm != null ? ` · ≈ $${p.preview_usd_tm}/TM` : ""
         }`,
@@ -105,6 +107,13 @@ function describeProposal(p: AgentProposal): {
 export function AssistantProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { toast } = useToast();
+  const t = useT();
+  const sugerencias = [
+    t.asistente.sugerencia1,
+    t.asistente.sugerencia2,
+    t.asistente.sugerencia3,
+    t.asistente.sugerencia4,
+  ];
   const [isOpen, setIsOpen] = React.useState(false);
   const [messages, setMessages] = React.useState<ChatMessage[]>([]);
   const [input, setInput] = React.useState("");
@@ -119,11 +128,19 @@ export function AssistantProvider({ children }: { children: React.ReactNode }) {
     const res = await executeAgentAction(proposal);
     setConfirming(null);
     if (!res.ok) {
-      toast({ tone: "error", title: "No se pudo aplicar", description: res.error });
+      toast({
+        tone: "error",
+        title: t.asistente.noSeAplico,
+        description: res.error,
+      });
       return;
     }
     setResolved((r) => ({ ...r, [key]: "done" }));
-    toast({ tone: "success", title: "Acción aplicada", description: res.message });
+    toast({
+      tone: "success",
+      title: t.asistente.accionAplicada,
+      description: res.message,
+    });
     router.refresh();
   }
 
@@ -153,7 +170,7 @@ export function AssistantProvider({ children }: { children: React.ReactNode }) {
       if (!res.ok) {
         setMessages((m) => [
           ...m,
-          { role: "assistant", content: data.error ?? "Hubo un error." },
+          { role: "assistant", content: data.error ?? t.asistente.huboError },
         ]);
       } else {
         setMessages((m) => [
@@ -169,7 +186,7 @@ export function AssistantProvider({ children }: { children: React.ReactNode }) {
     } catch {
       setMessages((m) => [
         ...m,
-        { role: "assistant", content: "No se pudo conectar con el asistente." },
+        { role: "assistant", content: t.asistente.sinConexion },
       ]);
     } finally {
       setLoading(false);
@@ -186,10 +203,10 @@ export function AssistantProvider({ children }: { children: React.ReactNode }) {
         title={
           <span className="flex items-center gap-2">
             <Sparkles className="h-4 w-4 text-accent" />
-            Asistente AROCO
+            {t.asistente.titulo}
           </span>
         }
-        subtitle={<span className="text-xs">Consulta tus datos en lenguaje natural · solo lectura</span>}
+        subtitle={<span className="text-xs">{t.asistente.subtitulo}</span>}
         footer={
           <form
             onSubmit={(e) => {
@@ -207,7 +224,7 @@ export function AssistantProvider({ children }: { children: React.ReactNode }) {
                   void send(input);
                 }
               }}
-              placeholder="Pregunta sobre leads, inventario, precios…"
+              placeholder={t.asistente.placeholder}
               rows={1}
               className="min-h-10 flex-1 resize-none"
             />
@@ -224,11 +241,10 @@ export function AssistantProvider({ children }: { children: React.ReactNode }) {
                 <Sparkles className="h-6 w-6" />
               </div>
               <p className="max-w-xs text-sm text-fg-muted">
-                Pregúntame sobre el pipeline, el inventario o los precios. Consulto
-                los datos reales respetando tus permisos.
+                {t.asistente.invitacion}
               </p>
               <div className="flex flex-col gap-2">
-                {SUGGESTIONS.map((s) => (
+                {sugerencias.map((s) => (
                   <button
                     key={s}
                     onClick={() => void send(s)}
@@ -265,7 +281,7 @@ export function AssistantProvider({ children }: { children: React.ReactNode }) {
               {m.proposals?.map((p, j) => {
                 const key = `${i}:${j}`;
                 const state = resolved[key];
-                const { Icon, title, detail } = describeProposal(p);
+                const { Icon, title, detail } = describeProposal(p, t);
                 return (
                   <div
                     key={key}
@@ -281,10 +297,12 @@ export function AssistantProvider({ children }: { children: React.ReactNode }) {
 
                     {state === "done" ? (
                       <p className="mt-2 flex items-center gap-1 text-xs font-medium text-success">
-                        <Check className="h-3.5 w-3.5" /> Aplicado
+                        <Check className="h-3.5 w-3.5" /> {t.asistente.aplicado}
                       </p>
                     ) : state === "dismissed" ? (
-                      <p className="mt-2 text-xs text-fg-subtle">Descartado</p>
+                      <p className="mt-2 text-xs text-fg-subtle">
+                        {t.asistente.descartado}
+                      </p>
                     ) : (
                       <div className="mt-2.5 flex items-center gap-2">
                         <Button
@@ -293,7 +311,7 @@ export function AssistantProvider({ children }: { children: React.ReactNode }) {
                           onClick={() => onConfirm(key, p)}
                         >
                           <Check className="h-3.5 w-3.5" />
-                          Confirmar
+                          {t.asistente.confirmar}
                         </Button>
                         <Button
                           size="sm"
@@ -301,7 +319,7 @@ export function AssistantProvider({ children }: { children: React.ReactNode }) {
                           onClick={() => setResolved((r) => ({ ...r, [key]: "dismissed" }))}
                         >
                           <X className="h-3.5 w-3.5" />
-                          Descartar
+                          {t.asistente.descartar}
                         </Button>
                       </div>
                     )}
@@ -314,7 +332,7 @@ export function AssistantProvider({ children }: { children: React.ReactNode }) {
           {loading && (
             <div className="flex items-center gap-2 self-start rounded-[var(--radius-md)] border border-border bg-surface px-3.5 py-2.5 text-sm text-fg-muted">
               <Loader2 className="h-4 w-4 animate-spin" />
-              Consultando…
+              {t.asistente.consultando}
             </div>
           )}
         </div>
