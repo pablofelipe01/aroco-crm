@@ -3,6 +3,7 @@
 import * as React from "react";
 import { motion } from "framer-motion";
 import {
+  Layers3,
   Boxes, Coins, ShieldAlert, TrendingUp, AlertTriangle, Landmark, RefreshCw, ImageUp,
   Newspaper, ExternalLink, Scale as Balanza, Factory, ArrowLeftRight,
 } from "lucide-react";
@@ -11,13 +12,14 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
 import { sincronizarAhora, subirTablero } from "./actions";
 import { Modal } from "@/components/ui/modal";
-import { Field, Input } from "@/components/ui/input";
+import { Field, Input, Select } from "@/components/ui/input";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardHeader, CardTitle, CardBody } from "@/components/ui/card";
 import { StatCard } from "@/components/ui/stat-card";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { staggerContainer } from "@/lib/motion";
+import { cn } from "@/lib/utils";
 import { useT, useFormatos, useIdioma, useLocale } from "@/lib/i18n/provider";
 import type { DatosMercado } from "./riesgo-data";
 
@@ -250,12 +252,25 @@ export function MercadoClient({
             {!d.broker ? (
               <EmptyState title={t.mercado.sinEstados} />
             ) : (
+              <>
               <dl className="grid grid-cols-2 gap-3 text-sm">
                 <Dato k={t.mercado.cuenta} v={d.broker.cuenta ?? "—"} />
                 <Dato k={t.mercado.equity} v={usd(d.broker.equity)} />
-                <Dato k={t.mercado.margenInicial} v={usd(d.broker.margenInicial)} />
+                <Dato k={t.mercado.cajaDisponible} v={usd(d.broker.disponible)} />
                 <Dato k={`${t.mercado.pnlRealizado} (${d.broker.moneda})`} v={usd(d.broker.pnlYtd)} tono={(d.broker.pnlYtd ?? 0) < 0 ? "danger" : undefined} />
               </dl>
+
+              {/* De dónde sale «disponible» y qué NO es. El extracto de StoneX
+                  trae cinco cifras de balance y el margen no está entre ellas,
+                  así que esto es lo que el bróker declara libre — no un equity
+                  menos margen calculado aquí. Decirlo evita comprometer ese
+                  dinero creyendo que ya se descontó la garantía. */}
+              <p className="mt-3 border-t border-border pt-2 text-xs text-fg-subtle">
+                {d.broker.margenInicial === null
+                  ? t.mercado.notaSinMargen
+                  : t.mercado.notaConMargen}
+              </p>
+              </>
             )}
           </CardBody>
         </Card>
@@ -301,6 +316,12 @@ export function MercadoClient({
           </CardBody>
         </Card>
       )}
+
+      <CadenaOpciones
+        cadena={d.cadena}
+        contrato={d.cadena.elegido}
+        onContrato={(c) => router.push(`/mercado?contrato=${encodeURIComponent(c)}`)}
+      />
 
       {/* Futuros y arbitraje. Van antes de los ratios porque son la base
           contra la que se miden: sin saber en cuánto está el contrato, un
@@ -638,6 +659,193 @@ export function MercadoClient({
         )}
       </p>
     </div>
+  );
+}
+
+
+/**
+ * La cadena del vencimiento elegido, con la posición propia encima.
+ *
+ * Es lo que faltaba para decidir una cobertura sin salir del CRM: la cadena ya
+ * se bajaba y se guardaba desde hace semanas, pero no se enseñaba en ninguna
+ * pantalla. Ver los strikes es la mitad; la otra mitad es ver CUÁLES son tuyos,
+ * porque de ahí sale si conviene ampliar, rodar o dejar como está.
+ *
+ * Por defecto se muestran los strikes cercanos al precio. Una cadena completa
+ * son ~200 filas y las de los extremos no cotizan: enseñarlas todas de entrada
+ * esconde las diez que importan.
+ */
+function CadenaOpciones({
+  cadena,
+  contrato,
+  onContrato,
+}: {
+  cadena: DatosMercado["cadena"];
+  contrato: string | null;
+  onContrato: (c: string) => void;
+}) {
+  const t = useT();
+  const f = useFormatos();
+  const [todos, setTodos] = React.useState(false);
+
+  const sub = cadena.subyacente;
+  // ±25 % alrededor del subyacente. Fuera de ahí las primas son ruido.
+  const cerca =
+    sub === null
+      ? cadena.filas
+      : cadena.filas.filter((r) => r.strike >= sub * 0.75 && r.strike <= sub * 1.25);
+  const filas = todos ? cadena.filas : cerca;
+  const ocultas = cadena.filas.length - filas.length;
+
+  // El tablero más nuevo que hay de cualquier vencimiento marca «hoy».
+  const masReciente = cadena.vencimientos.reduce<string | null>(
+    (a, v) => (a === null || v.date > a ? v.date : a),
+    null,
+  );
+  const desactualizada = cadena.fecha !== null && cadena.fecha !== masReciente;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>
+          <span className="inline-flex items-center gap-2">
+            <Layers3 className="h-4 w-4 text-fg-subtle" /> {t.mercado.cadenaTitulo}
+          </span>
+        </CardTitle>
+        {cadena.vencimientos.length > 0 && (
+          <div className="flex items-center gap-2">
+            {sub !== null && (
+              <span className="font-mono tnum text-xs text-fg-subtle">
+                {t.mercado.subyacente} {f.numero(sub)}
+              </span>
+            )}
+            <Select
+              value={contrato ?? ""}
+              onChange={(e) => onContrato(e.target.value)}
+              className="h-8 w-auto py-0 text-xs"
+            >
+              {cadena.vencimientos.map((v) => (
+                <option key={v.id} value={v.contract_month}>
+                  {v.contract_month} · {f.fecha(v.date)}
+                </option>
+              ))}
+            </Select>
+          </div>
+        )}
+      </CardHeader>
+      <CardBody>
+        {filas.length === 0 ? (
+          <EmptyState title={t.mercado.cadenaVacia} />
+        ) : (
+          <>
+            <div className="max-h-[28rem] overflow-auto">
+              <table className="w-full text-sm">
+                <thead className="sticky top-0 bg-surface">
+                  <tr className="border-b border-border text-left text-[11px] uppercase tracking-wide text-fg-subtle">
+                    <th className="pb-2 pr-3 text-right font-medium">
+                      {t.mercado.callPrima}
+                    </th>
+                    <th className="pb-2 pr-3 text-right font-medium">
+                      {t.mercado.delta}
+                    </th>
+                    <th className="pb-2 px-3 text-center font-medium">
+                      {t.mercado.strike}
+                    </th>
+                    <th className="pb-2 pl-3 text-right font-medium">
+                      {t.mercado.delta}
+                    </th>
+                    <th className="pb-2 pl-3 text-right font-medium">
+                      {t.mercado.putPrima}
+                    </th>
+                    <th className="pb-2 pl-3 text-right font-medium">
+                      {t.mercado.tuya}
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filas.map((r) => {
+                    const mio = r.propioCall !== 0 || r.propioPut !== 0;
+                    // La fila más cercana al subyacente marca dónde está el
+                    // dinero hoy; sin ella hay que ir contando strikes.
+                    const atm =
+                      sub !== null &&
+                      Math.abs(r.strike - sub) ===
+                        Math.min(...filas.map((x) => Math.abs(x.strike - sub)));
+                    return (
+                      <tr
+                        key={r.strike}
+                        className={cn(
+                          "border-b border-border/60 last:border-0",
+                          mio && "bg-accent-soft/40",
+                          atm && !mio && "bg-bg-subtle/60",
+                        )}
+                      >
+                        <td className="py-1.5 pr-3 text-right font-mono tnum text-fg">
+                          {r.call_premium === null ? "—" : f.numero(r.call_premium, 2)}
+                        </td>
+                        <td className="py-1.5 pr-3 text-right font-mono tnum text-fg-subtle">
+                          {r.call_delta === null ? "—" : r.call_delta.toFixed(2)}
+                        </td>
+                        <td
+                          className={cn(
+                            "py-1.5 px-3 text-center font-mono tnum",
+                            atm ? "font-semibold text-accent-soft-fg" : "text-fg-muted",
+                          )}
+                        >
+                          {f.numero(r.strike)}
+                        </td>
+                        <td className="py-1.5 pl-3 text-right font-mono tnum text-fg-subtle">
+                          {r.put_delta === null ? "—" : r.put_delta.toFixed(2)}
+                        </td>
+                        <td className="py-1.5 pl-3 text-right font-mono tnum text-fg">
+                          {r.put_premium === null ? "—" : f.numero(r.put_premium, 2)}
+                        </td>
+                        <td className="py-1.5 pl-3 text-right font-mono tnum text-xs">
+                          {mio ? (
+                            <span className="text-accent-soft-fg">
+                              {r.propioCall !== 0 &&
+                                `${r.propioCall > 0 ? "+" : ""}${r.propioCall}C`}
+                              {r.propioCall !== 0 && r.propioPut !== 0 && " "}
+                              {r.propioPut !== 0 &&
+                                `${r.propioPut > 0 ? "+" : ""}${r.propioPut}P`}
+                            </span>
+                          ) : (
+                            <span className="text-fg-subtle">—</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {desactualizada && (
+              /* Un vencimiento que falla en el sync no cancela a los otros, así
+                 que este tablero puede ser de otro día que el resto de la
+                 pantalla. Decirlo: una prima de anteayer sirve para orientarse,
+                 pero no para cerrar. */
+              <p className="mt-2 text-xs text-warn">
+                {t.mercado.cadenaVieja} {f.fecha(cadena.fecha)}.
+              </p>
+            )}
+
+            <div className="mt-3 flex items-baseline justify-between gap-3">
+              <p className="text-xs text-fg-subtle">{t.mercado.cadenaNota}</p>
+              {(ocultas > 0 || todos) && (
+                <button
+                  type="button"
+                  onClick={() => setTodos((v) => !v)}
+                  className="shrink-0 text-xs text-accent hover:underline"
+                >
+                  {todos ? t.mercado.verCerca : `${t.mercado.verTodos} (${ocultas})`}
+                </button>
+              )}
+            </div>
+          </>
+        )}
+      </CardBody>
+    </Card>
   );
 }
 

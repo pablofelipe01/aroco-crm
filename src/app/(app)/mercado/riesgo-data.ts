@@ -16,10 +16,42 @@ export type DatosMercado = {
     cuenta: string | null;
     equity: number | null;
     margenInicial: number | null;
+    /**
+     * Lo que el bróker declara disponible. Se muestra tal cual y NO se calcula
+     * como «equity − margen»: el extracto de StoneX no trae el margen (solo
+     * beginning/ending balance, total_equity, market_variance y excess_equity),
+     * así que restarlo daría una cifra inventada con pinta de exacta.
+     */
+    disponible: number | null;
+    variacionMercado: number | null;
     pnlMtd: number | null;
     pnlYtd: number | null;
     moneda: string;
   } | null;
+
+  /**
+   * Cadena de opciones del vencimiento elegido, tal como la bajó el sync.
+   *
+   * Es lo que hacía falta para proponer una cobertura sin salir del CRM: hasta
+   * ahora la cadena se descargaba y se guardaba, pero no se enseñaba en
+   * ninguna pantalla.
+   */
+  cadena: {
+    vencimientos: { id: string; contract_month: string; date: string; underlying: number | null }[];
+    elegido: string | null;
+    fecha: string | null;
+    subyacente: number | null;
+    filas: {
+      strike: number;
+      call_premium: number | null;
+      call_delta: number | null;
+      put_premium: number | null;
+      put_delta: number | null;
+      /** Contratos que ya tiene en ese strike, para verlo sobre la cadena. */
+      propioCall: number;
+      propioPut: number;
+    }[];
+  };
   mercado: {
     fecha: string | null;
     precioUsdT: number | null;
@@ -61,6 +93,8 @@ export type DatosMercado = {
  */
 export async function cargarMercado(
   db: SupabaseClient<Database>,
+  /** Vencimiento que se está mirando en la cadena. Por defecto, el primero. */
+  contratoElegido?: string,
 ): Promise<DatosMercado> {
   const [lotesRes, balRes, pnlRes, posRes, boardRes, trmRes, intelRes, difRes, ratRes, futRes] =
     await Promise.all([
@@ -71,7 +105,7 @@ export async function cargarMercado(
     db.from("account_balance").select("*").order("statement_date", { ascending: false }).limit(1),
     db.from("broker_pnl").select("*").order("statement_date", { ascending: false }).limit(1),
     db.from("broker_positions").select("option_type, long_qty, short_qty, strike, contract_month, statement_date").order("statement_date", { ascending: false }),
-    db.from("options_board").select("id, date, contract_month, underlying_price").not("underlying_price", "is", null).order("date", { ascending: false }).order("contract_month").limit(1),
+    db.from("options_board").select("id, date, contract_month, underlying_price").not("underlying_price", "is", null).order("date", { ascending: false }).order("contract_month").limit(60),
     db.from("trm_data").select("date, trm").order("date", { ascending: false }).limit(1),
     db
       .from("market_intel")
@@ -103,7 +137,36 @@ export async function cargarMercado(
   // estado procesado, tenga o no posiciones abiertas.
   const bal = balRes.data?.[0] ?? null;
   const pnl = pnlRes.data?.[0] ?? null;
-  const board = boardRes.data?.[0] ?? null;
+  const tableros = boardRes.data ?? [];
+
+  // El tablero MÁS RECIENTE DE CADA VENCIMIENTO, no los de la última fecha.
+  //
+  // Un vencimiento que falla en el sync no cancela a los otros, así que un día
+  // cualquiera puede traer Oct y Nov pero no Dic. Filtrando por fecha, Dic
+  // desaparecía del selector sin decir nada — y Dic es el contrato líquido, el
+  // que se usa para cubrir. Mejor mostrarlo con su fecha: un dato de anteayer
+  // sirve para decidir, uno que no está no.
+  const porVencimiento = new Map<string, (typeof tableros)[number]>();
+  for (const t of tableros) {
+    // Vienen ordenados por fecha descendente: el primero de cada mes es el
+    // último que se bajó.
+    if (!porVencimiento.has(t.contract_month)) porVencimiento.set(t.contract_month, t);
+  }
+
+  // En orden de vencimiento, no alfabético: DEC26 antes que NOV26 confunde.
+  const MESES = ["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"];
+  const orden = (m: string) => {
+    const g = /^([A-Z]{3})(\d{2})$/.exec(m.toUpperCase());
+    if (!g) return 9999;
+    return Number(g[2]) * 12 + MESES.indexOf(g[1]);
+  };
+  const delDia = [...porVencimiento.values()].sort(
+    (a, b) => orden(a.contract_month) - orden(b.contract_month),
+  );
+
+  const elegido =
+    delDia.find((t) => t.contract_month === contratoElegido) ?? delDia[0] ?? null;
+  const board = elegido;
   const trmFila = trmRes.data?.[0] ?? null;
 
   // La fecha de referencia es la del ÚLTIMO ESTADO procesado, no la del último
@@ -116,6 +179,15 @@ export async function cargarMercado(
   const posiciones = (posRes.data ?? []).filter(
     (p) => p.statement_date === ultimaFecha,
   ) as PosicionBroker[];
+
+  // La cadena entera del vencimiento elegido: es lo que se pinta en pantalla.
+  const { data: cadenaFilas } = board
+    ? await db
+        .from("options_chain")
+        .select("strike, call_premium, call_delta, put_premium, put_delta")
+        .eq("board_id", board.id)
+        .order("strike", { ascending: true })
+    : { data: null };
 
   // Griegas del tablero más reciente, si alguien cargó uno.
   const { data: griegas } = board
@@ -198,11 +270,48 @@ export async function cargarMercado(
           cuenta: bal.account,
           equity: bal.total_equity === null ? null : Number(bal.total_equity),
           margenInicial: bal.initial_margin === null ? null : Number(bal.initial_margin),
+          disponible: bal.excess_equity === null ? null : Number(bal.excess_equity),
+          variacionMercado:
+            bal.market_variance === null ? null : Number(bal.market_variance),
           pnlMtd: pnl?.realized_pnl_mtd == null ? null : Number(pnl.realized_pnl_mtd),
           pnlYtd: pnl?.realized_pnl_ytd == null ? null : Number(pnl.realized_pnl_ytd),
           moneda: pnl?.currency ?? "USD",
         }
       : null,
+    cadena: {
+      vencimientos: delDia.map((t) => ({
+        id: t.id,
+        contract_month: t.contract_month,
+        date: t.date,
+        underlying: t.underlying_price === null ? null : Number(t.underlying_price),
+      })),
+      elegido: board?.contract_month ?? null,
+      fecha: board?.date ?? null,
+      subyacente:
+        board?.underlying_price == null ? null : Number(board.underlying_price),
+      filas: (cadenaFilas ?? []).map((f) => {
+        const strike = Number(f.strike);
+        // Los contratos propios se pintan sobre la cadena. Es la diferencia
+        // entre mirar precios y mirar TU posición dentro de esos precios, que
+        // es lo que hace falta para decidir si ampliar o rodar una cobertura.
+        const mias = posiciones.filter(
+          (p) => p.strike !== null && Number(p.strike) === strike,
+        );
+        const neto = (tipo: string) =>
+          mias
+            .filter((p) => (p.option_type ?? "").toUpperCase() === tipo)
+            .reduce((a, p) => a + (p.long_qty ?? 0) - (p.short_qty ?? 0), 0);
+        return {
+          strike,
+          call_premium: f.call_premium === null ? null : Number(f.call_premium),
+          call_delta: f.call_delta === null ? null : Number(f.call_delta),
+          put_premium: f.put_premium === null ? null : Number(f.put_premium),
+          put_delta: f.put_delta === null ? null : Number(f.put_delta),
+          propioCall: neto("CALL"),
+          propioPut: neto("PUT"),
+        };
+      }),
+    },
     cobertura:
       deltaPorStrike.size > 0 && posiciones.length > 0
         ? (() => {

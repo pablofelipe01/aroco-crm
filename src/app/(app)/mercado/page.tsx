@@ -14,7 +14,11 @@ export const dynamic = "force-dynamic";
 // defecto se cortaría a la mitad y dejaría el tablero incompleto sin decirlo.
 export const maxDuration = 300;
 
-export default async function MercadoPage() {
+export default async function MercadoPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ contrato?: string }>;
+}) {
   const session = await getSessionContext();
 
   // Esconder el módulo del menú no es un control de acceso: la ruta se puede
@@ -35,9 +39,10 @@ export default async function MercadoPage() {
     );
   }
 
+  const { contrato } = await searchParams;
   const supabase = await createClient();
   const [datos, sync] = await Promise.all([
-    cargarMercado(supabase),
+    cargarMercado(supabase, contrato),
     ultimaSync(createAdminClient()),
   ]);
   return <MercadoClient datos={datos} sync={sync} />;
