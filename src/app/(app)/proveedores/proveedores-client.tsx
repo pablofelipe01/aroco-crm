@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import {
   Store, Clock, CheckCircle2, Receipt, AlertTriangle, FileText, Check, X, Wallet,
+  Copy, Link2, ExternalLink,
 } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardBody } from "@/components/ui/card";
@@ -55,6 +56,15 @@ export function ProveedoresClient({
   const [pregunta, setPregunta] = React.useState<Pregunta | null>(null);
   const [texto, setTexto] = React.useState("");
   const [ocupado, setOcupado] = React.useState(false);
+  const [copiado, setCopiado] = React.useState(false);
+  const [enlace, setEnlace] = React.useState("");
+
+  React.useEffect(() => {
+    // Leer el origen exige el navegador, así que solo se puede después de
+    // montar. No es un setState en cascada: corre una vez y no depende de nada.
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- window solo existe tras montar
+    setEnlace(`${window.location.origin}/portal/registro`);
+  }, []);
 
   const pendientes = proveedores.filter((p) => p.estado === "Pendiente").length;
   const activos = proveedores.filter((p) => p.estado === "Activo").length;
@@ -81,7 +91,43 @@ export function ProveedoresClient({
       <PageHeader
         title="Proveedores Insumos"
         description="Oficina, finca, cultivo, bodega y demás · sus documentos y cuentas de cobro"
+        actions={
+          <a href="/portal" target="_blank" rel="noopener noreferrer">
+            <Button size="sm" variant="ghost">
+              Ver el portal
+              <ExternalLink className="h-4 w-4" />
+            </Button>
+          </a>
+        }
       />
+
+      {/* El enlace de registro tiene que estar donde alguien lo va a buscar.
+          El portal no está en el menú —es para gente de fuera— así que sin
+          esto no habría forma de encontrarlo ni de enviárselo a nadie. */}
+      <Card>
+        <CardBody className="flex flex-wrap items-center gap-3">
+          <Link2 className="h-4 w-4 shrink-0 text-fg-subtle" />
+          <div className="min-w-0 flex-1">
+            <p className="text-sm text-fg">Enlace de registro para proveedores</p>
+            <code className="mt-0.5 block truncate font-mono text-xs text-fg-subtle">
+              {enlace || "…"}
+            </code>
+          </div>
+          <Button
+            size="sm"
+            variant="secondary"
+            disabled={!enlace}
+            onClick={async () => {
+              await navigator.clipboard.writeText(enlace);
+              setCopiado(true);
+              setTimeout(() => setCopiado(false), 2000);
+            }}
+          >
+            {copiado ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+            {copiado ? "Copiado" : "Copiar"}
+          </Button>
+        </CardBody>
+      </Card>
 
       {error && (
         <div role="alert" className="flex items-start gap-3 rounded-[var(--radius-md)] border border-danger/40 bg-danger-soft p-4">
