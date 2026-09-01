@@ -284,6 +284,7 @@ export function parseInventorySheet(csv: string): ParsedSheet {
     rowsRead++;
 
     const remision = cell(row, C.remision) || null;
+    const recepcion = cell(row, C.recepcion) || null;
     const inPremium = num(row, C.inPremium);
     const inCorriente = num(row, C.inCorriente);
     const inCorrienteC = num(row, C.inCorrienteC);
@@ -294,7 +295,7 @@ export function parseInventorySheet(csv: string): ParsedSheet {
       entry_date: parseEsDate(cell(row, C.fecha)),
       remision,
       odc: cell(row, C.odc) || null,
-      recepcion: cell(row, C.recepcion) || null,
+      recepcion,
       qty_in_kg: num(row, C.qtyIn),
       qty_out_kg: num(row, C.qtyOut),
       qty_requested_kg: optNum(row, C.qtyRequested),
@@ -341,7 +342,12 @@ export function parseInventorySheet(csv: string): ParsedSheet {
       if (qty <= 0) return; // bloque de salida vacío.
 
       dispatches.push({
-        source_key: `${code}#${remision ?? ""}#s${idx + 1}`,
+        // La recepción entra en la clave por la misma razón por la que la
+        // 0061 la metió en la del lote: un lote puede llegar varias veces bajo
+        // la misma remisión, y cada llegada tiene sus propias salidas. Sin
+        // ella, la primera salida de dos recepciones distintas se llamaba
+        // igual —«…#24#s1»— y Postgres abortaba el upsert entero.
+        source_key: `${code}#${remision ?? ""}#${recepcion ?? ""}#s${idx + 1}`,
         // Hay salidas registradas sin fecha; se guardan como null en vez de
         // inventarles un día.
         dispatch_date: parseEsDate(cell(row, s.fecha)),
@@ -364,6 +370,10 @@ export function parseInventorySheet(csv: string): ParsedSheet {
   // dice cuál fila ni qué código. Se detecta aquí para que el error nombre el
   // problema: el sync se detiene igual —escribir una de las dos y descartar la
   // otra perdería kilos en silencio— pero ahora se sabe qué corregir en la hoja.
+  //
+  // Esta guarda cubre también las claves de los despachos, que son esta misma
+  // más la casilla de salida. Las dos claves van juntas: cambiar una sin la
+  // otra es lo que dejó el sync caído seis días. Hay un test que lo ata.
   const claves = new Map<string, string[]>();
   for (const l of lots) {
     const k = `${l.code}|${l.remision ?? ""}|${l.recepcion ?? ""}`;

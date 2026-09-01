@@ -1,0 +1,45 @@
+-- ============================================================================
+--  AROCO · 0078 — La recepción entra también en la identidad del despacho
+--
+--  La 0061 metió la recepción en la clave del LOTE y dejó la del DESPACHO como
+--  estaba: `código#remisión#sN`, donde sN es la casilla «SALIDA n» de la fila.
+--
+--  Las dos claves tienen que ir juntas. Un lote que llega dos veces bajo la
+--  misma remisión son dos filas en la hoja —eso es lo que la 0061 hizo
+--  posible— y cada una tiene sus propias salidas. Sin la recepción, la primera
+--  salida de las dos se llama igual:
+--
+--      COL-MET-GRA-210826(DELEITE)#24#s1 · 27-ago · 4.499,8 kg · CASA LUKER
+--      COL-MET-GRA-210826(DELEITE)#24#s1 · 21-ago ·      50 kg · TIEMPO CHOCOLATE
+--
+--  Y vuelve el mismo error que la 0061 arregló para los lotes:
+--
+--      ON CONFLICT DO UPDATE command cannot affect row a second time
+--
+--  El sync no escribe nada desde el 27-ago —el upsert es todo o nada— así que
+--  el inventario del CRM lleva seis días congelado en la foto del 26.
+--
+--  Esta migración no cambia el esquema: la clave se arma en el parser
+--  (`sheet-sync.ts`) y ya lleva la recepción. Lo que hay que hacer aquí es
+--  reconciliar lo que está guardado: los 185 despachos existentes tienen la
+--  clave vieja y NINGUNO coincide con la nueva, así que la próxima corrida los
+--  insertaría otra vez al lado de los viejos y Despachos mostraría cada salida
+--  dos veces.
+--
+--  Se borran y se vuelven a construir. `dispatches` con source='sheet' es una
+--  proyección pura de la hoja: `lot_id` va nulo a propósito (ver 0018), no
+--  dispara el trigger de movimientos, y nada la referencia — `commission_calcs`
+--  es la única tabla con FK y hoy tiene cero filas. La hoja es la fuente de la
+--  verdad; reconstruirla desde ahí no pierde nada.
+--
+--  La recepción NO se puede deducir de lo guardado: el despacho conserva el
+--  código y la remisión de entrada, pero no la recepción, y justo cuando un
+--  lote se parte en varias recepciones es imposible saber a cuál pertenecía
+--  cada salida. Esa información solo existe en la hoja. Por eso se reconstruye
+--  en vez de reescribir la clave.
+--
+--  IMPORTANTE: correr el sync inmediatamente después. Entre esta migración y la
+--  siguiente corrida, Despachos se ve vacío.
+-- ============================================================================
+
+delete from public.dispatches where source = 'sheet';

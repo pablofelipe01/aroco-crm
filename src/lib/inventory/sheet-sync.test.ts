@@ -68,7 +68,17 @@ test("columna lanza cuando el encabezado no existe", () => {
  * finales. `extra` inserta columnas nuevas para comprobar que el parser las
  * ignora en vez de descolocarse — que es justo lo que rompió el sync dos veces.
  */
-function hoja({ extra = false }: { extra?: boolean } = {}) {
+function hoja({
+  extra = false,
+  recepciones = null,
+}: {
+  extra?: boolean;
+  /**
+   * Dos filas del MISMO lote y la MISMA remisión, cada una con su recepción:
+   * el caso que la 0061 hizo posible y que dejó el sync caído seis días.
+   */
+  recepciones?: [string, string] | null;
+} = {}) {
   const sub: string[] = [];
   const hojaFila: string[] = [];
   const push = (s: string, h = "") => {
@@ -78,6 +88,7 @@ function hoja({ extra = false }: { extra?: boolean } = {}) {
 
   push("Fecha");
   push("# Remision");
+  push("# Recepcion");
   push("CODIGO  DE PROCEDENCIA  Y/O DESTINO");
   push("CANTIDAD INGRESADA (KG)");
   push("CANTIDAD SALIDA");
@@ -118,12 +129,12 @@ function hoja({ extra = false }: { extra?: boolean } = {}) {
     fila({
       0: "5-may-2025",
       1: "2007",
-      2: "CO-ANT-URA-050525",
-      3: "200",
-      4: "3",
-      5: "ALTO",
-      [9 + off]: "200", // ingresada · orgánico
-      [13 + off]: "197", // disponible · orgánico
+      3: "CO-ANT-URA-050525",
+      4: "200",
+      5: "3",
+      6: "ALTO",
+      [10 + off]: "200", // ingresada · orgánico
+      [14 + off]: "197", // disponible · orgánico
       [salidaEn]: "8-jul-2025",
       [salidaEn + 4]: "2",
       [salidaEn + 6]: "MACRORUEDA",
@@ -131,9 +142,30 @@ function hoja({ extra = false }: { extra?: boolean } = {}) {
       [salidaEn + 12]: "1", // salida 2 · orgánico, sin fecha
       [salidaEn + 14]: "MUESTRAS",
     }),
-    fila({ 3: "201136,03", 4: "TOTAL" }), // fila TOTAL, sin código
-  ].join("\n");
-  return csv;
+    fila({ 4: "201136,03", 5: "TOTAL" }), // fila TOTAL, sin código
+  ];
+  if (recepciones) {
+    // El mismo código y la misma remisión, dos recepciones, una salida cada una.
+    csv.splice(
+      4,
+      1,
+      ...recepciones.map((rec, i) =>
+        fila({
+          0: "21-ago-2026",
+          1: "24",
+          2: rec,
+          3: "COL-MET-GRA-210826(DELEITE)",
+          4: i === 0 ? "4499,8" : "50",
+          [10 + off]: i === 0 ? "4499,8" : "50",
+          [salidaEn]: i === 0 ? "27-ago-2026" : "21-ago-2026",
+          [salidaEn + 2]: i === 0 ? "4499,8" : "50",
+          [salidaEn + 6]: i === 0 ? "CASA LUKER" : "TIEMPO CHOCOLATE",
+          [salidaEn + 7]: i === 0 ? "2145" : "2144",
+        }),
+      ),
+    );
+  }
+  return csv.join("\n");
 }
 
 test("parseInventorySheet lee lotes y salidas por nombre de columna", () => {
@@ -174,4 +206,38 @@ test("parseInventorySheet falla si desaparece una columna obligatoria", () => {
   // Mejor una corrida en rojo que doscientas filas con los campos corridos.
   const roto = hoja().replace("CANTIDAD SALIDA", "CANT. DE SALIDA TOTAL");
   assert.throws(() => parseInventorySheet(roto), ColumnaFaltante);
+});
+
+test("la clave del despacho lleva la recepción, como la del lote", () => {
+  // Un lote puede llegar varias veces bajo la misma remisión. La 0061 metió la
+  // recepción en la clave del lote y dejó la del despacho como estaba, así que
+  // la primera salida de dos recepciones distintas se llamaba igual y Postgres
+  // abortaba el upsert entero: seis días de inventario congelado.
+  const { lots, dispatches } = parseInventorySheet(
+    hoja({ recepciones: ["2414", "2416"] }),
+  );
+  assert.equal(lots.length, 2);
+  assert.equal(dispatches.length, 2);
+  assert.notEqual(dispatches[0].source_key, dispatches[1].source_key);
+  assert.match(dispatches[0].source_key, /#24#2414#s1$/);
+  assert.match(dispatches[1].source_key, /#24#2416#s1$/);
+});
+
+test("lotes distintos dan claves de despacho distintas", () => {
+  // Las dos claves van juntas: la del despacho es la del lote más la casilla.
+  // Cambiar una sin la otra es exactamente el fallo de arriba, y este test es
+  // lo que impide que vuelva a pasar sin que nadie se entere.
+  const { lots, dispatches } = parseInventorySheet(
+    hoja({ recepciones: ["2414", "2416"] }),
+  );
+  const clavesLote = new Set(
+    lots.map((l) => `${l.code}|${l.remision ?? ""}|${l.recepcion ?? ""}`),
+  );
+  const prefijos = new Set(
+    dispatches.map((d) => d.source_key.split("#").slice(0, 3).join("|")),
+  );
+  assert.equal(clavesLote.size, lots.length, "cada lote, una clave");
+  for (const p of prefijos) {
+    assert.ok(clavesLote.has(p), `«${p}» no corresponde a ningún lote`);
+  }
 });
