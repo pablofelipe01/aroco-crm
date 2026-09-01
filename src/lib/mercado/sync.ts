@@ -80,13 +80,37 @@ export async function sincronizarMercado(
     if (!MCPS.barchart.url || vencimientos <= 0) return;
     try {
       const vencs = await listarVencimientos(MCPS.barchart);
-      for (const v of vencs.slice(0, vencimientos)) {
-        try {
-          const t = await traerTablero(MCPS.barchart, v);
-          if (t) tableros.push(await guardarTablero(db, t, hoy));
-        } catch (e) {
+      const pedidos = vencs.slice(0, vencimientos);
+
+      // EN PARALELO, no en serie.
+      //
+      // Cada tablero tarda ~100 s (Playwright abriendo Chromium del otro lado),
+      // así que tres seguidos son ~300 s y la sincronización entera llegaba a
+      // 352 s — por encima del tope de 300 s de Vercel. La función moría en el
+      // ÚLTIMO vencimiento, que es justo el más lejano y el más líquido: el
+      // 31-ago quedaron guardados Oct y Nov, y Dic no. No dejaba error, solo
+      // faltaba una fila, y en pantalla se veía igual que si Barchart no lo
+      // ofreciera.
+      //
+      // Comprobado que el MCP aguanta las tres a la vez: 100 s en total y los
+      // tres tableros completos (82, 60 y 237 strikes).
+      const resultados = await Promise.allSettled(
+        pedidos.map((v) => traerTablero(MCPS.barchart, v)),
+      );
+
+      // El guardado sí va en serie: son escrituras rápidas y así el orden de
+      // `tableros` sigue al de los vencimientos.
+      for (const [i, r] of resultados.entries()) {
+        const v = pedidos[i];
+        if (r.status === "rejected") {
           // Un vencimiento que falla no cancela los otros.
-          fallos.push({ fuente: `Barchart ${v.label}`, error: texto(e) });
+          fallos.push({ fuente: `Barchart ${v.label}`, error: texto(r.reason) });
+          continue;
+        }
+        try {
+          if (r.value) tableros.push(await guardarTablero(db, r.value, hoy));
+        } catch (e) {
+          fallos.push({ fuente: `Barchart ${v.label} (guardado)`, error: texto(e) });
         }
       }
     } catch (e) {
