@@ -4,7 +4,7 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { getSessionContext } from "@/lib/auth";
 import { serverEnv } from "@/lib/env";
-import { AI_TOOLS, executeTool } from "@/lib/ai/tools";
+import { executeTool, herramientasPara } from "@/lib/ai/tools";
 import type { Idioma } from "@/lib/i18n";
 import { resolveAgentContext } from "@/lib/ai/context";
 
@@ -117,8 +117,12 @@ export async function POST(request: NextRequest) {
       cache_control: { type: "ephemeral" },
     },
   ];
-  const tools = AI_TOOLS.map((t, i) =>
-    i === AI_TOOLS.length - 1
+  // `herramientasPara` recorta la lista según el permiso: quien no ve Mercado
+  // ni siquiera recibe esas herramientas, así que no puede intentarlas ni leer
+  // un resultado vacío como «no hay cobertura».
+  const disponibles = herramientasPara(agentCtx);
+  const tools = disponibles.map((t, i) =>
+    i === disponibles.length - 1
       ? { ...t, cache_control: { type: "ephemeral" as const } }
       : t,
   );
