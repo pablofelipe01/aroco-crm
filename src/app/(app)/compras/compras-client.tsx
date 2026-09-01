@@ -2,7 +2,10 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Search, ShoppingCart, Clock, CheckCircle2, X, AlertTriangle } from "lucide-react";
+import {
+  Plus, Search, ShoppingCart, Clock, CheckCircle2, X, AlertTriangle,
+  Columns3, List, FileWarning,
+} from "lucide-react";
 import { motion } from "framer-motion";
 import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
@@ -20,6 +23,24 @@ import { COMPRA_ESTADOS, COMPRA_CATEGORIAS, MONEDAS } from "@/lib/schemas/compra
 import type { SolicitudConCotizaciones } from "./page";
 import { SolicitudDetail, ESTADO_TONE, formatMonto, type ProveedorOpcion } from "./solicitud-detail";
 import { crearSolicitudConCotizaciones } from "./actions";
+import { cn } from "@/lib/utils";
+import {
+  ETAPAS, GRUPO_DE, etapaDe, grupoDe, diasQuieta, siguientePaso,
+  type Etapa,
+} from "@/lib/compras/flujo";
+
+/** Color de cada etapa. El gris de «Rechazada» la aparta sin esconderla. */
+const ETAPA_TONE: Record<Etapa, "neutral" | "info" | "warn" | "success" | "danger"> = {
+  Borrador: "neutral",
+  "Esperando aprobación": "warn",
+  "Por comprar": "info",
+  "Por recibir": "info",
+  Recibida: "success",
+  Rechazada: "danger",
+};
+
+/** A partir de aquí una solicitud lleva demasiado quieta y hay que empujarla. */
+const DIAS_ESTANCADA = 7;
 
 /**
  * Lo que se muestra como monto de la solicitud: si ya se aprobó, el de la
@@ -29,6 +50,128 @@ import { crearSolicitudConCotizaciones } from "./actions";
 function montoReferencia(s: SolicitudConCotizaciones) {
   const elegida = s.compra_cotizaciones.find((c) => c.id === s.cotizacion_elegida_id);
   return elegida ?? s.compra_cotizaciones[0] ?? null;
+}
+
+
+/**
+ * Una solicitud en el tablero.
+ *
+ * Lleva el siguiente paso escrito. En una vista de gestión, el estado sin la
+ * acción siguiente obliga a abrir cada solicitud para saber a quién le toca
+ * mover — que es justo lo que se quería evitar.
+ */
+function TarjetaSolicitud({
+  s,
+  onAbrir,
+}: {
+  s: SolicitudConCotizaciones;
+  onAbrir: () => void;
+}) {
+  const ref = montoReferencia(s);
+  const cots = s.compra_cotizaciones.length;
+  const dias = diasQuieta(s);
+  const etapa = etapaDe(s);
+  // Ya cerrada, los días parada no dicen nada.
+  const estancada = dias >= DIAS_ESTANCADA && GRUPO_DE[etapa] !== "Finalizada";
+
+  return (
+    <button
+      onClick={onAbrir}
+      className="w-full rounded-[var(--radius-md)] border border-border bg-surface p-3 text-left shadow-[var(--shadow-soft-sm)] transition-colors hover:border-border-strong"
+    >
+      <div className="flex items-start justify-between gap-2">
+        <span className="font-mono text-[11px] text-fg-subtle">{s.consecutivo}</span>
+        {ref && (
+          <span className="shrink-0 font-mono text-xs tnum text-fg-muted">
+            {formatMonto(Number(ref.monto), ref.moneda)}
+          </span>
+        )}
+      </div>
+
+      <p className="mt-0.5 line-clamp-2 text-sm font-medium text-fg">{s.titulo}</p>
+
+      <p className="mt-1 truncate text-xs text-fg-subtle">
+        {s.categoria}
+        {s.area ? ` · ${s.area}` : ""}
+        {s.autor ? ` · ${s.autor}` : ""}
+      </p>
+
+      <p className="mt-1.5 text-xs text-fg-muted">{siguientePaso(s, cots)}</p>
+
+      <div className="mt-2 flex flex-wrap items-center gap-1.5">
+        {/* Sin cotizaciones es lo que hay que ver de lejos: la solicitud existe
+            pero no hay nada que aprobar. Era el punto de Luis Ernesto — que se
+            vieran también las que todavía no tienen cotización. */}
+        {cots === 0 ? (
+          <Badge tone="warn">
+            <FileWarning className="h-3 w-3" />
+            sin cotización
+          </Badge>
+        ) : (
+          <Badge tone="neutral">
+            {cots} cotización{cots === 1 ? "" : "es"}
+          </Badge>
+        )}
+        {estancada && (
+          <Badge tone="danger">
+            <Clock className="h-3 w-3" />
+            {dias} d
+          </Badge>
+        )}
+      </div>
+    </button>
+  );
+}
+
+/** El tablero: una columna por etapa, en el orden en que avanza el trabajo. */
+function TableroFlujo({
+  solicitudes,
+  onAbrir,
+}: {
+  solicitudes: SolicitudConCotizaciones[];
+  onAbrir: (s: SolicitudConCotizaciones) => void;
+}) {
+  return (
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+      {ETAPAS.map((etapa) => {
+        const dentro = solicitudes.filter((s) => etapaDe(s) === etapa);
+        // Rechazadas vacías no aportan una columna; el resto sí, porque una
+        // columna en cero es información: no hay nada esperando ahí.
+        if (etapa === "Rechazada" && dentro.length === 0) return null;
+        return (
+          <section key={etapa} className="flex flex-col">
+            <div className="mb-2 flex items-center justify-between gap-2 px-1">
+              <div className="flex items-center gap-1.5">
+                <Badge tone={ETAPA_TONE[etapa]} dot>
+                  {etapa}
+                </Badge>
+                <span className="text-[11px] text-fg-subtle">{GRUPO_DE[etapa]}</span>
+              </div>
+              <span className="font-mono text-xs tnum text-fg-subtle">
+                {dentro.length}
+              </span>
+            </div>
+            <div
+              className={cn(
+                "flex-1 space-y-2 rounded-[var(--radius-lg)] border border-dashed p-2",
+                dentro.length === 0
+                  ? "border-border bg-bg-subtle/20"
+                  : "border-border bg-bg-subtle/40",
+              )}
+            >
+              {dentro.length === 0 ? (
+                <p className="px-2 py-6 text-center text-xs text-fg-subtle">Nada aquí</p>
+              ) : (
+                dentro.map((s) => (
+                  <TarjetaSolicitud key={s.id} s={s} onAbrir={() => onAbrir(s)} />
+                ))
+              )}
+            </div>
+          </section>
+        );
+      })}
+    </div>
+  );
 }
 
 export function ComprasClient({
@@ -53,6 +196,7 @@ export function ComprasClient({
   const [fEstado, setFEstado] = React.useState<string[]>([]);
   const [fCategoria, setFCategoria] = React.useState<string[]>([]);
   const [fArea, setFArea] = React.useState<string[]>([]);
+  const [vista, setVista] = React.useState<"flujo" | "lista">("flujo");
   const [abierta, setAbierta] = React.useState<SolicitudConCotizaciones | null>(null);
   const [formOpen, setFormOpen] = React.useState(false);
   const [cotizaciones, setCotizaciones] = React.useState(1);
@@ -75,10 +219,14 @@ export function ComprasClient({
     });
   }, [solicitudes, query, fEstado, fCategoria, fArea]);
 
-  const pendientes = solicitudes.filter((s) => s.estado === "Pendiente").length;
-  const aprobadas = solicitudes.filter((s) => s.estado === "Aprobada").length;
-  const sinRecibir = solicitudes.filter(
-    (s) => s.estado === "Aprobada" && !s.recibida_en,
+  // Los tres grupos del flujo, no los estados de aprobación. «Aprobada» tapaba
+  // tres situaciones distintas —sin comprar, pagada sin recibir, y cerrada— y
+  // era justo lo que no se podía ver.
+  const abiertas = solicitudes.filter((s) => grupoDe(s) === "Abierta").length;
+  const enProceso = solicitudes.filter((s) => grupoDe(s) === "En proceso").length;
+  const finalizadas = solicitudes.filter((s) => grupoDe(s) === "Finalizada").length;
+  const estancadas = solicitudes.filter(
+    (s) => grupoDe(s) !== "Finalizada" && diasQuieta(s) >= DIAS_ESTANCADA,
   ).length;
   const hayFiltros =
     !!query || fEstado.length > 0 || fCategoria.length > 0 || fArea.length > 0;
@@ -123,7 +271,7 @@ export function ComprasClient({
     <div className="space-y-6">
       <PageHeader
         title="Compras"
-        description={`Cotizaciones de insumos y su aprobación · ${solicitudes.length} solicitudes${
+        description={`Solicitudes de insumos, de la petición a la entrega · ${solicitudes.length}${
           hayFiltros ? ` · ${filtradas.length} filtradas` : ""
         }`}
         actions={
@@ -157,11 +305,17 @@ export function ComprasClient({
         variants={staggerContainer}
         initial="hidden"
         animate="show"
-        className="grid grid-cols-1 gap-4 sm:grid-cols-3"
+        className="grid grid-cols-2 gap-4 lg:grid-cols-4"
       >
-        <StatCard label="Esperando aprobación" value={pendientes} icon={Clock} />
-        <StatCard label="Aprobadas" value={aprobadas} icon={CheckCircle2} />
-        <StatCard label="Aprobadas sin recibir" value={sinRecibir} icon={ShoppingCart} />
+        <StatCard label="Abiertas" value={abiertas} icon={Clock} />
+        <StatCard label="En proceso" value={enProceso} icon={ShoppingCart} />
+        <StatCard label="Finalizadas" value={finalizadas} icon={CheckCircle2} />
+        <StatCard
+          label={`Quietas +${DIAS_ESTANCADA} días`}
+          value={estancadas}
+          icon={AlertTriangle}
+          hint={estancadas > 0 ? "necesitan que alguien las empuje" : undefined}
+        />
       </motion.div>
 
       <div className="flex flex-wrap items-center gap-2">
@@ -210,6 +364,27 @@ export function ComprasClient({
             Limpiar
           </Button>
         )}
+
+        <div className="ml-auto inline-flex shrink-0 rounded-[var(--radius-md)] border border-border bg-surface p-0.5">
+          {(
+            [
+              { v: "flujo", icon: Columns3, label: "Flujo" },
+              { v: "lista", icon: List, label: "Lista" },
+            ] as const
+          ).map(({ v, icon: Icon, label }) => (
+            <button
+              key={v}
+              onClick={() => setVista(v)}
+              className={cn(
+                "flex items-center gap-1.5 rounded-[var(--radius-sm)] px-3 py-1.5 text-sm font-medium transition-colors",
+                vista === v ? "bg-accent text-accent-fg" : "text-fg-muted hover:text-fg",
+              )}
+            >
+              <Icon className="h-4 w-4" />
+              <span className="hidden sm:inline">{label}</span>
+            </button>
+          ))}
+        </div>
       </div>
 
       {filtradas.length === 0 ? (
@@ -230,6 +405,8 @@ export function ComprasClient({
             )
           }
         />
+      ) : vista === "flujo" ? (
+        <TableroFlujo solicitudes={filtradas} onAbrir={setAbierta} />
       ) : (
         <ul className="space-y-2">
           {filtradas.map((s) => {
