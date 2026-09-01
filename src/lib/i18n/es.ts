@@ -437,6 +437,24 @@ export const es = {
     fechaTableroHint: "Si se deja vacía, hoy.",
     modalNota:
       "De aquí salen delta y volatilidad, que Barchart no entrega. Sin delta no se puede decir cuánto protege de verdad una cobertura: un put muy fuera de dinero cubre en el papel y casi nada en la práctica.",
+    analistaAbrir: "Analista",
+    analistaTitulo: "Analista de mercado",
+    analistaSubtitulo: "Conversa sobre las cifras de esta pantalla",
+    analistaInvitacion:
+      "Pregúntame por la exposición, la cobertura o el tablero. Trabajo con las mismas cifras que estás viendo y consulto el resto cuando hace falta.",
+    analistaPlaceholder: "Pregunta sobre exposición, cobertura, opciones…",
+    analistaSugerencia1: "¿Qué me costaría cubrir lo que está descubierto?",
+    analistaSugerencia2: "¿Qué le pasa al inventario si el cacao cae 15 %?",
+    analistaSugerencia3: "¿Conviene vender nacional o exportar con estos números?",
+    analistaSugerencia4: "Explícame el arbitraje entre Nueva York y Londres.",
+    analistaPensando: "Pensando…",
+    analistaConsultando: "Consultando",
+    analistaLimpiar: "Nueva conversación",
+    analistaCerrar: "Cerrar el panel",
+    analistaError: "Hubo un error.",
+    analistaSinConexion: "No se pudo conectar con el analista.",
+    analistaNoEjecuta:
+      "Analiza y explica; no opera con el bróker ni cambia posiciones.",
   },
 
   asistente: {

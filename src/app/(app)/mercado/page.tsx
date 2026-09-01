@@ -8,6 +8,7 @@ import { cargarMercado } from "./riesgo-data";
 import { ultimaSync } from "@/lib/mercado/sync";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { MercadoClient } from "./mercado-client";
+import { fotoMercado } from "@/lib/mercado/foto";
 
 export const dynamic = "force-dynamic";
 // El botón de sincronizar corre en esta ruta y Barchart tarda: con el tope por
@@ -45,5 +46,7 @@ export default async function MercadoPage({
     cargarMercado(supabase, contrato),
     ultimaSync(createAdminClient()),
   ]);
-  return <MercadoClient datos={datos} sync={sync} />;
+  // La foto se arma aquí, del mismo objeto que se acaba de renderizar: así el
+  // analista cita exactamente las cifras que quedaron en pantalla.
+  return <MercadoClient datos={datos} sync={sync} foto={fotoMercado(datos)} />;
 }

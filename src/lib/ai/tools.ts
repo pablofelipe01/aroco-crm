@@ -499,6 +499,38 @@ export function herramientasPara(ctx: AgentContext): Anthropic.Tool[] {
 }
 
 /**
+ * Lo que se le ofrece al analista del panel de Mercado.
+ *
+ * Es un subconjunto a propósito. El analista entra con la foto de la pantalla
+ * en el contexto y la conversación es de cobertura y precio; darle además
+ * leads, despachos, cotizaciones y comisiones no lo hace más útil, le agrega
+ * treinta descripciones que compiten por su atención cuando tiene que elegir
+ * entre `get_tablero_opciones` y `get_diferenciales`.
+ *
+ * Lo que sí entra además de Mercado: inventario (los lotes que se van a
+ * cubrir), precios nacionales y la comparación contra bolsa —de ahí sale la
+ * decisión de vender nacional o exportar— y el equipo, que hace falta para
+ * poder proponer una tarea a nombre de alguien.
+ */
+const HERRAMIENTAS_ANALISTA = [
+  "get_inventory_summary",
+  "get_price_history",
+  "compare_prices",
+  "get_team",
+  "propose_create_task",
+];
+
+export function herramientasAnalista(ctx: AgentContext): Anthropic.Tool[] {
+  // Sin el permiso no hay panel; la lista vacía es la tercera capa, por si
+  // alguna vez se llega aquí sin pasar por el candado de la ruta.
+  if (!ctx.veMercado) return [];
+  return [
+    ...MERCADO_TOOLS,
+    ...AI_TOOLS.filter((t) => HERRAMIENTAS_ANALISTA.includes(t.name)),
+  ];
+}
+
+/**
  * Execute a tool by name. Returns a JSON-serializable result.
  *
  * `ctx` identifies who is asking; las herramientas que tocan datos de personas

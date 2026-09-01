@@ -437,6 +437,24 @@ export const en: Diccionario = {
     fechaTableroHint: "Leave empty for today.",
     modalNota:
       "This is where delta and volatility come from, which Barchart does not supply. Without delta there is no saying how much a hedge really protects: a deep out-of-the-money put covers on paper and almost nothing in practice.",
+    analistaAbrir: "Analyst",
+    analistaTitulo: "Market analyst",
+    analistaSubtitulo: "Talk through the figures on this screen",
+    analistaInvitacion:
+      "Ask me about exposure, hedging or the options board. I work from the same figures you are looking at, and look up the rest when needed.",
+    analistaPlaceholder: "Ask about exposure, hedging, options…",
+    analistaSugerencia1: "What would it cost to hedge what is uncovered?",
+    analistaSugerencia2: "What happens to the inventory if cocoa falls 15%?",
+    analistaSugerencia3: "With these numbers, sell domestically or export?",
+    analistaSugerencia4: "Explain the New York-London arbitrage.",
+    analistaPensando: "Thinking…",
+    analistaConsultando: "Looking up",
+    analistaLimpiar: "New conversation",
+    analistaCerrar: "Close panel",
+    analistaError: "Something went wrong.",
+    analistaSinConexion: "Could not reach the analyst.",
+    analistaNoEjecuta:
+      "It analyses and explains; it does not trade with the broker or change positions.",
   },
 
   asistente: {
