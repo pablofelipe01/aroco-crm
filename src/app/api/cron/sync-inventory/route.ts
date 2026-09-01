@@ -140,8 +140,13 @@ async function syncQuality(
       duration_ms: Date.now() - startedAt,
       error: message,
     });
-    await avisarFalloSync(db, "inventory_sheet", "el inventario", message);
-  console.error("[sync-inventory-quality]", message);
+    await avisarFalloSync(
+      db,
+      "inventory_quality_sheet",
+      "el inventario por calidad",
+      message,
+    );
+    console.error("[sync-inventory-quality]", message);
     return { ok: false, error: message };
   }
 }
@@ -160,6 +165,10 @@ async function fail(
     duration_ms: Date.now() - startedAt,
     error: message,
   });
+  // Este es el camino por el que se cae el sync de verdad. La d400a36 puso el
+  // aviso en el `catch` de la pestaña de calidad, que ni siquiera se alcanza
+  // cuando la hoja principal falla: `fail()` devuelve antes.
+  await avisarFalloSync(db, "inventory_sheet", "el inventario", message);
   console.error("[sync-inventory]", message);
   return NextResponse.json({ ok: false, error: message }, { status: 500 });
 }
