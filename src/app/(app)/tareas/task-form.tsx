@@ -17,6 +17,7 @@ import { TASK_STATUSES, TASK_STATUS_META } from "@/lib/status";
 import type { TeamMember } from "@/lib/types/database";
 import type { TaskWithPerson } from "./page";
 import { createTask, updateTask } from "./actions";
+import { TaskLog } from "./task-log";
 
 interface FormValues {
   name: string;
@@ -24,17 +25,26 @@ interface FormValues {
   start_date: string;
   due_date: string;
   status: string;
-  notes: string;
+}
+
+/** Hoy en formato ISO y en hora local, que es el día que ve quien escribe. */
+function hoyISO(): string {
+  const d = new Date();
+  const dos = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${dos(d.getMonth() + 1)}-${dos(d.getDate())}`;
 }
 
 function toValues(t: TaskWithPerson | null): FormValues {
   return {
     name: t?.name ?? "",
     description: t?.description ?? "",
-    start_date: t?.start_date ?? "",
+    // Una tarea nueva arranca hoy. El campo queda editable —hay compromisos
+    // que empiezan la semana entrante— pero deja de ser un espacio en blanco
+    // que nadie llenaba. La columna tiene el mismo default, así que las tareas
+    // que entran por el asistente o por un acta también lo traen.
+    start_date: t ? (t.start_date ?? "") : hoyISO(),
     due_date: t?.due_date ?? "",
     status: t?.status ?? "pending",
-    notes: t?.notes ?? "",
   };
 }
 
@@ -63,12 +73,15 @@ export function TaskForm({
   team,
   initial,
   onSaved,
+  currentUserId,
 }: {
   open: boolean;
   onClose: () => void;
   team: TeamMember[];
   initial: TaskWithPerson | null;
   onSaved: () => void;
+  /** Perfil en sesión: decide qué notas de la bitácora se pueden borrar. */
+  currentUserId?: string;
 }) {
   const { toast } = useToast();
   const { register, handleSubmit, reset, formState } = useForm<FormValues>({
@@ -203,10 +216,14 @@ export function TaskForm({
         <Field label="Descripción" className="sm:col-span-2">
           <Textarea {...register("description")} rows={2} />
         </Field>
-        <Field label="Notas" className="sm:col-span-2">
-          <Textarea {...register("notes")} rows={2} />
-        </Field>
       </form>
+
+      {/* La bitácora solo existe para una tarea que ya está guardada: no hay
+          dónde colgar una nota de algo que todavía no tiene id. En una tarea
+          nueva aparece apenas se crea, al volver a abrirla. */}
+      {initial && (
+        <TaskLog taskId={initial.id} currentUserId={currentUserId} />
+      )}
     </Modal>
   );
 }

@@ -2841,8 +2841,36 @@ export type Database = {
         };
         Relationships: [];
       };
+      task_notes: {
+        Row: {
+          author_name: string | null;
+          body: string;
+          created_at: string;
+          created_by: string | null;
+          id: string;
+          task_id: string;
+        };
+        Insert: {
+          author_name?: string | null;
+          body: string;
+          created_at?: string;
+          created_by?: string | null;
+          id?: string;
+          task_id: string;
+        };
+        Update: {
+          author_name?: string | null;
+          body?: string;
+          created_at?: string;
+          created_by?: string | null;
+          id?: string;
+          task_id?: string;
+        };
+        Relationships: [];
+      };
       tasks: {
         Row: {
+          completed_at: string | null;
           created_at: string;
           created_by: string | null;
           description: string | null;
@@ -2860,6 +2888,7 @@ export type Database = {
           updated_at: string;
         };
         Insert: {
+          completed_at?: string | null;
           created_at?: string;
           created_by?: string | null;
           description?: string | null;
@@ -2877,6 +2906,7 @@ export type Database = {
           updated_at?: string;
         };
         Update: {
+          completed_at?: string | null;
           created_at?: string;
           created_by?: string | null;
           description?: string | null;
@@ -3093,6 +3123,7 @@ export type RecepcionFoto = Tables<"recepcion_fotos">;
 export type Liquidacion = Tables<"liquidaciones">;
 export type Contrato = Tables<"contratos">;
 export type Task = Tables<"tasks">;
+export type TaskNote = Tables<"task_notes">;
 export type Meeting = Tables<"meetings">;
 
 export type Department = Enums<"department">;

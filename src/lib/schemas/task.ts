@@ -18,10 +18,14 @@ export const taskSchema = z.object({
   /** Nombre libre cuando el responsable no está en el catálogo del equipo. */
   person_name: optionalText,
   source: optionalText,
+  /**
+   * Vacío significa «que la ponga la base»: `tasks.start_date` tiene
+   * `default current_date` desde 0079. Por eso `createTask` OMITE la clave
+   * cuando viene nula, en vez de mandar un null que pisaría el default.
+   */
   start_date: optionalText,
   due_date: optionalText,
   status: z.enum(TASK_STATUSES),
-  notes: optionalText,
 });
 
 export type TaskInput = z.input<typeof taskSchema>;

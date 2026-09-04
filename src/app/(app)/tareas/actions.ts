@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getSessionContext } from "@/lib/auth";
 import { taskSchema } from "@/lib/schemas/task";
 import type { TaskStatus } from "@/lib/status";
+import type { TaskNote } from "@/lib/types/database";
 
 export type ActionResult = { ok: boolean; error?: string; id?: string };
 
@@ -59,10 +60,18 @@ export async function createTask(input: unknown): Promise<ActionResult> {
   }
   const session = await requireSession();
   const supabase = await createClient();
-  const { assignee_ids, ...task } = parsed.data;
+  const { assignee_ids, start_date, ...task } = parsed.data;
   const { data, error } = await supabase
     .from("tasks")
-    .insert({ ...task, created_by: session.userId })
+    .insert({
+      ...task,
+      created_by: session.userId,
+      // La clave se OMITE cuando viene vacía para que actúe el
+      // `default current_date` de la columna (migración 0079). Mandar
+      // `start_date: null` lo pisaría y la tarea nacería sin fecha de inicio,
+      // que es justo lo que se pidió resolver.
+      ...(start_date ? { start_date } : {}),
+    })
     .select("id")
     .single();
   if (error) return { ok: false, error: error.message };
@@ -108,6 +117,80 @@ export async function deleteTask(id: string): Promise<ActionResult> {
   await requireSession();
   const supabase = await createClient();
   const { error } = await supabase.from("tasks").delete().eq("id", id);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/tareas");
+  return { ok: true };
+}
+
+/**
+ * Bitácora de una tarea, de la más nueva a la más vieja.
+ *
+ * Se pide al abrir la tarea y no se trae junto con el tablero: son cientos de
+ * tareas y las notas de todas ellas viajarían al navegador para que se lean
+ * las de una.
+ */
+export async function listTaskNotes(
+  taskId: string,
+): Promise<{ ok: boolean; error?: string; notes: TaskNote[] }> {
+  await requireSession();
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("task_notes")
+    .select("*")
+    .eq("task_id", taskId)
+    .order("created_at", { ascending: false });
+  if (error) return { ok: false, error: error.message, notes: [] };
+  return { ok: true, notes: data ?? [] };
+}
+
+/**
+ * Agrega una entrada a la bitácora de la tarea.
+ *
+ * Se guarda de inmediato y no al «Guardar» del formulario: una bitácora es un
+ * registro de lo que pasó, y una nota que se pierde porque alguien cerró el
+ * modal sin darle guardar no sirve como constancia.
+ *
+ * `created_by` lo pone el `default auth.uid()` de la columna y la política de
+ * RLS exige que coincida con la sesión, así que aquí no hay nada que falsear.
+ */
+export async function addTaskNote(
+  taskId: string,
+  body: string,
+): Promise<ActionResult> {
+  const texto = body.trim();
+  if (!texto) return { ok: false, error: "La nota está vacía." };
+
+  const session = await requireSession();
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("task_notes")
+    .insert({
+      task_id: taskId,
+      body: texto,
+      // El nombre se congela al escribir: si la persona cambia de nombre o
+      // sale del equipo, la nota sigue diciendo quién la puso ese día.
+      author_name: session.profile?.full_name ?? session.email ?? null,
+      created_by: session.userId,
+    })
+    .select("id")
+    .single();
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath("/tareas");
+  return { ok: true, id: data.id };
+}
+
+/**
+ * Borra una entrada de la bitácora.
+ *
+ * Quién puede hacerlo lo decide la RLS —el autor o un admin—, no esta función:
+ * la comprobación tiene que estar donde no se pueda esquivar llamando a la API
+ * por otro lado.
+ */
+export async function deleteTaskNote(id: string): Promise<ActionResult> {
+  await requireSession();
+  const supabase = await createClient();
+  const { error } = await supabase.from("task_notes").delete().eq("id", id);
   if (error) return { ok: false, error: error.message };
   revalidatePath("/tareas");
   return { ok: true };

@@ -24,6 +24,7 @@ import {
   CalendarPlus,
   Trash2,
   Pencil,
+  Archive,
 } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
@@ -45,6 +46,7 @@ import type { TaskWithPerson } from "./page";
 import { TaskForm } from "./task-form";
 import { CalendarExport } from "./calendar-export";
 import { updateTaskStatus, deleteTask } from "./actions";
+import { etiquetaMes } from "@/lib/tareas/archivo";
 
 /** Etiqueta para las tareas que no traen origen, para poder filtrarlas. */
 const SIN_ORIGEN = "Sin origen";
@@ -325,10 +327,22 @@ export function TareasClient({
   initialTasks,
   team,
   currentPersonId = "",
+  currentUserId,
+  meses = [],
+  mesArchivo = null,
+  archivadas = [],
 }: {
   initialTasks: TaskWithPerson[];
   team: TeamMember[];
   currentPersonId?: string;
+  /** Perfil en sesión: decide qué notas de la bitácora se pueden borrar. */
+  currentUserId?: string;
+  /** Meses que tienen tareas archivadas, del más reciente al más viejo. */
+  meses?: string[];
+  /** Mes que se está viendo en el archivo, o null si se está en el tablero. */
+  mesArchivo?: string | null;
+  /** Tareas completadas del mes que se está viendo. */
+  archivadas?: TaskWithPerson[];
 }) {
   const router = useRouter();
   const { toast } = useToast();
@@ -480,9 +494,13 @@ export function TareasClient({
     <div className="space-y-6">
       <PageHeader
         title="Tareas"
-        description={`${tasks.length} tareas${
-          hasFilters ? ` · ${filtered.length} filtradas` : ""
-        }`}
+        description={
+          mesArchivo
+            ? `Archivo de ${etiquetaMes(mesArchivo)} · ${archivadas.length} completadas`
+            : `${tasks.length} tareas${
+                hasFilters ? ` · ${filtered.length} filtradas` : ""
+              }`
+        }
         actions={
           <Button
             size="sm"
@@ -498,6 +516,23 @@ export function TareasClient({
       />
 
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        {/* En el archivo los filtros del tablero no aplican —lo que se ve es un
+            mes cerrado entero— así que su sitio lo ocupa el selector de mes. */}
+        {mesArchivo ? (
+          <div className="flex flex-1 items-center gap-2">
+            <Select
+              value={mesArchivo}
+              onChange={(e) => router.push(`/tareas?archivo=${e.target.value}`)}
+              className="w-auto"
+            >
+              {meses.map((m) => (
+                <option key={m} value={m}>
+                  {etiquetaMes(m)}
+                </option>
+              ))}
+            </Select>
+          </div>
+        ) : (
         <div className="flex flex-1 flex-wrap items-center gap-2">
           <div className="relative min-w-48 flex-1 sm:max-w-xs">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-fg-subtle" />
@@ -564,6 +599,7 @@ export function TareasClient({
             </Button>
           )}
         </div>
+        )}
 
         <div className="inline-flex shrink-0 rounded-[var(--radius-md)] border border-border bg-surface p-0.5">
           {(
@@ -574,20 +610,86 @@ export function TareasClient({
           ).map(({ v, icon: Icon, label }) => (
             <button
               key={v}
-              onClick={() => setView(v)}
+              onClick={() => {
+                setView(v);
+                // Salir del archivo es cambiar la URL: el mes que se mira lo
+                // decide el servidor, que es quien trae esas tareas.
+                if (mesArchivo) router.push("/tareas");
+              }}
               className={cn(
                 "flex items-center gap-1.5 rounded-[var(--radius-sm)] px-3 py-1.5 text-sm font-medium transition-colors",
-                view === v ? "bg-accent text-accent-fg" : "text-fg-muted hover:text-fg",
+                !mesArchivo && view === v
+                  ? "bg-accent text-accent-fg"
+                  : "text-fg-muted hover:text-fg",
               )}
             >
               <Icon className="h-4 w-4" />
               <span className="hidden sm:inline">{label}</span>
             </button>
           ))}
+          {/* Sin meses cerrados no hay archivo que abrir, y un botón que lleva
+              a una pantalla vacía solo genera la duda de si algo se perdió. */}
+          {meses.length > 0 && (
+            <button
+              onClick={() => router.push(`/tareas?archivo=${mesArchivo ?? meses[0]}`)}
+              className={cn(
+                "flex items-center gap-1.5 rounded-[var(--radius-sm)] px-3 py-1.5 text-sm font-medium transition-colors",
+                mesArchivo ? "bg-accent text-accent-fg" : "text-fg-muted hover:text-fg",
+              )}
+            >
+              <Archive className="h-4 w-4" />
+              <span className="hidden sm:inline">Archivo</span>
+            </button>
+          )}
         </div>
       </div>
 
-      {view === "kanban" ? (
+      {mesArchivo ? (
+        archivadas.length === 0 ? (
+          <EmptyState
+            icon={<Archive className="h-6 w-6" />}
+            title="Nada archivado en este mes"
+            description="Las tareas completadas se archivan al cerrar el mes. Nunca se borran."
+          />
+        ) : (
+          <div className="overflow-hidden rounded-[var(--radius-lg)] border border-border bg-surface">
+            <ul className="divide-y divide-border">
+              {archivadas.map((t) => (
+                <li key={t.id} className="flex items-center gap-3 px-4 py-3">
+                  <Badge tone="success" dot>
+                    Completado
+                  </Badge>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium text-fg">{t.name}</p>
+                    {assigneeNames(t) && (
+                      <p className="truncate text-xs text-fg-muted">
+                        {assigneeNames(t)}
+                      </p>
+                    )}
+                  </div>
+                  {/* La fecha que importa aquí es la de cierre, no la de
+                      vencimiento: es lo que ordena el archivo. */}
+                  <span className="shrink-0 font-mono text-xs text-fg-subtle">
+                    {formatDate(t.completed_at)}
+                  </span>
+                  {/* Abrir es lo único que se ofrece: el archivo es para
+                      consultar —incluida la bitácora—, no para reorganizar. */}
+                  <button
+                    onClick={() => {
+                      setEditing(t);
+                      setFormOpen(true);
+                    }}
+                    className="shrink-0 rounded p-1.5 text-fg-subtle hover:bg-bg-subtle hover:text-fg"
+                    aria-label="Abrir"
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )
+      ) : view === "kanban" ? (
         <DndContext
           sensors={sensors}
           onDragStart={(e) => setActiveId(String(e.active.id))}
@@ -689,6 +791,7 @@ export function TareasClient({
         onClose={() => setFormOpen(false)}
         team={team}
         initial={editing}
+        currentUserId={currentUserId}
         onSaved={() => {
           setFormOpen(false);
           router.refresh();
