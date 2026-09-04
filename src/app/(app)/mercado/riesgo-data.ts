@@ -41,6 +41,11 @@ export type DatosMercado = {
     elegido: string | null;
     fecha: string | null;
     subyacente: number | null;
+    /**
+     * De dónde salen los deltas: `broker` si alguien subió el tablero,
+     * `calculado` si los despejamos de la prima, null si no hay ninguno.
+     */
+    fuenteDelta: "broker" | "calculado" | null;
     filas: {
       strike: number;
       call_premium: number | null;
@@ -184,29 +189,56 @@ export async function cargarMercado(
   const { data: cadenaFilas } = board
     ? await db
         .from("options_chain")
-        .select("strike, call_premium, call_delta, put_premium, put_delta")
+        .select(
+          "strike, call_premium, call_delta, call_delta_calc, put_premium, put_delta, put_delta_calc",
+        )
         .eq("board_id", board.id)
         .order("strike", { ascending: true })
     : { data: null };
 
-  // Griegas del tablero más reciente, si alguien cargó uno.
+  /**
+   * Deltas para medir la cobertura efectiva.
+   *
+   * Manda el del BRÓKER —es lo que afirma la contraparte con la que se
+   * liquida— y cuando no hay, entra el CALCULADO desde la prima (Black-76, ver
+   * `black76.ts`). Antes, sin tablero subido no había delta ninguno y la
+   * pantalla no podía decir cuánto protegía de verdad una cobertura; eso quedó
+   * anotado en la revisión del 1-sep-2026.
+   */
   const { data: griegas } = board
     ? await db
         .from("options_chain")
-        .select("strike, call_delta, put_delta")
+        .select("strike, call_delta, call_delta_calc, put_delta, put_delta_calc")
         .eq("board_id", board.id)
-        .or("call_delta.not.is.null,put_delta.not.is.null")
+        .or(
+          "call_delta.not.is.null,put_delta.not.is.null,call_delta_calc.not.is.null,put_delta_calc.not.is.null",
+        )
     : { data: null };
+
+  const num = (v: number | string | null) => (v === null ? null : Number(v));
 
   const deltaPorStrike = new Map(
     (griegas ?? []).map((g) => [
       Number(g.strike),
       {
-        call: g.call_delta === null ? null : Number(g.call_delta),
-        put: g.put_delta === null ? null : Number(g.put_delta),
+        call: num(g.call_delta) ?? num(g.call_delta_calc),
+        put: num(g.put_delta) ?? num(g.put_delta_calc),
       },
     ]),
   );
+
+  /**
+   * De dónde salieron esos deltas, para poder decirlo en pantalla. Un número
+   * deducido de una prima y uno afirmado por el bróker no valen lo mismo en
+   * una discusión sobre una cobertura.
+   */
+  const fuenteDelta: "broker" | "calculado" | null = (griegas ?? []).some(
+    (g) => g.call_delta !== null || g.put_delta !== null,
+  )
+    ? "broker"
+    : (griegas ?? []).length > 0
+      ? "calculado"
+      : null;
 
   // ── Precio del cacao ──────────────────────────────────────────────────────
   // En vivo primero. Antes salía de la paridad put-call sobre la cadena de
@@ -289,6 +321,7 @@ export async function cargarMercado(
       fecha: board?.date ?? null,
       subyacente:
         board?.underlying_price == null ? null : Number(board.underlying_price),
+      fuenteDelta,
       filas: (cadenaFilas ?? []).map((f) => {
         const strike = Number(f.strike);
         // Los contratos propios se pintan sobre la cadena. Es la diferencia
@@ -304,9 +337,12 @@ export async function cargarMercado(
         return {
           strike,
           call_premium: f.call_premium === null ? null : Number(f.call_premium),
-          call_delta: f.call_delta === null ? null : Number(f.call_delta),
+          // En pantalla se enseña el delta que haya, con la fuente declarada
+          // arriba: entre no mostrar nada y mostrar el calculado, lo segundo
+          // es lo que permite decidir.
+          call_delta: num(f.call_delta) ?? num(f.call_delta_calc),
           put_premium: f.put_premium === null ? null : Number(f.put_premium),
-          put_delta: f.put_delta === null ? null : Number(f.put_delta),
+          put_delta: num(f.put_delta) ?? num(f.put_delta_calc),
           propioCall: neto("CALL"),
           propioPut: neto("PUT"),
         };

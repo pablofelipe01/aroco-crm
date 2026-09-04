@@ -771,6 +771,16 @@ function CadenaOpciones({
         </CardTitle>
         {cadena.vencimientos.length > 0 && (
           <div className="flex items-center gap-2">
+            {/* De dónde salen los deltas. Un número que afirma el bróker y uno
+                que dedujimos de la prima no valen lo mismo cuando se discute
+                una cobertura, así que la columna dice cuál se está mirando. */}
+            {cadena.fuenteDelta && (
+              <Badge tone={cadena.fuenteDelta === "broker" ? "info" : "neutral"}>
+                {cadena.fuenteDelta === "broker"
+                  ? t.mercado.deltaBroker
+                  : t.mercado.deltaCalculado}
+              </Badge>
+            )}
             {sub !== null && (
               <span className="font-mono tnum text-xs text-fg-subtle">
                 {t.mercado.subyacente} {f.numero(sub)}

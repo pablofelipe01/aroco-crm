@@ -402,6 +402,8 @@ export const es = {
     ratiosProducto: "Ratios de producto",
     ratiosNota:
       "Cuántas veces el precio del futuro vale cada derivado. Un ratio de 1,74 significa que ese producto se cotiza a 1,74 veces el grano — es lo que dice si conviene vender cacao o transformarlo.",
+    deltaBroker: "Delta del bróker",
+    deltaCalculado: "Delta calculado",
     refEuropa: "Referencia Europa",
     vsEuropa: "vs Europa",
     ratiosEuropaNota:

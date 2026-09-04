@@ -402,6 +402,8 @@ export const en: Diccionario = {
     ratiosProducto: "Product ratios",
     ratiosNota:
       "How many times the futures price each derivative is worth. A ratio of 1.74 means that product trades at 1.74 times the bean — it is what tells you whether to sell cocoa or process it.",
+    deltaBroker: "Broker delta",
+    deltaCalculado: "Computed delta",
     refEuropa: "Europe reference",
     vsEuropa: "vs Europe",
     ratiosEuropaNota:

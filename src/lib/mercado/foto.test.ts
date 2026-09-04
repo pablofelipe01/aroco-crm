@@ -55,6 +55,9 @@ const base: DatosMercado = {
     elegido: "DEC26",
     fecha: "2026-08-28",
     subyacente: 6401,
+    // Sin tablero del bróker y sin cálculo: el caso que la prueba de abajo
+    // exige que se declare en vez de disimularse.
+    fuenteDelta: null,
     filas: [
       {
         strike: 4000,

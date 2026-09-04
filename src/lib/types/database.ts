@@ -888,8 +888,10 @@ export type Database = {
           strike: number;
           call_premium: number | null;
           call_delta: number | null;
+          call_delta_calc: number | null;
           put_premium: number | null;
           put_delta: number | null;
+          put_delta_calc: number | null;
           created_at: string;
         };
         Insert: {
@@ -898,8 +900,10 @@ export type Database = {
           strike?: number;
           call_premium?: number | null;
           call_delta?: number | null;
+          call_delta_calc?: number | null;
           put_premium?: number | null;
           put_delta?: number | null;
+          put_delta_calc?: number | null;
           created_at?: string;
         };
         Update: {
@@ -908,8 +912,10 @@ export type Database = {
           strike?: number;
           call_premium?: number | null;
           call_delta?: number | null;
+          call_delta_calc?: number | null;
           put_premium?: number | null;
           put_delta?: number | null;
+          put_delta_calc?: number | null;
           created_at?: string;
         };
         Relationships: [];

@@ -7,7 +7,12 @@ import { traerTrm } from "./trm";
 import { sincronizarIntel } from "./intel";
 import { precioEnVivo, guardarPrecio } from "./precio";
 import { sincronizarDiferenciales, type ResultadoDiferenciales } from "./diferenciales-sync";
-import { guardarExtracto, guardarTablero, type ResultadoGuardado } from "./guardar";
+import {
+  guardarExtracto,
+  guardarTablero,
+  TASA_POR_DEFECTO,
+  type ResultadoGuardado,
+} from "./guardar";
 
 export type ResumenSync = {
   estados: ResultadoGuardado[];
@@ -79,6 +84,16 @@ export async function sincronizarMercado(
   const conBarchart = async () => {
     if (!MCPS.barchart.url || vencimientos <= 0) return;
     try {
+      // La tasa con la que se despeja el delta desde la prima. Configurable
+      // (ajustes_mercado, migración 0081) porque una tasa escrita en el código
+      // es una tasa que nadie actualiza; si falta, el respaldo del módulo.
+      const { data: ajusteTasa } = await db
+        .from("ajustes_mercado")
+        .select("valor")
+        .eq("clave", "tasa_libre_riesgo")
+        .maybeSingle();
+      const tasa = Number(ajusteTasa?.valor ?? TASA_POR_DEFECTO) || TASA_POR_DEFECTO;
+
       const vencs = await listarVencimientos(MCPS.barchart);
       const pedidos = vencs.slice(0, vencimientos);
 
@@ -108,7 +123,7 @@ export async function sincronizarMercado(
           continue;
         }
         try {
-          if (r.value) tableros.push(await guardarTablero(db, r.value, hoy));
+          if (r.value) tableros.push(await guardarTablero(db, r.value, hoy, tasa));
         } catch (e) {
           fallos.push({ fuente: `Barchart ${v.label} (guardado)`, error: texto(e) });
         }

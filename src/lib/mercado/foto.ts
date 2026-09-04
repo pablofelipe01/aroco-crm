@@ -140,6 +140,17 @@ export function fotoMercado(d: DatosMercado): string {
     L.push(
       `Primas en PUNTOS, la misma unidad que el strike (no son dólares). ${cerca.length} strikes alrededor del dinero, de ${d.cadena.filas.length} en la cadena completa; para los demás usa get_tablero_opciones.`,
     );
+    // De dónde salen las deltas. Importa para lo que el analista puede
+    // afirmar: una delta del bróker es lo que dice la contraparte con la que
+    // se liquida; una calculada es una deducción a partir de la prima, y ante
+    // una discusión hay que poder decirlo.
+    L.push(
+      d.cadena.fuenteDelta === "broker"
+        ? "Las deltas son las del TABLERO DEL BRÓKER (StoneX)."
+        : d.cadena.fuenteDelta === "calculado"
+          ? "Las deltas están CALCULADAS por AROCO con Black-76 a partir de la prima cotizada, no vienen del bróker. Reproducen el tablero de StoneX con menos de una décima de punto cerca del dinero; en los strikes lejanos pueden apartarse un punto o dos. Dilo si alguien va a apoyar una decisión en ellas."
+          : "No hay deltas: ni del bróker ni calculadas.",
+    );
     L.push(
       "strike | prima_call | prima_put | delta_call | delta_put | contratos_propios_call | contratos_propios_put",
     );

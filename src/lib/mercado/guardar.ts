@@ -4,6 +4,7 @@ import type { Database } from "@/lib/types/database";
 import type { Extracto } from "./stonex";
 import type { Tablero } from "./barchart";
 import type { TableroImagen } from "./tablero-imagen";
+import { anosHasta, deltaDesdePrima, vencimientoOpcion } from "./black76";
 
 export type ResultadoGuardado = {
   statement_date: string;
@@ -95,6 +96,23 @@ export async function guardarExtracto(
 }
 
 /**
+ * Tasa anual de respaldo para el cálculo del delta.
+ *
+ * La de verdad vive en `ajustes_mercado` y la pasa quien llama; esta es para
+ * que una llamada suelta —una prueba, un script— no tenga que ir a la base. A
+ * estos plazos la tasa mueve el delta en la tercera cifra.
+ */
+export const TASA_POR_DEFECTO = 0.038;
+
+/**
+ * Tanto por uno → por ciento, que es la escala en la que el bróker escribe el
+ * delta y en la que ya está el resto del módulo.
+ */
+function aPorciento(v: number | null): number | null {
+  return v === null ? null : Math.round(v * 100 * 10_000) / 10_000;
+}
+
+/**
  * Guarda un tablero y su cadena de strikes.
  *
  * Dos fuentes escriben aquí y saben cosas distintas: Barchart trae strikes y
@@ -116,12 +134,16 @@ async function guardarCadena(
     put_premium?: number | null;
     call_delta?: number | null;
     put_delta?: number | null;
+    call_delta_calc?: number | null;
+    put_delta_calc?: number | null;
   }[],
-  opciones: { conGriegas: boolean; podar: boolean },
+  opciones: { conGriegas: boolean; conCalculadas?: boolean; podar: boolean },
 ): Promise<number> {
   const { data: previas } = await db
     .from("options_chain")
-    .select("strike, call_premium, put_premium, call_delta, put_delta")
+    .select(
+      "strike, call_premium, put_premium, call_delta, put_delta, call_delta_calc, put_delta_calc",
+    )
     .eq("board_id", boardId);
 
   const antes = new Map((previas ?? []).map((p) => [Number(p.strike), p]));
@@ -137,6 +159,15 @@ async function guardarCadena(
       // borrarlas.
       call_delta: opciones.conGriegas ? (f.call_delta ?? null) : (p?.call_delta ?? null),
       put_delta: opciones.conGriegas ? (f.put_delta ?? null) : (p?.put_delta ?? null),
+      // El delta que calculamos nosotros vive aparte del que afirma el bróker
+      // (migración 0081): son dos afirmaciones distintas y hay que poder decir
+      // de cuál salió el número.
+      call_delta_calc: opciones.conCalculadas
+        ? (f.call_delta_calc ?? null)
+        : (p?.call_delta_calc ?? null),
+      put_delta_calc: opciones.conCalculadas
+        ? (f.put_delta_calc ?? null)
+        : (p?.put_delta_calc ?? null),
     };
   });
 
@@ -196,28 +227,65 @@ async function boardId(
   return data.id;
 }
 
-/** Tablero desde Barchart: strikes y primas, sin griegas. */
+/**
+ * Tablero desde Barchart: strikes y primas, sin griegas… y con el delta
+ * calculado a partir de ellas.
+ *
+ * Barchart sigue sin mandar el delta, pero ya no hace falta que lo mande: con
+ * la prima, el strike, el subyacente y el plazo se despeja y sale (ver
+ * `black76.ts`). El vencimiento se deduce del mes del contrato —segundo
+ * viernes del mes anterior— porque Barchart tampoco lo manda y sin plazo no
+ * hay cálculo posible.
+ *
+ * Si algo de eso falta, los deltas quedan en null y la pantalla lo dice. Nunca
+ * en cero: un delta cero afirma que la opción no se mueve con el mercado.
+ */
 export async function guardarTablero(
   db: SupabaseClient<Database>,
   t: Tablero,
   fecha: string,
-): Promise<{ contract_month: string; strikes: number }> {
+  tasa = TASA_POR_DEFECTO,
+): Promise<{ contract_month: string; strikes: number; conDeltaCalc: number }> {
+  const vencimiento = vencimientoOpcion(t.contract_month);
+  const T = vencimiento ? anosHasta(fecha, vencimiento) : null;
+  const F = t.underlying_price;
+
   const id = await boardId(db, fecha, t.contract_month, {
     // El subyacente se deduce por paridad put-call de la propia cadena.
-    underlying_price: t.underlying_price,
+    underlying_price: F,
+    expiration: vencimiento,
+    dte: T === null ? null : Math.round(T * 365),
   });
-  const strikes = await guardarCadena(
-    db,
-    id,
-    t.filas.map((f) => ({
+
+  const filas = t.filas.map((f) => {
+    // Sin subyacente o sin plazo no hay nada que despejar. Se guarda la prima
+    // igual: media cadena sirve, un delta inventado no.
+    const base = F !== null && T !== null ? { F, K: f.strike, T, r: tasa } : null;
+    return {
       strike: f.strike,
       call_premium: f.call_premium,
       put_premium: f.put_premium,
-    })),
+      call_delta_calc:
+        base && f.call_premium !== null ? aPorciento(deltaDesdePrima("call", f.call_premium, base)) : null,
+      put_delta_calc:
+        base && f.put_premium !== null ? aPorciento(deltaDesdePrima("put", f.put_premium, base)) : null,
+    };
+  });
+
+  const strikes = await guardarCadena(db, id, filas, {
+    conGriegas: false,
+    conCalculadas: true,
     // Barchart devuelve la cadena completa, así que sí puede podar.
-    { conGriegas: false, podar: true },
-  );
-  return { contract_month: t.contract_month, strikes };
+    podar: true,
+  });
+
+  return {
+    contract_month: t.contract_month,
+    strikes,
+    conDeltaCalc: filas.filter(
+      (f) => f.call_delta_calc !== null || f.put_delta_calc !== null,
+    ).length,
+  };
 }
 
 /** Tablero leído de una captura: trae las griegas y la metadata. */
