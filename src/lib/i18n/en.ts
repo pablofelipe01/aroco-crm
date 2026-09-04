@@ -402,6 +402,10 @@ export const en: Diccionario = {
     ratiosProducto: "Product ratios",
     ratiosNota:
       "How many times the futures price each derivative is worth. A ratio of 1.74 means that product trades at 1.74 times the bean — it is what tells you whether to sell cocoa or process it.",
+    refEuropa: "Europe reference",
+    vsEuropa: "vs Europe",
+    ratiosEuropaNota:
+      "Each product is compared against the European reference for its category, the market that sets the benchmark.",
     licor: "Liquor",
     manteca: "Butter",
     polvo: "Powder",

@@ -1,6 +1,14 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { numero, moneda, parsearMatriz, buscarFila, estimarColombia, etiqueta } from "./diferenciales";
+import {
+  numero,
+  moneda,
+  parsearMatriz,
+  buscarFila,
+  estimarColombia,
+  etiqueta,
+  baseColombia,
+} from "./diferenciales";
 
 /** El reporte real del 20-ago-2026, tal como lo entrega el agente. */
 const REAL: string[][] = [
@@ -116,4 +124,22 @@ test("la etiqueta junta origen e incoterm", () => {
   const f = filas.find((x) => x.incoterm === "FOB Guayaquil")!;
   assert.equal(etiqueta(f), "Ecuador Grade 2 · FOB Guayaquil");
   assert.equal(buscarFila(filas, "fob guayaquil")?.valor, -30);
+});
+
+test("la base del estimado de Colombia sale del incoterm de las referencias", () => {
+  // Hoy las referencias son ExW US. Rotular eso «FOB Cartagena» pondría el
+  // estimado unos 350 USD/t por encima de lo que dice ser.
+  assert.equal(baseColombia("ExW US"), "ExW US");
+  assert.equal(baseColombia("CIF N. Europe"), "CIF N. Europe");
+
+  // Con referencias FOB, el puerto que corresponde es el nuestro.
+  assert.equal(baseColombia("FOB Guayaquil"), "FOB Cartagena");
+  assert.equal(baseColombia("FOB + tax"), "FOB Cartagena");
+  assert.equal(baseColombia("fob guayaquil"), "FOB Cartagena");
+});
+
+test("sin incoterm común no se inventa una base", () => {
+  // `estimarColombia` deja `incoterm` en null cuando las dos referencias no
+  // coinciden; ahí la fila se queda sin base antes que afirmar una falsa.
+  assert.equal(baseColombia(null), null);
 });

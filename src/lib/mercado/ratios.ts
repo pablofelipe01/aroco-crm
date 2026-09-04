@@ -157,3 +157,47 @@ export function parsearRatios(matriz: Matriz): {
 
   return { ratios, futuros, ignoradas };
 }
+
+/**
+ * Referencia europea de una categoría.
+ *
+ * Pedido en la revisión del 1-sep-2026: que los ratios de subproductos se lean
+ * CONTRA Europa —«manteca Europa 1,74»— y no como una lista suelta de números
+ * de la que hay que acordarse cuál es el patrón.
+ *
+ * Se exige mercado LDN además del nombre porque en «Powder» hay dos filas que
+ * empiezan por Europe: «Europe Powder» (Londres) y «European High» (Nueva
+ * York). Son plazas distintas y tomar la que caiga primero cambiaría la
+ * referencia de una semana a otra sin que nadie lo note.
+ */
+export function referenciaEuropa<
+  T extends { producto: string; mercado: string | null },
+>(filas: T[]): T | null {
+  const europeas = filas.filter((f) => /^europe\b/i.test(f.producto.trim()));
+  return (
+    europeas.find((f) => (f.mercado ?? "").toUpperCase() === "LDN") ??
+    europeas[0] ??
+    null
+  );
+}
+
+/**
+ * Cuánto se aparta un ratio de la referencia europea, en puntos y en por
+ * ciento.
+ *
+ * El por ciento es lo que se puede llevar a una conversación —«la manteca de
+ * Costa de Marfil vale 10 % menos que la europea»—; los puntos son lo que se
+ * compara contra el reporte de la semana pasada. Hacen falta los dos.
+ */
+export function brechaVsEuropa(
+  ratio: number,
+  referencia: number | null,
+): { puntos: number; porcentaje: number } | null {
+  if (referencia === null || !Number.isFinite(referencia) || referencia === 0) {
+    return null;
+  }
+  return {
+    puntos: Math.round((ratio - referencia) * 1000) / 1000,
+    porcentaje: Math.round(((ratio - referencia) / referencia) * 1000) / 10,
+  };
+}

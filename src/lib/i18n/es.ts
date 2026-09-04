@@ -402,6 +402,10 @@ export const es = {
     ratiosProducto: "Ratios de producto",
     ratiosNota:
       "Cuántas veces el precio del futuro vale cada derivado. Un ratio de 1,74 significa que ese producto se cotiza a 1,74 veces el grano — es lo que dice si conviene vender cacao o transformarlo.",
+    refEuropa: "Referencia Europa",
+    vsEuropa: "vs Europa",
+    ratiosEuropaNota:
+      "Cada producto se compara contra la referencia europea de su categoría, que es la plaza que marca el patrón.",
     licor: "Licor",
     manteca: "Manteca",
     polvo: "Polvo",

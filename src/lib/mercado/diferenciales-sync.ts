@@ -1,7 +1,13 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/types/database";
 import { llamarHerramienta, type McpConfig } from "@/lib/mcp/client";
-import { parsearMatriz, estimarColombia, POSICION_COLOMBIA, type Matriz } from "./diferenciales";
+import {
+  parsearMatriz,
+  estimarColombia,
+  baseColombia,
+  POSICION_COLOMBIA,
+  type Matriz,
+} from "./diferenciales";
 import { parsearRatios } from "./ratios";
 
 /**
@@ -127,7 +133,10 @@ export async function sincronizarDiferenciales(
     const { error: eCol } = await db.from("cocoa_differentials").insert({
       report_date: reportDate,
       origen: "Colombia",
-      grado: null,
+      // Sobre qué base está el estimado. Iba en null y la pantalla mostraba
+      // «Colombia +311» a secas, sin decir si eso era FOB, ExW o CIF —tres
+      // números que se llevan cientos de dólares por tonelada.
+      grado: baseColombia(est.incoterm),
       valor: est.valor,
       unidad: est.moneda,
       fuente: "aroco",

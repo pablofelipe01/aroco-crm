@@ -22,6 +22,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { staggerContainer } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 import { useT, useFormatos, useIdioma, useLocale } from "@/lib/i18n/provider";
+import { brechaVsEuropa, referenciaEuropa } from "@/lib/mercado/ratios";
 import type { DatosMercado } from "./riesgo-data";
 
 export function MercadoClient({
@@ -403,12 +404,16 @@ export function MercadoClient({
             </CardHeader>
             <CardBody>
               <p className="mb-3 text-xs text-fg-subtle">
-                {t.mercado.ratiosNota}
+                {t.mercado.ratiosNota} {t.mercado.ratiosEuropaNota}
               </p>
               <div className="space-y-4">
                 {["Liquor", "Butter", "Powder", "Combined"].map((cat) => {
                   const filas = d.ratios.filas.filter((f) => f.categoria === cat);
                   if (filas.length === 0) return null;
+                  // Contra qué se lee la categoría. Sin esto la sección era una
+                  // lista de números sueltos y había que acordarse de cuál era
+                  // el patrón.
+                  const europa = referenciaEuropa(filas);
                   return (
                     <div key={cat}>
                       <h4 className="mb-1.5 text-[11px] uppercase tracking-wide text-fg-subtle">
@@ -426,6 +431,12 @@ export function MercadoClient({
                             fila.ratio_anterior === null
                               ? null
                               : Math.round((fila.ratio - fila.ratio_anterior) * 100) / 100;
+                          const esReferencia = europa === fila;
+                          // La referencia no se compara consigo misma: un
+                          // «0,0 %» al lado del patrón solo ocupa sitio.
+                          const brecha = esReferencia
+                            ? null
+                            : brechaVsEuropa(fila.ratio, europa?.ratio ?? null);
                           return (
                             <li
                               key={`${fila.producto}-${fila.incoterm ?? ""}`}
@@ -438,6 +449,11 @@ export function MercadoClient({
                                     {fila.mercado}
                                   </span>
                                 )}
+                                {esReferencia && (
+                                  <Badge tone="info" className="ml-2">
+                                    {t.mercado.refEuropa}
+                                  </Badge>
+                                )}
                               </span>
                               <span className="shrink-0 font-mono tnum text-fg-muted">
                                 {fila.ratio.toFixed(2)}
@@ -446,6 +462,25 @@ export function MercadoClient({
                                     {" "}
                                     {cambio > 0 ? "+" : ""}
                                     {cambio.toFixed(2)}
+                                  </span>
+                                )}
+                                {brecha && (
+                                  /* Contra Europa. En por ciento y no en
+                                     puntos: «10 % menos que la europea» es lo
+                                     que se puede llevar a una negociación. */
+                                  <span
+                                    className="ml-2 text-xs text-fg-subtle"
+                                    title={`${t.mercado.vsEuropa} ${europa?.producto ?? ""}`}
+                                  >
+                                    {t.mercado.vsEuropa}{" "}
+                                    <span
+                                      className={
+                                        brecha.porcentaje >= 0 ? "text-success" : "text-danger"
+                                      }
+                                    >
+                                      {brecha.porcentaje > 0 ? "+" : ""}
+                                      {f.numero(brecha.porcentaje, 1)} %
+                                    </span>
                                   </span>
                                 )}
                                 {fila.precio_usd && (

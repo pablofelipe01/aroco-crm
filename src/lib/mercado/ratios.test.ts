@@ -1,6 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parsearRatios, numero } from "./ratios";
+import {
+  parsearRatios,
+  numero,
+  referenciaEuropa,
+  brechaVsEuropa,
+} from "./ratios";
 
 /** Trozo real del reporte del 27-ago-2026. */
 const REAL: string[][] = [
@@ -85,4 +90,41 @@ test("el bloque de futuros sale aparte, con su arbitraje", () => {
 test("el pie y los encabezados no entran como producto", () => {
   assert.ok(!ratios.some((r) => /Source|Cocoa Product|FUTURES/i.test(r.producto)));
   assert.ok(ignoradas.length > 0, "lo descartado se reporta, no se calla");
+});
+
+test("la referencia europea de polvo es la de Londres, no la de Nueva York", () => {
+  // El reporte del 27-ago trae dos filas que empiezan por «Europe» en Powder:
+  // «Europe Powder» (LDN) y «European High» (NY). Son plazas distintas.
+  const polvo = [
+    { producto: "Asia Natural Powder", mercado: "LDN" },
+    { producto: "European High", mercado: "NY" },
+    { producto: "Europe Powder", mercado: "LDN" },
+  ];
+  assert.equal(referenciaEuropa(polvo)?.producto, "Europe Powder");
+});
+
+test("sin fila europea no se elige una cualquiera", () => {
+  const sinEuropa = [
+    { producto: "Asia Natural", mercado: "LDN" },
+    { producto: "Ghana Boxed", mercado: "LDN" },
+  ];
+  assert.equal(referenciaEuropa(sinEuropa), null);
+});
+
+test("la brecha contra Europa sale en puntos y en por ciento", () => {
+  // Manteca Costa de Marfil 1,56 contra la europea 1,74: 0,18 puntos abajo,
+  // que es un 10,3 % menos.
+  const b = brechaVsEuropa(1.56, 1.74);
+  assert.ok(b);
+  assert.equal(b.puntos, -0.18);
+  assert.equal(b.porcentaje, -10.3);
+
+  // La propia referencia queda en cero, no en null: cero es un dato.
+  assert.deepEqual(brechaVsEuropa(1.74, 1.74), { puntos: 0, porcentaje: 0 });
+});
+
+test("sin referencia no se calcula una brecha inventada", () => {
+  assert.equal(brechaVsEuropa(1.56, null), null);
+  // Un cero en el denominador daría infinito y se pintaría como si fuera dato.
+  assert.equal(brechaVsEuropa(1.56, 0), null);
 });

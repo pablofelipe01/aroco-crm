@@ -163,6 +163,28 @@ export function parsearMatriz(matriz: Matriz): {
   return { filas, ignoradas };
 }
 
+/**
+ * Sobre qué base queda el estimado de Colombia, dicho como se diría aquí.
+ *
+ * Pedido en la revisión del 1-sep-2026: que Colombia se muestre etiquetada
+ * «FOB Cartagena — estimado AROCO». La etiqueta se DEDUCE del incoterm que
+ * comparten las dos referencias en vez de escribirse fija, porque hoy esas
+ * referencias son ExW US y un estimado ExW rotulado FOB estaría unos 350
+ * dólares por tonelada por encima de lo que dice ser — que es la clase de
+ * número que se cita en una negociación y termina en pérdida.
+ *
+ * Cuando la base sí es FOB, el puerto es el nuestro: un diferencial FOB
+ * aplicado a cacao colombiano sale de Cartagena, no de Guayaquil.
+ *
+ * Qué filas se comparan lo decide Comercial desde `ajustes_mercado` (ver
+ * migración 0067), así que el día que se cambien a un par FOB la etiqueta pasa
+ * sola a «FOB Cartagena».
+ */
+export function baseColombia(incoterm: string | null): string | null {
+  if (!incoterm) return null;
+  return /^\s*FOB\b/i.test(incoterm) ? "FOB Cartagena" : incoterm.trim();
+}
+
 /** Etiqueta legible de una fila: «Ecuador Grade 2 · FOB Guayaquil». */
 export const etiqueta = (f: FilaDiferencial) =>
   f.incoterm && f.incoterm !== f.origen ? `${f.origen} · ${f.incoterm}` : f.origen;
