@@ -22,12 +22,14 @@ import { formatCOP, formatDate, formatNumber } from "@/lib/utils";
 import { MONEDAS, COMPRA_CATEGORIAS } from "@/lib/schemas/compra";
 import { nombreProveedor } from "@/lib/schemas/proveedor";
 import { DEPARTMENTS } from "@/lib/departments";
+import { SeguimientoAprobacion } from "./aprobacion-seguimiento";
 import type { SolicitudConCotizaciones } from "./page";
 import {
   editarSolicitud,
   editarCotizacion,
   subirCotizacion,
   borrarCotizacion,
+  borrarCotizaciones,
   urlCotizacion,
   enviarAAprobacion,
   aprobarSolicitud,
@@ -85,6 +87,10 @@ export function SolicitudDetail({
   const [pagoMedio, setPagoMedio] = React.useState("");
   const [pagoRef, setPagoRef] = React.useState("");
   const [entregaNotas, setEntregaNotas] = React.useState("");
+  // Cotizaciones marcadas para el borrado masivo. Va con el resto de los hooks
+  // y no más abajo: debajo del `return null` no se ejecutaría siempre, que es
+  // justo lo que React no permite.
+  const [marcadas, setMarcadas] = React.useState<string[]>([]);
 
   if (!solicitud) return null;
 
@@ -110,6 +116,37 @@ export function SolicitudDetail({
     toast({ tone: "success", title: exito });
     router.refresh();
     return true;
+  }
+
+  /**
+   * Borra de una vez las cotizaciones marcadas.
+   *
+   * Se informa cuántas cayeron: la solicitud puede haberse decidido en otra
+   * pestaña mientras tanto, y entonces la base rechaza el borrado con razón.
+   */
+  async function borrarMarcadas() {
+    if (
+      !confirm(
+        marcadas.length === 1
+          ? "¿Borrar la cotización seleccionada?"
+          : `¿Borrar las ${marcadas.length} cotizaciones seleccionadas?`,
+      )
+    )
+      return;
+    setBusy(true);
+    const res = await borrarCotizaciones(s.id, marcadas);
+    setBusy(false);
+    if (!res.ok) {
+      toast({ tone: "error", title: "No se pudo borrar", description: res.error });
+      return;
+    }
+    const n = res.borradas ?? 0;
+    toast({
+      tone: "success",
+      title: n === 1 ? "1 cotización borrada" : `${n} cotizaciones borradas`,
+    });
+    setMarcadas([]);
+    router.refresh();
   }
 
   async function abrirArchivo(path: string) {
@@ -195,6 +232,15 @@ export function SolicitudDetail({
           </dl>
         )}
 
+        {/* Quién la tiene que aprobar, desde cuándo y quién decidió. Va antes
+            de las cotizaciones porque, con la solicitud ya enviada, la
+            pregunta que trae a alguien a esta pantalla es «¿en qué va?». */}
+        <SeguimientoAprobacion
+          solicitudId={s.id}
+          estado={s.estado}
+          enviadaEn={s.enviada_en}
+        />
+
         {s.estado === "Rechazada" && s.motivo_rechazo && (
           <div className="rounded-[var(--radius-md)] border border-danger/30 bg-danger-soft/40 p-3">
             <p className="text-[11px] font-medium uppercase tracking-wide text-danger">
@@ -210,12 +256,28 @@ export function SolicitudDetail({
             <h3 className="text-xs font-medium uppercase tracking-wide text-fg-subtle">
               Cotizaciones ({cotizaciones.length})
             </h3>
-            {editable && (
-              <Button variant="ghost" size="sm" onClick={() => setNuevaOpen((v) => !v)}>
-                <Plus className="h-3.5 w-3.5" />
-                Añadir
-              </Button>
-            )}
+            <div className="flex items-center gap-1">
+              {/* Borrado masivo: hasta ahora había que ir una por una. Solo
+                  aparece con algo marcado, para no ofrecer un botón de borrar
+                  permanentemente al lado del de añadir. */}
+              {editable && marcadas.length > 0 && (
+                <Button
+                  variant="danger"
+                  size="sm"
+                  loading={busy}
+                  onClick={borrarMarcadas}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  Borrar {marcadas.length}
+                </Button>
+              )}
+              {editable && (
+                <Button variant="ghost" size="sm" onClick={() => setNuevaOpen((v) => !v)}>
+                  <Plus className="h-3.5 w-3.5" />
+                  Añadir
+                </Button>
+              )}
+            </div>
           </div>
 
           {cotizaciones.length === 0 ? (
@@ -237,6 +299,21 @@ export function SolicitudDetail({
                     }
                   >
                     <div className="flex items-start justify-between gap-3">
+                      {editable && (
+                        <input
+                          type="checkbox"
+                          checked={marcadas.includes(c.id)}
+                          onChange={() =>
+                            setMarcadas((xs) =>
+                              xs.includes(c.id)
+                                ? xs.filter((x) => x !== c.id)
+                                : [...xs, c.id],
+                            )
+                          }
+                          aria-label={`Seleccionar cotización de ${c.proveedor}`}
+                          className="mt-1 h-4 w-4 shrink-0 accent-[var(--color-accent)]"
+                        />
+                      )}
                       <div className="min-w-0 flex-1">
                         <p className="flex items-center gap-2 text-sm font-medium text-fg">
                           {c.proveedor}

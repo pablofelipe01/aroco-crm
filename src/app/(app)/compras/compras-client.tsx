@@ -4,7 +4,7 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import {
   Plus, Search, ShoppingCart, Clock, CheckCircle2, X, AlertTriangle,
-  Columns3, List, FileWarning,
+  Columns3, List, FileWarning, Trash2,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { PageHeader } from "@/components/ui/page-header";
@@ -22,7 +22,7 @@ import { DEPARTMENTS } from "@/lib/departments";
 import { COMPRA_ESTADOS, COMPRA_CATEGORIAS, MONEDAS } from "@/lib/schemas/compra";
 import type { SolicitudConCotizaciones } from "./page";
 import { SolicitudDetail, ESTADO_TONE, formatMonto, type ProveedorOpcion } from "./solicitud-detail";
-import { crearSolicitudConCotizaciones } from "./actions";
+import { crearSolicitudConCotizaciones, borrarSolicitudes } from "./actions";
 import { cn } from "@/lib/utils";
 import {
   ETAPAS, GRUPO_DE, etapaDe, grupoDe, diasQuieta, siguientePaso,
@@ -201,6 +201,10 @@ export function ComprasClient({
   const [formOpen, setFormOpen] = React.useState(false);
   const [cotizaciones, setCotizaciones] = React.useState(1);
   const [guardando, setGuardando] = React.useState(false);
+  // Selección para el borrado masivo. Vive aquí y no en cada fila porque la
+  // barra de acciones necesita saber cuántas hay.
+  const [seleccion, setSeleccion] = React.useState<string[]>([]);
+  const [borrando, setBorrando] = React.useState(false);
 
   // Mantiene abierto el panel con los datos frescos tras cada acción.
   const viva = abierta ? (solicitudes.find((s) => s.id === abierta.id) ?? null) : null;
@@ -230,6 +234,43 @@ export function ComprasClient({
   ).length;
   const hayFiltros =
     !!query || fEstado.length > 0 || fCategoria.length > 0 || fArea.length > 0;
+
+  /**
+   * Borra lo seleccionado.
+   *
+   * Qué se deja borrar lo decide la base —lo propio y en borrador, o todo si
+   * es admin—, no esta pantalla: por eso se informa cuántas cayeron de verdad.
+   * Decir «listo» tras borrar tres de siete sería mentir por omisión.
+   */
+  async function borrarSeleccion() {
+    if (
+      !confirm(
+        seleccion.length === 1
+          ? "¿Borrar la solicitud seleccionada?"
+          : `¿Borrar las ${seleccion.length} solicitudes seleccionadas?`,
+      )
+    )
+      return;
+    setBorrando(true);
+    const res = await borrarSolicitudes(seleccion);
+    setBorrando(false);
+    if (!res.ok) {
+      toast({ tone: "error", title: "No se pudo borrar", description: res.error });
+      return;
+    }
+    const n = res.borradas ?? 0;
+    const quedaron = seleccion.length - n;
+    toast({
+      tone: quedaron > 0 ? "warn" : "success",
+      title: n === 1 ? "1 solicitud borrada" : `${n} solicitudes borradas`,
+      description:
+        quedaron > 0
+          ? `${quedaron} no se pudieron borrar: solo se borra lo propio en borrador. Lo decidido queda como historial.`
+          : undefined,
+    });
+    setSeleccion([]);
+    router.refresh();
+  }
 
   /**
    * El alta va por FormData y no por react-hook-form porque los PDF de las
@@ -408,14 +449,57 @@ export function ComprasClient({
       ) : vista === "flujo" ? (
         <TableroFlujo solicitudes={filtradas} onAbrir={setAbierta} />
       ) : (
+        <>
+        {/* Barra de selección. Aparece solo con algo marcado: una fila de
+            acciones permanentemente visible ocupa sitio para el caso raro. */}
+        {seleccion.length > 0 && (
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-[var(--radius-md)] border border-border bg-bg-subtle/60 px-3 py-2">
+            <span className="text-sm text-fg-muted">
+              {seleccion.length === 1
+                ? "1 solicitud seleccionada"
+                : `${seleccion.length} solicitudes seleccionadas`}
+            </span>
+            <div className="flex items-center gap-2">
+              <Button variant="ghost" size="sm" onClick={() => setSeleccion([])}>
+                Quitar selección
+              </Button>
+              <Button
+                variant="danger"
+                size="sm"
+                loading={borrando}
+                onClick={borrarSeleccion}
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                Borrar
+              </Button>
+            </div>
+          </div>
+        )}
         <ul className="space-y-2">
           {filtradas.map((s) => {
             const ref = montoReferencia(s);
+            const marcada = seleccion.includes(s.id);
             return (
-              <li key={s.id}>
+              <li
+                key={s.id}
+                className="flex items-center gap-2 rounded-[var(--radius-md)] border border-border bg-surface pl-3 shadow-[var(--shadow-soft-sm)] transition-colors hover:border-border-strong"
+              >
+                {/* La casilla va FUERA del botón que abre el detalle: anidar un
+                    control dentro de otro hace que marcar abra el panel. */}
+                <input
+                  type="checkbox"
+                  checked={marcada}
+                  onChange={() =>
+                    setSeleccion((xs) =>
+                      marcada ? xs.filter((x) => x !== s.id) : [...xs, s.id],
+                    )
+                  }
+                  aria-label={`Seleccionar ${s.consecutivo}`}
+                  className="h-4 w-4 shrink-0 accent-[var(--color-accent)]"
+                />
                 <button
                   onClick={() => setAbierta(s)}
-                  className="flex w-full items-center gap-3 rounded-[var(--radius-md)] border border-border bg-surface p-3 text-left shadow-[var(--shadow-soft-sm)] transition-colors hover:border-border-strong"
+                  className="flex w-full items-center gap-3 rounded-[var(--radius-md)] p-3 text-left"
                 >
                   <div className="min-w-0 flex-1">
                     <p className="flex items-center gap-2 truncate text-sm font-medium text-fg">
@@ -450,6 +534,7 @@ export function ComprasClient({
             );
           })}
         </ul>
+        </>
       )}
 
       <SolicitudDetail

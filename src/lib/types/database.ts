@@ -1028,6 +1028,7 @@ export type Database = {
           created_by: string | null;
           descripcion: string | null;
           entrega_notas: string | null;
+          enviada_en: string | null;
           estado: Database["public"]["Enums"]["compra_estado"];
           id: string;
           justificacion: string | null;
@@ -1052,6 +1053,7 @@ export type Database = {
           created_by?: string | null;
           descripcion?: string | null;
           entrega_notas?: string | null;
+          enviada_en?: string | null;
           estado?: Database["public"]["Enums"]["compra_estado"];
           id?: string;
           justificacion?: string | null;
@@ -1076,6 +1078,7 @@ export type Database = {
           created_by?: string | null;
           descripcion?: string | null;
           entrega_notas?: string | null;
+          enviada_en?: string | null;
           estado?: Database["public"]["Enums"]["compra_estado"];
           id?: string;
           justificacion?: string | null;
@@ -2988,6 +2991,16 @@ export type Database = {
       replace_inventory_quality: {
         Args: { p_rows: Json };
         Returns: number;
+      };
+      compra_seguimiento_aprobacion: {
+        Args: { p_solicitud: string };
+        Returns: {
+          profile_id: string;
+          nombre: string;
+          avisado_en: string | null;
+          leido: boolean;
+          decidio: boolean;
+        }[];
       };
       is_active_member: { Args: Record<string, never>; Returns: boolean };
       is_admin: { Args: Record<string, never>; Returns: boolean };

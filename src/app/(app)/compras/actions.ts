@@ -430,3 +430,93 @@ export async function borrarSolicitud(id: string): Promise<CompraResult> {
   revalidatePath("/compras");
   return { ok: true };
 }
+
+/**
+ * Borra varias solicitudes de una pasada.
+ *
+ * Pedido en la revisión del 1-sep-2026: hasta ahora limpiar el módulo era
+ * entrar solicitud por solicitud. Qué se puede borrar sigue decidiéndolo la
+ * RLS —lo propio y en borrador, o cualquier cosa si es admin—, así que un
+ * borrado masivo no puede llevarse por delante lo que ya se decidió: eso es
+ * historial.
+ *
+ * Se informa CUÁNTAS se borraron y no solo «ok». Si la selección incluía
+ * solicitudes ajenas, la base las deja quietas sin dar error, y decir «listo»
+ * cuando se borraron tres de siete sería mentir por omisión.
+ */
+export async function borrarSolicitudes(
+  ids: string[],
+): Promise<CompraResult & { borradas?: number }> {
+  await requireSession();
+  if (ids.length === 0) return { ok: false, error: "No seleccionaste ninguna solicitud." };
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("compra_solicitudes")
+    .delete()
+    .in("id", ids)
+    .select("id");
+  if (error) return { ok: false, error: legible(error.message) };
+
+  revalidatePath("/compras");
+  return { ok: true, borradas: data?.length ?? 0 };
+}
+
+/**
+ * Borra varias cotizaciones de una solicitud.
+ *
+ * El candado de «solicitud ya decidida» se comprueba igual que en el borrado
+ * de una sola: lo aprobado tiene que seguir mostrando contra qué alternativas
+ * se aprobó.
+ */
+export async function borrarCotizaciones(
+  solicitudId: string,
+  ids: string[],
+): Promise<CompraResult & { borradas?: number }> {
+  await requireSession();
+  if (ids.length === 0) return { ok: false, error: "No seleccionaste ninguna cotización." };
+
+  const supabase = await createClient();
+  const bloqueo = await editable(supabase, solicitudId);
+  if (bloqueo) return { ok: false, error: bloqueo };
+
+  const { data, error } = await supabase
+    .from("compra_cotizaciones")
+    .delete()
+    .in("id", ids)
+    // Acotado a la solicitud abierta: sin esto, una lista de ids manipulada
+    // podría borrar cotizaciones de otra solicitud cualquiera.
+    .eq("solicitud_id", solicitudId)
+    .select("id");
+  if (error) return { ok: false, error: legible(error.message) };
+
+  revalidatePath("/compras");
+  return { ok: true, borradas: data?.length ?? 0 };
+}
+
+export type SeguimientoAprobador = {
+  profile_id: string;
+  nombre: string;
+  avisado_en: string | null;
+  leido: boolean;
+  decidio: boolean;
+};
+
+/**
+ * Quién tiene que aprobar esta solicitud, desde cuándo lo sabe y quién decidió.
+ *
+ * Va por RPC porque el rastro vive en `notifications`, cuya RLS solo deja ver
+ * lo dirigido a uno mismo. La función es SECURITY DEFINER y devuelve nombres y
+ * fechas, nada más (ver migración 0080).
+ */
+export async function seguimientoAprobacion(
+  solicitudId: string,
+): Promise<{ ok: boolean; error?: string; aprobadores: SeguimientoAprobador[] }> {
+  await requireSession();
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("compra_seguimiento_aprobacion", {
+    p_solicitud: solicitudId,
+  });
+  if (error) return { ok: false, error: legible(error.message), aprobadores: [] };
+  return { ok: true, aprobadores: (data ?? []) as SeguimientoAprobador[] };
+}
