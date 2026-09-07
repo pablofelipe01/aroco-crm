@@ -47,6 +47,7 @@ import { TaskForm } from "./task-form";
 import { CalendarExport } from "./calendar-export";
 import { updateTaskStatus, deleteTask } from "./actions";
 import { etiquetaMes } from "@/lib/tareas/archivo";
+import { diasAbierta, fechasDeTarea } from "@/lib/tareas/fechas";
 
 /** Etiqueta para las tareas que no traen origen, para poder filtrarlas. */
 const SIN_ORIGEN = "Sin origen";
@@ -156,6 +157,90 @@ const TODAY = new Date().toISOString().slice(0, 10);
 const isOverdue = (t: TaskWithPerson) =>
   !!t.due_date && t.due_date < TODAY && t.status !== "done";
 
+/**
+ * Las fechas de una tarea en una línea: cuándo arrancó y cuándo vence.
+ *
+ * Antes solo se veía el vencimiento, y en la revisión del CRM se pidió que
+ * quedara claro CUÁNDO SE INICIÓ. Se muestran las dos porque una sola no
+ * responde nada: «vence el 20» no dice si lleva dos días o dos meses.
+ *
+ * Las tareas anteriores a la migración 0079 no tienen fecha de inicio y no se
+ * les inventó una. Para esas se enseña la de creación, dicha como creación:
+ * es lo que sí se sabe, y confundir «se registró» con «se empezó» es
+ * precisamente lo que hay que evitar.
+ */
+function FechasTarea({
+  task,
+  className,
+  compacto = false,
+}: {
+  task: TaskWithPerson;
+  className?: string;
+  /**
+   * En pantalla angosta deja solo el vencimiento. Para la fila de la lista,
+   * donde las dos fechas no caben al lado del nombre — y esconder las dos
+   * dejaría al móvil con menos información de la que ya tenía.
+   */
+  compacto?: boolean;
+}) {
+  const f = fechasDeTarea(task);
+  const overdue = isOverdue(task);
+  // Una tarea completada deja de acumular días; el resto se cuenta hasta hoy.
+  const dias = diasAbierta(f.inicio, task.completed_at ?? TODAY);
+
+  if (!f.inicio && !f.vence) return null;
+
+  const desde =
+    f.origen === "declarado" ? `Inicio ${formatDate(f.inicio)}` : `Creada ${formatDate(f.inicio)}`;
+
+  return (
+    <span
+      className={cn("flex items-center gap-1 text-[11px] text-fg-subtle", className)}
+      // El detalle completo en el título: en la tarjeta hay sitio para lo
+      // corto, y quien necesita el matiz lo tiene a un hover.
+      title={
+        [
+          f.inicio
+            ? f.origen === "declarado"
+              ? `Inicio ${formatDate(f.inicio)}`
+              : `Sin fecha de inicio · creada el ${formatDate(f.inicio)}`
+            : null,
+          f.vence ? `Vence ${formatDate(f.vence)}` : "Sin vencimiento",
+          dias === null
+            ? null
+            : task.status === "done"
+              ? `Tomó ${dias} ${dias === 1 ? "día" : "días"}`
+              : `Lleva ${dias} ${dias === 1 ? "día" : "días"}`,
+        ]
+          .filter(Boolean)
+          .join(" · ")
+      }
+    >
+      <Calendar className="h-3 w-3 shrink-0" />
+      {f.inicio && (
+        <span
+          className={cn(
+            f.origen === "creacion" && "italic",
+            compacto && f.vence && "hidden sm:inline",
+          )}
+        >
+          {desde}
+        </span>
+      )}
+      {f.inicio && f.vence && (
+        <span aria-hidden className={compacto ? "hidden sm:inline" : undefined}>
+          →
+        </span>
+      )}
+      {f.vence && (
+        <span className={overdue ? "font-medium text-danger" : undefined}>
+          {formatDate(f.vence)}
+        </span>
+      )}
+    </span>
+  );
+}
+
 function TaskCard({
   task,
   onEdit,
@@ -169,7 +254,6 @@ function TaskCard({
   onCalendar?: () => void;
   dragging?: boolean;
 }) {
-  const overdue = isOverdue(task);
   return (
     <div
       className={cn(
@@ -187,19 +271,7 @@ function TaskCard({
         </p>
       )}
       <div className="mt-2.5 flex items-center justify-between gap-2">
-        {task.due_date ? (
-          <span
-            className={cn(
-              "flex items-center gap-1 text-[11px]",
-              overdue ? "font-medium text-danger" : "text-fg-subtle",
-            )}
-          >
-            <Calendar className="h-3 w-3" />
-            {formatDate(task.due_date)}
-          </span>
-        ) : (
-          <span />
-        )}
+        <FechasTarea task={task} className="min-w-0 flex-wrap" />
         {(onEdit || onDelete || onCalendar) && (
           // Visibles siempre, como en la vista de lista. Estaban detrás de
           // `group-hover`, y en Tailwind v4 esa variante va envuelta en
@@ -667,10 +739,12 @@ export function TareasClient({
                       </p>
                     )}
                   </div>
-                  {/* La fecha que importa aquí es la de cierre, no la de
-                      vencimiento: es lo que ordena el archivo. */}
+                  {/* Desde cuándo venía y cuándo se cerró. Puestas juntas se
+                      lee lo que tardó, que es lo que se busca al mirar un mes
+                      cerrado. */}
+                  <FechasTarea task={t} className="hidden shrink-0 lg:flex" />
                   <span className="shrink-0 font-mono text-xs text-fg-subtle">
-                    {formatDate(t.completed_at)}
+                    ✓ {formatDate(t.completed_at)}
                   </span>
                   {/* Abrir es lo único que se ofrece: el archivo es para
                       consultar —incluida la bitácora—, no para reorganizar. */}
@@ -744,16 +818,7 @@ export function TareasClient({
                     </p>
                   )}
                 </div>
-                {t.due_date && (
-                  <span
-                    className={cn(
-                      "shrink-0 font-mono text-xs",
-                      isOverdue(t) ? "font-medium text-danger" : "text-fg-subtle",
-                    )}
-                  >
-                    {formatDate(t.due_date)}
-                  </span>
-                )}
+                <FechasTarea task={t} compacto className="shrink-0" />
                 <div className="flex shrink-0 items-center gap-1">
                   <button
                     onClick={() => setCalTask(t)}

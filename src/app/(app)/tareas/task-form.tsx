@@ -170,7 +170,14 @@ export function TaskForm({
             ))}
           </Select>
         </Field>
-        <Field label="Inicio">
+        <Field
+          label="Inicio"
+          hint={
+            initial
+              ? "Si se deja vacío, el tablero muestra la fecha de creación."
+              : "Hoy, salvo que la tarea arranque otro día."
+          }
+        >
           <Input type="date" {...register("start_date")} />
         </Field>
         <Field label="Vencimiento">
