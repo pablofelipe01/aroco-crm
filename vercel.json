@@ -24,6 +24,10 @@
     {
       "path": "/api/cron/sync-mercado?diferenciales=1&dias=2",
       "schedule": "0 14 * * 4"
+    },
+    {
+      "path": "/api/cron/sync-rutas",
+      "schedule": "30 12 * * *"
     }
   ]
 }

@@ -147,6 +147,18 @@ export const serverEnv = {
     );
   },
   /**
+   * Hoja de ruta de CISCA, en CSV: quién entregó cada kilo y desde qué vereda.
+   *
+   * Es la fuente de la trazabilidad hacia atrás — el inventario sabe que un
+   * lote se llama «CISCA ruta #3» y esta hoja sabe de qué manos salió.
+   */
+  get RUTAS_SHEET_CSV_URL() {
+    return (
+      process.env.RUTAS_SHEET_CSV_URL ??
+      "https://docs.google.com/spreadsheets/d/1rLbETukttAR43iS39WkG7fpUyM89I6Gl3yayh1IbC70/gviz/tq?tqx=out:csv"
+    );
+  },
+  /**
    * Published CSV export of the daily prices Google Sheet (company × date
    * matrix). Override per-environment if it ever moves.
    */

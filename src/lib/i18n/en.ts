@@ -17,6 +17,7 @@ export const en: Diccionario = {
     comercial: "Sales pipeline",
     cotizaciones: "Quotes",
     inventario: "Inventory",
+    trazabilidad: "Traceability",
     proveedoresInsumos: "Supply vendors",
     compras: "Purchasing",
     despachos: "Shipments",

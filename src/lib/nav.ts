@@ -13,6 +13,7 @@ import {
   LineChart,
   ListChecks,
   ClipboardList,
+  Route,
   Settings,
   type LucideIcon,
 } from "lucide-react";
@@ -77,6 +78,15 @@ export const NAV_ITEMS: NavItem[] = [
     label: "Inventario",
     icon: Boxes,
     departments: ["Dirección", "Bodega Central", "Administrativo", "Operaciones"],
+  },
+  {
+    href: "/trazabilidad",
+    llave: "trazabilidad",
+    label: "Trazabilidad",
+    icon: Route,
+    // Comercial entra porque la trazabilidad es justo lo que se le enseña a un
+    // cliente que pregunta de dónde viene el grano.
+    departments: ["Dirección", "Bodega Central", "Administrativo", "Operaciones", "Comercial"],
   },
   // "Inventario calidad" (/inventario-calidad) se retiró del menú el 2026-07-29.
   // Era la segunda pestaña de la misma hoja y quedó duplicando a Inventario, que

@@ -17,6 +17,7 @@ export const es = {
     comercial: "Comercial",
     cotizaciones: "Cotizaciones",
     inventario: "Inventario",
+    trazabilidad: "Trazabilidad",
     proveedoresInsumos: "Proveedores Insumos",
     compras: "Compras",
     despachos: "Despachos",

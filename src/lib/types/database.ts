@@ -2973,6 +2973,198 @@ export type Database = {
         };
         Relationships: [];
       };
+      trazabilidad_acopios: {
+        Row: {
+          id: string;
+          fecha: string;
+          ruta: number;
+          kg_primera: number;
+          kg_segunda: number;
+          kg_total: number;
+          productores: number;
+          veredas: number;
+          total_venta: number;
+          lote_id: string | null;
+          enlazado_por: string | null;
+          enlazado_en: string | null;
+          synced_at: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          fecha: string;
+          ruta: number;
+          kg_primera?: number;
+          kg_segunda?: number;
+          kg_total?: number;
+          productores?: number;
+          veredas?: number;
+          total_venta?: number;
+          lote_id?: string | null;
+          enlazado_por?: string | null;
+          enlazado_en?: string | null;
+          synced_at?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          fecha?: string;
+          ruta?: number;
+          kg_primera?: number;
+          kg_segunda?: number;
+          kg_total?: number;
+          productores?: number;
+          veredas?: number;
+          total_venta?: number;
+          lote_id?: string | null;
+          enlazado_por?: string | null;
+          enlazado_en?: string | null;
+          synced_at?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      trazabilidad_entregas: {
+        Row: {
+          id: string;
+          acopio_id: string;
+          fila: number;
+          productor: string;
+          cedula: string | null;
+          tipo_productor: string | null;
+          vereda_cruda: string | null;
+          vereda_clave: string | null;
+          vereda_id: string | null;
+          calidad: string | null;
+          kg_primera: number;
+          kg_segunda: number;
+          precio_base: number | null;
+          bonificacion_calidad: number | null;
+          precio_kg_primera: number | null;
+          total_primera: number | null;
+          precio_kg_segunda: number | null;
+          total_segunda: number | null;
+          total_venta: number | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          acopio_id: string;
+          fila: number;
+          productor: string;
+          cedula?: string | null;
+          tipo_productor?: string | null;
+          vereda_cruda?: string | null;
+          vereda_clave?: string | null;
+          vereda_id?: string | null;
+          calidad?: string | null;
+          kg_primera?: number;
+          kg_segunda?: number;
+          precio_base?: number | null;
+          bonificacion_calidad?: number | null;
+          precio_kg_primera?: number | null;
+          total_primera?: number | null;
+          precio_kg_segunda?: number | null;
+          total_segunda?: number | null;
+          total_venta?: number | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          acopio_id?: string;
+          fila?: number;
+          productor?: string;
+          cedula?: string | null;
+          tipo_productor?: string | null;
+          vereda_cruda?: string | null;
+          vereda_clave?: string | null;
+          vereda_id?: string | null;
+          calidad?: string | null;
+          kg_primera?: number;
+          kg_segunda?: number;
+          precio_base?: number | null;
+          bonificacion_calidad?: number | null;
+          precio_kg_primera?: number | null;
+          total_primera?: number | null;
+          precio_kg_segunda?: number | null;
+          total_segunda?: number | null;
+          total_venta?: number | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      trazabilidad_lugares: {
+        Row: {
+          id: string;
+          tipo: Database["public"]["Enums"]["lugar_tipo"];
+          nombre: string;
+          clave: string;
+          municipio_id: string | null;
+          departamento: string | null;
+          lat: number | null;
+          lng: number | null;
+          fuente: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          tipo: Database["public"]["Enums"]["lugar_tipo"];
+          nombre: string;
+          clave: string;
+          municipio_id?: string | null;
+          departamento?: string | null;
+          lat?: number | null;
+          lng?: number | null;
+          fuente?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          tipo?: Database["public"]["Enums"]["lugar_tipo"];
+          nombre?: string;
+          clave?: string;
+          municipio_id?: string | null;
+          departamento?: string | null;
+          lat?: number | null;
+          lng?: number | null;
+          fuente?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      trazabilidad_ruta_municipios: {
+        Row: { ruta: number; lugar_id: string };
+        Insert: { ruta: number; lugar_id: string };
+        Update: { ruta?: number; lugar_id?: string };
+        Relationships: [];
+      };
+      trazabilidad_rutas: {
+        Row: {
+          numero: number;
+          etiqueta: string;
+          nota: string | null;
+          created_at: string;
+        };
+        Insert: {
+          numero: number;
+          etiqueta: string;
+          nota?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          numero?: number;
+          etiqueta?: string;
+          nota?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
     };
     Views: {
       [_ in never]: never;
@@ -3012,6 +3204,7 @@ export type Database = {
       is_admin: { Args: Record<string, never>; Returns: boolean };
     };
     Enums: {
+      lugar_tipo: "bodega" | "municipio" | "vereda";
       compra_categoria:
         | "Oficina"
         | "Finca"
@@ -3143,6 +3336,10 @@ export type Liquidacion = Tables<"liquidaciones">;
 export type Contrato = Tables<"contratos">;
 export type Task = Tables<"tasks">;
 export type TaskNote = Tables<"task_notes">;
+export type TrazabilidadAcopio = Tables<"trazabilidad_acopios">;
+export type TrazabilidadEntrega = Tables<"trazabilidad_entregas">;
+export type TrazabilidadLugar = Tables<"trazabilidad_lugares">;
+export type TrazabilidadRuta = Tables<"trazabilidad_rutas">;
 export type Meeting = Tables<"meetings">;
 
 export type Department = Enums<"department">;
