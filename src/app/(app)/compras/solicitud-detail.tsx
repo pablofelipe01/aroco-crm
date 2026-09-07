@@ -30,6 +30,7 @@ import {
   subirCotizacion,
   borrarCotizacion,
   borrarCotizaciones,
+  borrarSolicitud,
   urlCotizacion,
   enviarAAprobacion,
   aprobarSolicitud,
@@ -68,6 +69,7 @@ export function SolicitudDetail({
   onClose,
   puedeAprobar,
   userId,
+  esAdmin = false,
   proveedores,
 }: {
   solicitud: SolicitudConCotizaciones | null;
@@ -75,6 +77,8 @@ export function SolicitudDetail({
   onClose: () => void;
   puedeAprobar: boolean;
   userId: string;
+  /** Misma regla que la RLS: un admin borra cualquier solicitud. */
+  esAdmin?: boolean;
   proveedores: ProveedorOpcion[];
 }) {
   const router = useRouter();
@@ -104,6 +108,16 @@ export function SolicitudDetail({
   // se congela, porque el registro debe seguir diciendo qué se decidió.
   const editable = !["Aprobada", "Rechazada"].includes(s.estado) && (esAutor || puedeAprobar);
   const elegida = cotizaciones.find((c) => c.id === s.cotizacion_elegida_id) ?? null;
+
+  /**
+   * Borrar la solicitud ENTERA, no solo sus cotizaciones.
+   *
+   * La regla es la misma que aplica la RLS —lo propio en borrador, o cualquier
+   * cosa si eres admin— y se comprueba aquí solo para no ofrecer un botón que
+   * la base va a rechazar. Cuando no se puede, se dice por qué en vez de
+   * esconderlo: un botón ausente se lee como que la función no existe.
+   */
+  const puedeBorrar = esAdmin || (esAutor && esBorrador);
 
   async function correr(fn: () => Promise<{ ok: boolean; error?: string }>, exito: string) {
     setBusy(true);
@@ -149,6 +163,35 @@ export function SolicitudDetail({
     router.refresh();
   }
 
+  async function borrarTodo() {
+    if (
+      !confirm(
+        `¿Eliminar la solicitud ${s.consecutivo} completa?\n\n` +
+          `Se van con ella sus ${cotizaciones.length} cotización${
+            cotizaciones.length === 1 ? "" : "es"
+          }, los archivos adjuntos y los avisos que les llegaron a los ` +
+          `aprobadores. No se puede deshacer.`,
+      )
+    )
+      return;
+    setBusy(true);
+    const res = await borrarSolicitud(s.id);
+    setBusy(false);
+    if (!res.ok) {
+      toast({ tone: "error", title: "No se pudo eliminar", description: res.error });
+      return;
+    }
+    toast({
+      tone: res.aviso ? "warn" : "success",
+      title: `${s.consecutivo} eliminada`,
+      description: res.aviso,
+    });
+    // Se cierra el panel: quedarse mirando el detalle de algo que ya no existe
+    // es la forma más rápida de que alguien crea que no se borró.
+    onClose();
+    router.refresh();
+  }
+
   async function abrirArchivo(path: string) {
     const url = await urlCotizacion(path);
     if (url) window.open(url, "_blank");
@@ -177,18 +220,44 @@ export function SolicitudDetail({
         </div>
       }
       footer={
-        esBorrador && (esAutor || puedeAprobar) && (
-          <Button
-            size="sm"
-            loading={busy}
-            onClick={() =>
-              correr(() => enviarAAprobacion(s.id), "Enviada a aprobación")
-            }
-          >
-            <Send className="h-4 w-4" />
-            Enviar a aprobación
-          </Button>
-        )
+        <>
+          {/* Eliminar va a la IZQUIERDA y separado del resto: es lo único
+              irreversible de este panel y no debe quedar al lado del botón que
+              la gente pulsa a diario. */}
+          {puedeBorrar && (
+            <Button
+              variant="ghost"
+              size="sm"
+              loading={busy}
+              onClick={borrarTodo}
+              className="mr-auto text-danger hover:bg-danger-soft"
+            >
+              <Trash2 className="h-4 w-4" />
+              Eliminar solicitud
+            </Button>
+          )}
+          {!puedeBorrar && (
+            // Se dice por qué no se puede en vez de esconderlo: un botón que
+            // no está se lee como que la función no existe.
+            <span className="mr-auto text-xs text-fg-subtle">
+              {esBorrador
+                ? "Solo quien la creó (o un administrador) puede eliminarla."
+                : `Una solicitud ${s.estado.toLowerCase()} solo la elimina un administrador: lo decidido queda como historial.`}
+            </span>
+          )}
+          {esBorrador && (esAutor || puedeAprobar) && (
+            <Button
+              size="sm"
+              loading={busy}
+              onClick={() =>
+                correr(() => enviarAAprobacion(s.id), "Enviada a aprobación")
+              }
+            >
+              <Send className="h-4 w-4" />
+              Enviar a aprobación
+            </Button>
+          )}
+        </>
       }
     >
       <div className="space-y-6">

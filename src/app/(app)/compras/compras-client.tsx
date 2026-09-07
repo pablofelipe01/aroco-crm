@@ -179,6 +179,7 @@ export function ComprasClient({
   error,
   puedeAprobar,
   userId,
+  esAdmin,
   proveedores,
 }: {
   solicitudes: SolicitudConCotizaciones[];
@@ -189,6 +190,8 @@ export function ComprasClient({
   /** Álvaro, Nicolás y Luis Ernesto. */
   puedeAprobar: boolean;
   userId: string;
+  /** Misma regla que la RLS: un admin puede borrar cualquier solicitud. */
+  esAdmin: boolean;
 }) {
   const router = useRouter();
   const { toast } = useToast();
@@ -544,6 +547,7 @@ export function ComprasClient({
         onClose={() => setAbierta(null)}
         puedeAprobar={puedeAprobar}
         userId={userId}
+        esAdmin={esAdmin}
         proveedores={proveedores}
       />
 

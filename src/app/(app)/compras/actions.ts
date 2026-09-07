@@ -422,13 +422,70 @@ export async function registrarEntrega(
   return { ok: true };
 }
 
-export async function borrarSolicitud(id: string): Promise<CompraResult> {
+/**
+ * Borra una solicitud ENTERA: la solicitud, sus cotizaciones y sus archivos.
+ *
+ * Las cotizaciones se van solas por la llave foránea en cascada de 0051, y los
+ * avisos de la campana por el disparador de 0084. Lo que ninguna de las dos
+ * cosas alcanza son los PDF del bucket, que hay que barrer desde aquí: el
+ * almacenamiento no es una tabla y ningún disparador de Postgres lo toca.
+ *
+ * EL ORDEN IMPORTA. Primero la fila, después los archivos. Al revés, si la RLS
+ * rechazara el borrado nos habríamos llevado por delante los soportes de una
+ * solicitud que sigue viva.
+ *
+ * Y se comprueba QUE DE VERDAD SE BORRÓ. Un `delete` que la RLS bloquea no
+ * devuelve error: borra cero filas y responde que todo bien. Sin el `select`
+ * de abajo, intentar borrar una solicitud aprobada sin ser admin decía
+ * «eliminada» y la dejaba en la lista.
+ */
+export async function borrarSolicitud(
+  id: string,
+): Promise<CompraResult & { aviso?: string }> {
   await requireSession();
   const supabase = await createClient();
-  const { error } = await supabase.from("compra_solicitudes").delete().eq("id", id);
+
+  // Los archivos se leen ANTES: después del borrado, las cotizaciones ya no
+  // existen y con ellas se pierde el rastro de qué había que barrer.
+  const { data: cotizaciones } = await supabase
+    .from("compra_cotizaciones")
+    .select("archivo_path")
+    .eq("solicitud_id", id);
+
+  const { data: borradas, error } = await supabase
+    .from("compra_solicitudes")
+    .delete()
+    .eq("id", id)
+    .select("id");
   if (error) return { ok: false, error: legible(error.message) };
+
+  if (!borradas || borradas.length === 0) {
+    return {
+      ok: false,
+      error:
+        "No se borró: solo se puede eliminar una solicitud propia en borrador, " +
+        "o cualquiera si eres administrador. Lo ya decidido queda como historial.",
+    };
+  }
+
+  const rutas = (cotizaciones ?? [])
+    .map((c) => c.archivo_path)
+    .filter((p): p is string => !!p);
+
+  let aviso: string | undefined;
+  if (rutas.length > 0) {
+    const { error: eArch } = await supabase.storage.from("compras").remove(rutas);
+    // La solicitud ya no está y eso es lo que se pidió: un archivo que quedó
+    // suelto en el bucket se dice, no convierte la operación en un fracaso.
+    if (eArch) {
+      aviso = `La solicitud se borró, pero ${rutas.length} archivo${
+        rutas.length === 1 ? "" : "s"
+      } quedó en el almacenamiento: ${eArch.message}`;
+    }
+  }
+
   revalidatePath("/compras");
-  return { ok: true };
+  return { ok: true, aviso };
 }
 
 /**
@@ -451,12 +508,31 @@ export async function borrarSolicitudes(
   if (ids.length === 0) return { ok: false, error: "No seleccionaste ninguna solicitud." };
 
   const supabase = await createClient();
+
+  // Los archivos, antes: al borrar las solicitudes se van las cotizaciones en
+  // cascada y con ellas el rastro de qué PDF había que barrer del bucket.
+  const { data: cotizaciones } = await supabase
+    .from("compra_cotizaciones")
+    .select("solicitud_id, archivo_path")
+    .in("solicitud_id", ids);
+
   const { data, error } = await supabase
     .from("compra_solicitudes")
     .delete()
     .in("id", ids)
     .select("id");
   if (error) return { ok: false, error: legible(error.message) };
+
+  // Solo los archivos de las que SÍ se borraron. La RLS pudo dejar vivas
+  // algunas de la selección, y barrer sus soportes las dejaría sin
+  // cotizaciones que enseñar.
+  const cayeron = new Set((data ?? []).map((d) => d.id));
+  const rutas = (cotizaciones ?? [])
+    .filter((c) => cayeron.has(c.solicitud_id) && c.archivo_path)
+    .map((c) => c.archivo_path as string);
+  if (rutas.length > 0) {
+    await supabase.storage.from("compras").remove(rutas);
+  }
 
   revalidatePath("/compras");
   return { ok: true, borradas: data?.length ?? 0 };

@@ -62,6 +62,10 @@ export default async function ComprasPage() {
       proveedores={proveedores ?? []}
       puedeAprobar={session?.profile?.aprueba_compras ?? false}
       userId={session?.userId ?? ""}
+      // Quién puede borrar una solicitud entera. Es la misma regla que aplica
+      // la RLS; aquí solo sirve para no ofrecer un botón que la base va a
+      // rechazar.
+      esAdmin={session?.profile?.role === "admin"}
     />
   );
 }
