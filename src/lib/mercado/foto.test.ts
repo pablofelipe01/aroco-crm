@@ -97,6 +97,13 @@ const base: DatosMercado = {
     cierrePrevio: 6390,
   },
   cobertura: null,
+  // Sin nada anotado a mano: la posición es la del extracto tal cual.
+  manual: {
+    fechaExtracto: "2026-08-28",
+    aplicados: [],
+    superados: [],
+    posiciones: [],
+  },
   trm: { fecha: "2026-08-30", valor: 4180.25 },
   diferenciales: {
     fecha: "2026-08-25",

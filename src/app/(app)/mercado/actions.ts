@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { createClient } from "@/lib/supabase/server";
 import { getSessionContext } from "@/lib/auth";
 import { sincronizarMercado } from "@/lib/mercado/sync";
 import { leerTableroDeImagen, TableroIlegible } from "@/lib/mercado/tablero-imagen";
@@ -120,4 +121,91 @@ export async function subirTablero(formData: FormData): Promise<ResultadoSync> {
       detalle: e instanceof Error ? e.message.slice(0, 300) : undefined,
     };
   }
+}
+
+export type MovimientoResult = { ok: boolean; error?: string };
+
+/**
+ * Anota una apertura o un cierre hecho durante el día.
+ *
+ * Va contra la sesión del usuario y NO con `service_role` como los syncs: la
+ * RLS de 0086 exige `ve_mercado()` y que `registrado_por` sea quien escribe,
+ * y saltarse eso con la llave de servicio dejaría el registro sin autor
+ * comprobable. Un apunte de lo que se operó vale por quién lo firmó.
+ */
+export async function registrarMovimiento(input: {
+  fecha: string;
+  accion: "abre" | "cierra";
+  tipo: "FUT" | "CALL" | "PUT";
+  lado: "largo" | "corto";
+  contrato: string;
+  strike: number | null;
+  contratos: number;
+  precio: number | null;
+  nota: string | null;
+}): Promise<MovimientoResult> {
+  const session = await getSessionContext();
+  if (!session?.profile?.ve_mercado) {
+    return { ok: false, error: "No tienes acceso al módulo de Mercado." };
+  }
+
+  const contrato = input.contrato.trim().toUpperCase();
+  if (!contrato) return { ok: false, error: "Falta el contrato (p. ej. DEC26)." };
+  if (!Number.isInteger(input.contratos) || input.contratos <= 0) {
+    return { ok: false, error: "El número de contratos tiene que ser un entero mayor que cero." };
+  }
+  // El mismo par de reglas que la restricción de la tabla, comprobado aquí para
+  // poder decirlo con palabras en vez de devolver un error de Postgres.
+  if (input.tipo === "FUT" && input.strike !== null) {
+    return { ok: false, error: "Un futuro no lleva strike." };
+  }
+  if (input.tipo !== "FUT" && input.strike === null) {
+    return { ok: false, error: "Una opción necesita su strike." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("posiciones_manuales").insert({
+    fecha: input.fecha,
+    accion: input.accion,
+    tipo: input.tipo,
+    lado: input.lado,
+    contrato,
+    strike: input.strike,
+    contratos: input.contratos,
+    precio: input.precio,
+    nota: input.nota?.trim() || null,
+    registrado_por: session.userId,
+  });
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath("/mercado");
+  return { ok: true };
+}
+
+/**
+ * Borra un movimiento anotado.
+ *
+ * Quién puede lo decide la RLS —su autor o un admin—, no esta función: un
+ * registro de lo que se operó es una afirmación firmada, y que cualquiera
+ * pueda quitar la de otro le resta todo el valor como constancia.
+ */
+export async function borrarMovimiento(id: string): Promise<MovimientoResult> {
+  const session = await getSessionContext();
+  if (!session?.profile?.ve_mercado) {
+    return { ok: false, error: "No tienes acceso al módulo de Mercado." };
+  }
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("posiciones_manuales")
+    .delete()
+    .eq("id", id)
+    .select("id");
+  if (error) return { ok: false, error: error.message };
+  // Un `delete` que la RLS rechaza no da error: borra cero filas y responde
+  // que todo bien.
+  if (!data || data.length === 0) {
+    return { ok: false, error: "Solo quien lo anotó (o un administrador) puede borrarlo." };
+  }
+  revalidatePath("/mercado");
+  return { ok: true };
 }

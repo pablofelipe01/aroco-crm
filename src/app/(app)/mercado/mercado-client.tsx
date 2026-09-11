@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
 import { sincronizarAhora, subirTablero } from "./actions";
 import { AnalistaMercado } from "./analista";
+import { PosicionesManuales } from "./posiciones-manuales";
 import { Modal } from "@/components/ui/modal";
 import { Field, Input, Select } from "@/components/ui/input";
 import { PageHeader } from "@/components/ui/page-header";
@@ -329,6 +330,10 @@ export function MercadoClient({
             </CardBody>
           </Card>
         )}
+
+        {/* Va ANTES de la cadena: cuando alguien acaba de operar, lo primero
+            que busca es si su movimiento está reflejado, no los strikes. */}
+        <PosicionesManuales manual={d.manual} />
 
         <CadenaOpciones
           cadena={d.cadena}

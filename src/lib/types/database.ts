@@ -2973,6 +2973,54 @@ export type Database = {
         };
         Relationships: [];
       };
+      posiciones_manuales: {
+        Row: {
+          id: string;
+          fecha: string;
+          accion: string;
+          tipo: string;
+          lado: string;
+          contrato: string;
+          strike: number | null;
+          contratos: number;
+          precio: number | null;
+          nota: string | null;
+          registrado_por: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          fecha?: string;
+          accion: string;
+          tipo: string;
+          lado: string;
+          contrato: string;
+          strike?: number | null;
+          contratos: number;
+          precio?: number | null;
+          nota?: string | null;
+          registrado_por?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          fecha?: string;
+          accion?: string;
+          tipo?: string;
+          lado?: string;
+          contrato?: string;
+          strike?: number | null;
+          contratos?: number;
+          precio?: number | null;
+          nota?: string | null;
+          registrado_por?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       trazabilidad_acopios: {
         Row: {
           id: string;
@@ -3336,6 +3384,7 @@ export type Liquidacion = Tables<"liquidaciones">;
 export type Contrato = Tables<"contratos">;
 export type Task = Tables<"tasks">;
 export type TaskNote = Tables<"task_notes">;
+export type PosicionManual = Tables<"posiciones_manuales">;
 export type TrazabilidadAcopio = Tables<"trazabilidad_acopios">;
 export type TrazabilidadEntrega = Tables<"trazabilidad_entregas">;
 export type TrazabilidadLugar = Tables<"trazabilidad_lugares">;

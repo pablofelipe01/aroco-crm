@@ -4,6 +4,18 @@ import { construirPosicion, type LoteRow } from "@/lib/posicion";
 import { calcularRiesgo, escenarios, type PosicionBroker, type Riesgo } from "@/lib/mercado/riesgo";
 import { toneladasPorDelta } from "@/lib/mercado/tablero-imagen";
 import { precioEnVivo, ultimoPrecioGuardado } from "@/lib/mercado/precio";
+import {
+  posicionEfectiva,
+  type MovimientoManual,
+  type PosicionEfectiva,
+} from "@/lib/mercado/posiciones";
+
+/** Hace 30 días, en ISO. Corte para traer los movimientos anotados a mano. */
+function hace30Dias(): string {
+  const d = new Date();
+  d.setUTCDate(d.getUTCDate() - 30);
+  return d.toISOString().slice(0, 10);
+}
 
 export type DatosMercado = {
   riesgo: Riesgo;
@@ -72,6 +84,20 @@ export type DatosMercado = {
    * cobertura efectiva diría que se sabe algo que no se sabe.
    */
   cobertura: { efectivaT: number; sinDeltaT: number } | null;
+  /**
+   * Lo anotado a mano durante el día y su efecto sobre la posición.
+   *
+   * `superados` son los que el extracto ya debería recoger: se enseñan para
+   * poder comprobar que de verdad los recogió. El 1-sep pasó lo contrario —un
+   * futuro cerrado que seguía apareciendo abierto— y esa discrepancia hay que
+   * poder verla.
+   */
+  manual: {
+    fechaExtracto: string | null;
+    aplicados: MovimientoManual[];
+    superados: MovimientoManual[];
+    posiciones: PosicionEfectiva[];
+  };
   trm: { fecha: string | null; valor: number | null };
   diferenciales: {
     fecha: string | null;
@@ -101,7 +127,7 @@ export async function cargarMercado(
   /** Vencimiento que se está mirando en la cadena. Por defecto, el primero. */
   contratoElegido?: string,
 ): Promise<DatosMercado> {
-  const [lotesRes, balRes, pnlRes, posRes, boardRes, trmRes, intelRes, difRes, ratRes, futRes] =
+  const [lotesRes, balRes, pnlRes, posRes, boardRes, trmRes, intelRes, difRes, ratRes, futRes, manRes] =
     await Promise.all([
     db
       .from("inventory_lots")
@@ -135,6 +161,15 @@ export async function cargarMercado(
       .select("report_date, contrato, valor, valor_anterior, moneda")
       .order("report_date", { ascending: false })
       .limit(10),
+    // Aperturas y cierres anotados a mano. Se traen los últimos treinta días:
+    // más atrás ya están todos superados por algún extracto y solo alargarían
+    // la consulta.
+    db
+      .from("posiciones_manuales")
+      .select("id, fecha, accion, tipo, lado, contrato, strike, contratos, precio, nota")
+      .gte("fecha", hace30Dias())
+      .order("fecha", { ascending: false })
+      .order("created_at", { ascending: false }),
   ]);
 
   const posicion = construirPosicion((lotesRes.data ?? []) as LoteRow[], new Date());
@@ -181,9 +216,24 @@ export async function cargarMercado(
   // ninguna cobertura. Un estado sin posiciones no es ausencia de datos: es la
   // afirmación de que ese día no había nada abierto.
   const ultimaFecha = bal?.statement_date ?? null;
-  const posiciones = (posRes.data ?? []).filter(
+  const delExtracto = (posRes.data ?? []).filter(
     (p) => p.statement_date === ultimaFecha,
   ) as PosicionBroker[];
+
+  /**
+   * La posición de HOY: la del extracto más lo que se anotó a mano después.
+   *
+   * El extracto es de cierre, así que sin esto el CRM enseña la posición de
+   * ayer a quien acaba de operar hace una hora. Un movimiento anotado deja de
+   * aplicarse solo en cuanto llega el extracto de su día — ver
+   * `src/lib/mercado/posiciones.ts`, que es donde vive la regla y sus pruebas.
+   */
+  const efectivas = posicionEfectiva(
+    delExtracto,
+    (manRes.data ?? []) as MovimientoManual[],
+    ultimaFecha,
+  );
+  const posiciones: PosicionBroker[] = efectivas.posiciones;
 
   // La cadena entera del vencimiento elegido: es lo que se pinta en pantalla.
   const { data: cadenaFilas } = board
@@ -362,6 +412,12 @@ export async function cargarMercado(
       fuente,
       momento,
       cierrePrevio,
+    },
+    manual: {
+      fechaExtracto: ultimaFecha,
+      aplicados: efectivas.aplicados,
+      superados: efectivas.superados,
+      posiciones: efectivas.posiciones,
     },
     trm: { fecha: trmFila?.date ?? null, valor: trmFila ? Number(trmFila.trm) : null },
     // Solo el reporte más reciente: mezclar semanas pondría dos diferenciales
