@@ -80,6 +80,18 @@ export type DispatchRow = {
   bultos: number | null;
   remision_salida: string | null;
   remision_entrada: string | null;
+  /**
+   * Lo que costó el kilo que salió en este despacho.
+   *
+   * Es el MISMO «VALOR DE COMPRA» que se guarda en el lote, copiado aquí
+   * porque sale de la misma fila de la hoja. Podría deducirse cruzando
+   * `origin` contra el código del lote, pero ese cruce no es fiable: el
+   * 21-ago hay tres lotes con el código `COL-MET-GRA-210826(DELEITE)` y
+   * precios de 13.435, 14.890 y 18.700 — un cruce por código elegiría uno al
+   * azar y la utilidad saldría hasta un 40 % desviada. Copiándolo no hay nada
+   * que adivinar.
+   */
+  purchase_price_cop_kg: number | null;
   origin: string;
 };
 
@@ -361,6 +373,8 @@ export function parseInventorySheet(csv: string): ParsedSheet {
         remision_salida: cell(row, s.remision) || null,
         remision_entrada: remision,
         origin: code,
+        // El precio del lote del que salió, de esta misma fila.
+        purchase_price_cop_kg: optNum(row, C.valorCompra),
       });
     });
   }

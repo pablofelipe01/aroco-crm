@@ -287,7 +287,23 @@ export function DespachosClient({
                     {formatKg(d.qty_kg)}
                   </td>
                   <td className="px-4 py-3 text-right font-mono tnum text-fg-muted">
-                    {d.purchase_price_cop_kg != null ? formatCOP(d.purchase_price_cop_kg) : "—"}
+                    {d.purchase_price_cop_kg != null ? (
+                      <>
+                        {formatCOP(d.purchase_price_cop_kg)}
+                        {/* Lo que costó ESTE despacho. El precio por kilo dice
+                            a cómo se compró; el total dice cuánta plata salió
+                            por esa puerta, que es la cifra con la que se
+                            compara contra la venta. */}
+                        <span className="block text-[11px] text-fg-subtle">
+                          {formatCOP(
+                            Number(d.purchase_price_cop_kg) * Number(d.qty_kg),
+                          )}{" "}
+                          en total
+                        </span>
+                      </>
+                    ) : (
+                      "—"
+                    )}
                   </td>
                   <td className="px-4 py-3 text-right">
                     {canWrite && (
