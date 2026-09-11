@@ -147,6 +147,19 @@ export const serverEnv = {
     );
   },
   /**
+   * Pestaña «LIQUIDACION DE BONIFICACIONES COMERCIALES», en CSV.
+   *
+   * Vive en el MISMO archivo que las ventas. Se pide por `gid` y no por nombre
+   * de pestaña porque el nombre lleva tildes y espacios y el endpoint por
+   * nombre se atraganta con ellos; el gid es opaco pero estable.
+   */
+  get COMISIONES_SHEET_CSV_URL() {
+    return (
+      process.env.COMISIONES_SHEET_CSV_URL ??
+      "https://docs.google.com/spreadsheets/d/1dAMXDTKStJCwUOcMF1mCY4g1pQ43NPF6RJyfRRxxzYM/export?format=csv&gid=2023914934"
+    );
+  },
+  /**
    * Hoja de ruta de CISCA, en CSV: quién entregó cada kilo y desde qué vereda.
    *
    * Es la fuente de la trazabilidad hacia atrás — el inventario sabe que un

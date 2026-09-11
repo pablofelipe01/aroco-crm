@@ -1022,6 +1022,99 @@ export type Database = {
         };
         Relationships: [];
       };
+      comision_comerciales: {
+        Row: { nombre: string; profile_id: string | null; es_casa: boolean; created_at: string; updated_at: string };
+        Insert: { nombre: string; profile_id?: string | null; es_casa?: boolean; created_at?: string; updated_at?: string };
+        Update: { nombre?: string; profile_id?: string | null; es_casa?: boolean; created_at?: string; updated_at?: string };
+        Relationships: [];
+      };
+      comision_periodos: {
+        Row: {
+          id: string; anio: number; mes: number; mes_nombre: string | null;
+          mercado_por_defecto: string | null; umbral_senior_ton: number | null;
+          share_vendedor: number | null; share_comprador: number | null;
+          transporte_kg: number | null; seleccion_kg: number | null;
+          toneladas: number; utilidad: number; total_comisiones: number; suma_lineas: number;
+          synced_at: string; created_at: string; updated_at: string;
+        };
+        Insert: {
+          id?: string; anio: number; mes: number; mes_nombre?: string | null;
+          mercado_por_defecto?: string | null; umbral_senior_ton?: number | null;
+          share_vendedor?: number | null; share_comprador?: number | null;
+          transporte_kg?: number | null; seleccion_kg?: number | null;
+          toneladas?: number; utilidad?: number; total_comisiones?: number; suma_lineas?: number;
+          synced_at?: string; created_at?: string; updated_at?: string;
+        };
+        Update: {
+          id?: string; anio?: number; mes?: number; mes_nombre?: string | null;
+          mercado_por_defecto?: string | null; umbral_senior_ton?: number | null;
+          share_vendedor?: number | null; share_comprador?: number | null;
+          transporte_kg?: number | null; seleccion_kg?: number | null;
+          toneladas?: number; utilidad?: number; total_comisiones?: number; suma_lineas?: number;
+          synced_at?: string; created_at?: string; updated_at?: string;
+        };
+        Relationships: [];
+      };
+      comision_lineas: {
+        Row: {
+          id: string; periodo_id: string; comercial: string; profile_id: string | null;
+          anio: number; mes: number;
+          ton_venta: number; ton_compra: number; ton_total: number;
+          nivel: string | null; pct_techo: number | null;
+          utilidad_venta: number; utilidad_compra: number;
+          comision_venta: number; comision_compra: number; total_pagar: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string; periodo_id: string; comercial: string; profile_id?: string | null;
+          anio: number; mes: number;
+          ton_venta?: number; ton_compra?: number; ton_total?: number;
+          nivel?: string | null; pct_techo?: number | null;
+          utilidad_venta?: number; utilidad_compra?: number;
+          comision_venta?: number; comision_compra?: number; total_pagar?: number;
+          created_at?: string;
+        };
+        Update: {
+          id?: string; periodo_id?: string; comercial?: string; profile_id?: string | null;
+          anio?: number; mes?: number;
+          ton_venta?: number; ton_compra?: number; ton_total?: number;
+          nivel?: string | null; pct_techo?: number | null;
+          utilidad_venta?: number; utilidad_compra?: number;
+          comision_venta?: number; comision_compra?: number; total_pagar?: number;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      comision_operaciones: {
+        Row: {
+          id: string; periodo_id: string; fila: number; fecha: string | null;
+          cliente: string | null; odc: string | null; descripcion: string | null;
+          kg: number; utilidad_bruta: number; proveedor: string | null;
+          vendedor: string | null; comprador: string | null; kg_aroco: number;
+          costo_transp_selec: number; utilidad_neta: number; remision: string | null;
+          destino: string | null; mercado: string | null;
+          comision_vendedor: number; comision_comprador: number; created_at: string;
+        };
+        Insert: {
+          id?: string; periodo_id: string; fila: number; fecha?: string | null;
+          cliente?: string | null; odc?: string | null; descripcion?: string | null;
+          kg?: number; utilidad_bruta?: number; proveedor?: string | null;
+          vendedor?: string | null; comprador?: string | null; kg_aroco?: number;
+          costo_transp_selec?: number; utilidad_neta?: number; remision?: string | null;
+          destino?: string | null; mercado?: string | null;
+          comision_vendedor?: number; comision_comprador?: number; created_at?: string;
+        };
+        Update: {
+          id?: string; periodo_id?: string; fila?: number; fecha?: string | null;
+          cliente?: string | null; odc?: string | null; descripcion?: string | null;
+          kg?: number; utilidad_bruta?: number; proveedor?: string | null;
+          vendedor?: string | null; comprador?: string | null; kg_aroco?: number;
+          costo_transp_selec?: number; utilidad_neta?: number; remision?: string | null;
+          destino?: string | null; mercado?: string | null;
+          comision_vendedor?: number; comision_comprador?: number; created_at?: string;
+        };
+        Relationships: [];
+      };
       compra_solicitudes: {
         Row: {
           aprobada_en: string | null;
@@ -2560,6 +2653,7 @@ export type Database = {
         Row: {
           active: boolean;
           aprueba_compras: boolean;
+          ve_comisiones_todas: boolean;
           ve_mercado: boolean;
           verifica_proveedores: boolean;
           created_at: string;
@@ -2575,6 +2669,7 @@ export type Database = {
         Insert: {
           active?: boolean;
           aprueba_compras?: boolean;
+          ve_comisiones_todas?: boolean;
           ve_mercado?: boolean;
           verifica_proveedores?: boolean;
           created_at?: string;
@@ -2590,6 +2685,7 @@ export type Database = {
         Update: {
           active?: boolean;
           aprueba_compras?: boolean;
+          ve_comisiones_todas?: boolean;
           ve_mercado?: boolean;
           verifica_proveedores?: boolean;
           created_at?: string;
@@ -3248,6 +3344,7 @@ export type Database = {
           decidio: boolean;
         }[];
       };
+      ve_comisiones_todas: { Args: Record<string, never>; Returns: boolean };
       is_active_member: { Args: Record<string, never>; Returns: boolean };
       is_admin: { Args: Record<string, never>; Returns: boolean };
     };
@@ -3385,6 +3482,10 @@ export type Contrato = Tables<"contratos">;
 export type Task = Tables<"tasks">;
 export type TaskNote = Tables<"task_notes">;
 export type PosicionManual = Tables<"posiciones_manuales">;
+export type ComisionPeriodo = Tables<"comision_periodos">;
+export type ComisionLinea = Tables<"comision_lineas">;
+export type ComisionOperacion = Tables<"comision_operaciones">;
+export type ComisionComercial = Tables<"comision_comerciales">;
 export type TrazabilidadAcopio = Tables<"trazabilidad_acopios">;
 export type TrazabilidadEntrega = Tables<"trazabilidad_entregas">;
 export type TrazabilidadLugar = Tables<"trazabilidad_lugares">;
