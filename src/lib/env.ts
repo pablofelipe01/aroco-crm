@@ -147,6 +147,19 @@ export const serverEnv = {
     );
   },
   /**
+   * Pestaña «VENTAS 2026», en CSV: el margen de cada operación.
+   *
+   * Es de donde sale el COSTO REAL —el precio base negociado con el proveedor
+   * más la bonificación de calidad, menos humedad y retenciones—, que es la
+   * pieza que le faltaba al CRM para calcular la utilidad por su cuenta.
+   */
+  get VENTAS_2026_SHEET_CSV_URL() {
+    return (
+      process.env.VENTAS_2026_SHEET_CSV_URL ??
+      "https://docs.google.com/spreadsheets/d/1dAMXDTKStJCwUOcMF1mCY4g1pQ43NPF6RJyfRRxxzYM/export?format=csv&gid=2052661845"
+    );
+  },
+  /**
    * Pestaña «LIQUIDACION DE BONIFICACIONES COMERCIALES», en CSV.
    *
    * Vive en el MISMO archivo que las ventas. Se pide por `gid` y no por nombre

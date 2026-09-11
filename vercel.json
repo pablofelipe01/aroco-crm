@@ -32,6 +32,10 @@
     {
       "path": "/api/cron/sync-comisiones",
       "schedule": "45 12 * * *"
+    },
+    {
+      "path": "/api/cron/sync-operaciones",
+      "schedule": "15 12 * * *"
     }
   ]
 }
