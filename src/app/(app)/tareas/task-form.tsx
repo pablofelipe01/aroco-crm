@@ -18,6 +18,8 @@ import type { TeamMember } from "@/lib/types/database";
 import type { TaskWithPerson } from "./page";
 import { createTask, updateTask } from "./actions";
 import { TaskLog } from "./task-log";
+import { diasAbierta, fechasDeTarea } from "@/lib/tareas/fechas";
+import { formatDate } from "@/lib/utils";
 
 interface FormValues {
   name: string;
@@ -65,6 +67,45 @@ function toAssignees(t: TaskWithPerson | null): string[] {
   if (!t) return [];
   if (t.assignees.length > 0) return t.assignees.map((a) => a.id);
   return t.person_id ? [t.person_id] : [];
+}
+
+/**
+ * Cuándo nació la tarea, dentro del detalle.
+ *
+ * Pedido en la revisión del 9-sep-2026: la fecha solo se veía en la tarjeta
+ * del tablero —«el cuadrito exterior»— y al abrir la tarea desaparecía, que es
+ * justo cuando alguien quiere saber desde cuándo viene esto.
+ *
+ * Se enseña la de CREACIÓN además del campo de inicio, aunque por regla de
+ * negocio sean la misma. Son la misma por decisión, no por definición: el
+ * campo de inicio se puede cambiar a mano, y el día que alguien lo mueva hay
+ * que poder ver las dos y notar la diferencia.
+ */
+function FichaFechas({ task }: { task: TaskWithPerson }) {
+  const f = fechasDeTarea(task);
+  const hoy = new Date().toISOString().slice(0, 10);
+  const dias = diasAbierta(f.inicio, task.completed_at ?? hoy);
+  const hecha = task.status === "done";
+
+  const partes = [
+    `Creada el ${formatDate(task.created_at)}`,
+    task.start_date ? `inicio ${formatDate(task.start_date)}` : "sin fecha de inicio",
+    task.due_date ? `vence ${formatDate(task.due_date)}` : null,
+    hecha && task.completed_at
+      ? `completada el ${formatDate(task.completed_at)}`
+      : null,
+    dias === null
+      ? null
+      : hecha
+        ? `tomó ${dias} ${dias === 1 ? "día" : "días"}`
+        : `lleva ${dias} ${dias === 1 ? "día" : "días"}`,
+  ].filter(Boolean);
+
+  return (
+    <p className="mb-4 rounded-[var(--radius-md)] border border-border bg-bg-subtle/40 px-3 py-2 text-xs text-fg-muted">
+      {partes.join(" · ")}
+    </p>
+  );
 }
 
 export function TaskForm({
@@ -142,6 +183,10 @@ export function TaskForm({
         </>
       }
     >
+      {/* Solo para una tarea que ya existe: una nueva todavía no tiene fecha
+          de creación que enseñar. */}
+      {initial && <FichaFechas task={initial} />}
+
       <form onSubmit={onSubmit} className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Field label="Tarea *" className="sm:col-span-2">
           <Input {...register("name", { required: true })} placeholder="¿Qué hay que hacer?" />
@@ -172,11 +217,7 @@ export function TaskForm({
         </Field>
         <Field
           label="Inicio"
-          hint={
-            initial
-              ? "Si se deja vacío, el tablero muestra la fecha de creación."
-              : "Hoy, salvo que la tarea arranque otro día."
-          }
+          hint="Por defecto, el día en que se creó la tarea. Cámbialo solo si de verdad arranca otro día."
         >
           <Input type="date" {...register("start_date")} />
         </Field>
