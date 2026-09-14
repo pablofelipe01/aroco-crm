@@ -15,6 +15,7 @@
  */
 
 import { llamarHerramienta, type McpConfig } from "@/lib/mcp/client";
+import { traducirPosicion, type PosicionCruda } from "./posicion-extracto";
 
 export type Extracto = {
   statement_date: string;
@@ -42,6 +43,13 @@ export type BalanceNormalizado = {
 };
 
 export type PosicionNormalizada = {
+  /**
+   * El extracto trajo contratos pero no de qué lado están, y tampoco había con
+   * qué deducirlo. Se guarda en cero —inventar un lado convierte una cobertura
+   * en una exposición— y se cuenta aparte para que el sync lo diga: una
+   * posición que no suma tiene que verse como problema, no como «no hay nada».
+   */
+  sin_lado?: boolean;
   trade_date: string | null;
   card: string | null;
   long_qty: number;
@@ -135,22 +143,59 @@ export function normalizarPnl(summary: unknown): { mtd: number; ytd: number; mon
   return { mtd: 0, ytd: 0, moneda: "USD" };
 }
 
-export function normalizarPosicion(p: Record<string, unknown>): PosicionNormalizada {
-  const mv = num(primero(p, ["market_value", "marketValue", "value"]));
+/**
+ * Normaliza una posición del extracto.
+ *
+ * Acepta LOS DOS vocabularios. El que el MCP manda de verdad —`qty`,
+ * `direction`, `contract`, `open_price`— lo traduce `posicion-extracto.ts`; el
+ * que este módulo esperaba —`long_qty`, `contract_month`, `settle_price`— se
+ * respeta si alguna vez llega, porque es el de la tabla.
+ *
+ * Durante meses solo se leyó el segundo y el MCP nunca lo mandó: cada posición
+ * entraba con todo en cero y la fecha de operación veinte años atrás. En
+ * pantalla no se veía «no hay posiciones» sino «hay N posiciones» sin contrato
+ * ni cantidad, que es lo mismo que no ver nada. Álvaro lo reportó tres veces.
+ */
+export function normalizarPosicion(
+  p: Record<string, unknown>,
+  fechaExtracto: string,
+): PosicionNormalizada {
+  // Si el extracto ya habla el vocabulario de la tabla, se cree tal cual.
+  const yaNormalizada =
+    primero(p, ["long_qty", "longQty"]) !== undefined ||
+    primero(p, ["contract_month", "contractMonth"]) !== undefined;
+
+  if (yaNormalizada) {
+    const mv = num(primero(p, ["market_value", "marketValue", "value"]));
+    return {
+      trade_date: txt(primero(p, ["trade_date", "tradeDate"])),
+      card: txt(primero(p, ["card"])),
+      long_qty: ent(primero(p, ["long_qty", "longQty", "long"])),
+      short_qty: ent(primero(p, ["short_qty", "shortQty", "short"])),
+      option_type: txt(primero(p, ["option_type", "optionType", "type"])),
+      contract_month: txt(primero(p, ["contract_month", "contractMonth", "month"])),
+      exchange: txt(primero(p, ["exchange"])) ?? "ICE COCOA",
+      strike: num(primero(p, ["strike"])),
+      settle_price: num(primero(p, ["settle_price", "settlePrice", "settle"])),
+      market_value: mv,
+      dr_cr: txt(primero(p, ["dr_cr", "drCr"])) ?? (mv !== null && mv < 0 ? "DR" : "CR"),
+    };
+  }
+
+  const t = traducirPosicion(p as PosicionCruda, fechaExtracto);
   return {
-    trade_date: txt(primero(p, ["trade_date", "tradeDate"])),
-    card: txt(primero(p, ["card"])),
-    long_qty: ent(primero(p, ["long_qty", "longQty", "long"])),
-    short_qty: ent(primero(p, ["short_qty", "shortQty", "short"])),
-    option_type: txt(primero(p, ["option_type", "optionType", "type"])),
-    contract_month: txt(primero(p, ["contract_month", "contractMonth", "month"])),
-    exchange: txt(primero(p, ["exchange"])) ?? "ICE COCOA",
-    strike: num(primero(p, ["strike"])),
-    settle_price: num(primero(p, ["settle_price", "settlePrice", "settle"])),
-    market_value: mv,
-    // Si el estado no lo trae, se deduce del signo. Es la convención de StoneX
-    // y evita dejar la columna en null cuando el dato sí se puede saber.
-    dr_cr: txt(primero(p, ["dr_cr", "drCr"])) ?? (mv !== null && mv < 0 ? "DR" : "CR"),
+    sin_lado: t.sinLado,
+    trade_date: t.trade_date,
+    card: t.card,
+    long_qty: t.long_qty,
+    short_qty: t.short_qty,
+    option_type: t.option_type,
+    contract_month: t.contract_month,
+    exchange: t.exchange,
+    strike: t.strike,
+    settle_price: t.settle_price,
+    market_value: t.market_value,
+    dr_cr: t.dr_cr,
   };
 }
 
@@ -185,7 +230,11 @@ export async function traerExtracto(
     cuenta_nombre: txt(cuenta.name),
     balance: normalizarBalance(e.balances),
     pnl: normalizarPnl(e.summary),
-    posiciones: (posiciones as Record<string, unknown>[]).map(normalizarPosicion),
+    posiciones: (posiciones as Record<string, unknown>[]).map((p) =>
+      // La fecha del extracto hace falta para reconstruir la de operación: el
+      // MCP la manda como «9/11/6», con un solo dígito de año.
+      normalizarPosicion(p, txt(e.statement_date) ?? fecha),
+    ),
     archivo: ruta,
   };
 }

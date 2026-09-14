@@ -74,7 +74,17 @@ export async function sincronizarMercado(
           sinEstado.push(fecha);
           continue;
         }
-        estados.push(await guardarExtracto(db, extracto));
+        const guardado = await guardarExtracto(db, extracto);
+        estados.push(guardado);
+        // No es un fallo de la corrida, pero sí algo que alguien tiene que
+        // mirar: hay contratos abiertos que no suman a la cobertura porque el
+        // extracto no dijo de qué lado están.
+        if (guardado.sinLado > 0) {
+          fallos.push({
+            fuente: `StoneX ${fecha}`,
+            error: `${guardado.sinLado} posición(es) sin lado en el extracto: quedaron en cero y no cuentan como cobertura.`,
+          });
+        }
       } catch (e) {
         fallos.push({ fuente: `StoneX ${fecha}`, error: texto(e) });
       }

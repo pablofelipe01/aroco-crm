@@ -30,15 +30,34 @@ test("sin P&L en el estado, cero explícito", () => {
 });
 
 test("una posición acepta snake_case y camelCase", () => {
-  const a = normalizarPosicion({ long_qty: 3, option_type: "CALL", contract_month: "DEC26", strike: 9000, market_value: -1500 });
+  const a = normalizarPosicion({ long_qty: 3, option_type: "CALL", contract_month: "DEC26", strike: 9000, market_value: -1500 }, "2026-09-11");
   assert.equal(a.long_qty, 3);
   assert.equal(a.option_type, "CALL");
   assert.equal(a.dr_cr, "DR", "valor de mercado negativo es débito");
 
-  const b = normalizarPosicion({ longQty: "2", optionType: "PUT", marketValue: "1,200" });
+  const b = normalizarPosicion({ longQty: "2", optionType: "PUT", marketValue: "1,200" }, "2026-09-11");
   assert.equal(b.long_qty, 2);
   assert.equal(b.market_value, 1200, "los miles con coma se limpian");
   assert.equal(b.dr_cr, "CR");
+});
+
+test("una posición en el vocabulario del MCP se traduce, no se pierde", () => {
+  // Es el fallo que dejó invisibles las posiciones de Álvaro durante meses:
+  // el MCP manda `qty`/`direction`/`contract` y el CRM leía `long_qty`/
+  // `contract_month`, así que todo entraba en cero.
+  const p = normalizarPosicion(
+    {
+      trade_date: "9/11/6", card: "4420", qty: 1, direction: "long",
+      contract: "DEC 26 ICE COCOA", open_price: 60.3, close_price: 59.61,
+      ote_amount: 690, ote_sign: "loss",
+    },
+    "2026-09-11",
+  );
+  assert.equal(p.long_qty, 1);
+  assert.equal(p.contract_month, "DEC26");
+  assert.equal(p.trade_date, "2026-09-11", "y no 2006");
+  assert.equal(p.settle_price, 5961, "la escala se comprueba contra el flotante");
+  assert.equal(p.market_value, -690);
 });
 
 test("los días hábiles saltan fines de semana", () => {

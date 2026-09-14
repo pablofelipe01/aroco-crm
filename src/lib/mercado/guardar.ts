@@ -10,6 +10,8 @@ export type ResultadoGuardado = {
   statement_date: string;
   cuenta: string;
   posiciones: number;
+  /** De las anteriores, cuántas llegaron sin poder saber de qué lado están. */
+  sinLado: number;
   balance: boolean;
   pnl: boolean;
 };
@@ -77,10 +79,24 @@ export async function guardarExtracto(
 
   if (e.posiciones.length > 0) {
     const { error: ePos } = await db.from("broker_positions").insert(
+      // Campo por campo y no esparciendo la posición entera: `sin_lado` es una
+      // señal para el registro del sync y no una columna de la tabla, y con un
+      // `...p` se colaba. Enumerar también evita que un campo nuevo del
+      // extracto llegue a la base sin que nadie lo haya decidido.
       e.posiciones.map((p) => ({
         statement_date: e.statement_date,
         account: e.cuenta,
-        ...p,
+        trade_date: p.trade_date,
+        card: p.card,
+        long_qty: p.long_qty,
+        short_qty: p.short_qty,
+        option_type: p.option_type,
+        contract_month: p.contract_month,
+        exchange: p.exchange,
+        strike: p.strike,
+        settle_price: p.settle_price,
+        market_value: p.market_value,
+        dr_cr: p.dr_cr,
       })),
     );
     if (ePos) throw new Error(`broker_positions: ${ePos.message}`);
@@ -90,6 +106,10 @@ export async function guardarExtracto(
     statement_date: e.statement_date,
     cuenta: e.cuenta,
     posiciones: e.posiciones.length,
+    // Las que llegaron sin lado se cuentan aparte: quedaron guardadas en cero
+    // y no suman a la cobertura, así que tienen que verse como problema y no
+    // confundirse con «ese día no había nada abierto».
+    sinLado: e.posiciones.filter((p) => p.sin_lado).length,
     balance: e.balance.total_equity !== null,
     pnl: e.pnl.mtd !== 0 || e.pnl.ytd !== 0,
   };
