@@ -53,6 +53,27 @@ export type Riesgo = {
 
 const redondear = (v: number, d = 2) => Math.round(v * 10 ** d) / 10 ** d;
 
+/**
+ * ¿Esta fila es un futuro?
+ *
+ * La convención del módulo es que un futuro lleva `option_type` en NULL: es lo
+ * que produce el extracto del bróker y lo que asumen `posiciones.ts` y
+ * `tablero-imagen.ts`. Aquí se comparaba contra la cadena «FUTURE», que no
+ * aparece en ningún dato real — así que los futuros NUNCA se contaron.
+ *
+ * No era cosmético: un FUTURO VENDIDO es la cobertura principal, y
+ * `contratosCubriendo` lo suma. Con este filtro roto, una cobertura hecha con
+ * futuros salía como cero por ciento cubierto.
+ *
+ * Se aceptan las dos escrituras a propósito: la real es el nulo, pero si algún
+ * día el extracto empieza a decir «FUTURE» o «FUT» tampoco se va a perder.
+ */
+function esFuturo(tipo: string | null): boolean {
+  if (tipo === null) return true;
+  const t = tipo.trim().toUpperCase();
+  return t === "" || t === "FUTURE" || t === "FUT" || t === "FUTURO";
+}
+
 export function calcularRiesgo(e: EntradaRiesgo): Riesgo {
   const toneladasFisicas = redondear(e.kgFisico / 1000, 4);
 
@@ -63,10 +84,10 @@ export function calcularRiesgo(e: EntradaRiesgo): Riesgo {
     .filter((p) => p.option_type === "CALL" && p.short_qty > 0)
     .reduce((a, p) => a + p.short_qty, 0);
   const futurosLargos = e.posiciones
-    .filter((p) => p.option_type === "FUTURE" && p.long_qty > 0)
+    .filter((p) => esFuturo(p.option_type) && p.long_qty > 0)
     .reduce((a, p) => a + p.long_qty, 0);
   const futurosCortos = e.posiciones
-    .filter((p) => p.option_type === "FUTURE" && p.short_qty > 0)
+    .filter((p) => esFuturo(p.option_type) && p.short_qty > 0)
     .reduce((a, p) => a + p.short_qty, 0);
 
   // Cubre lo que protege de una CAÍDA del precio: los puts comprados y los

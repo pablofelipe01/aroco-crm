@@ -26,7 +26,10 @@ test("un futuro COMPRADO no cuenta como cobertura", () => {
   const r = calcularRiesgo({
     ...base,
     kgFisico: 100_000,
-    posiciones: [{ option_type: "FUTURE", long_qty: 5, short_qty: 0, strike: null, contract_month: "DEC26" }],
+    // `option_type` NULO es como llega un futuro del extracto de verdad. Los
+    // tests decían "FUTURE", que no aparece en ningún dato real, y por eso el
+    // filtro roto de `calcularRiesgo` pasó meses sin que nadie lo notara.
+    posiciones: [{ option_type: null, long_qty: 5, short_qty: 0, strike: null, contract_month: "DEC26" }],
   });
   assert.equal(r.toneladasCubiertas, 0);
   assert.equal(r.contratos.futurosLargos, 5);
@@ -38,7 +41,7 @@ test("puts largos y futuros cortos sí cubren", () => {
     kgFisico: 100_000, // 100 t
     posiciones: [
       { option_type: "PUT", long_qty: 3, short_qty: 0, strike: 5500, contract_month: "DEC26" },
-      { option_type: "FUTURE", long_qty: 0, short_qty: 2, strike: null, contract_month: "DEC26" },
+      { option_type: null, long_qty: 0, short_qty: 2, strike: null, contract_month: "DEC26" },
     ],
   });
   assert.equal(r.toneladasCubiertas, 5 * TONELADAS_POR_CONTRATO);
@@ -138,4 +141,29 @@ test("el collar de marzo se reconoce cuando SÍ es el estado vigente", () => {
   });
   assert.deepEqual(r.collar, { piso: 3250, techo: 3300 });
   assert.equal(r.toneladasCubiertas, 20, "2 puts × 10 t");
+});
+
+test("un futuro se reconoce venga como venga escrito", () => {
+  // El dato real trae `option_type` en null. Se aceptan las otras escrituras
+  // por si el extracto cambia, pero la que manda es el nulo.
+  const base = { kgFisico: 100_000, costoPromedioCopKg: null, precioCacaoUsdT: null, trm: null };
+  for (const tipo of [null, "", "FUTURE", "FUT", "futuro"]) {
+    const r = calcularRiesgo({
+      ...base,
+      posiciones: [{ option_type: tipo, long_qty: 0, short_qty: 3, strike: null, contract_month: "DEC26" }],
+    });
+    assert.equal(r.contratos.futurosCortos, 3, `no contó el futuro con option_type=${JSON.stringify(tipo)}`);
+    // Y un futuro VENDIDO cubre: 3 contratos × 10 t = 30 t.
+    assert.equal(r.toneladasCubiertas, 30);
+  }
+});
+
+test("una opción no se confunde con un futuro", () => {
+  const r = calcularRiesgo({
+    kgFisico: 100_000, costoPromedioCopKg: null, precioCacaoUsdT: null, trm: null,
+    posiciones: [{ option_type: "PUT", long_qty: 0, short_qty: 4, strike: 6000, contract_month: "DEC26" }],
+  });
+  assert.equal(r.contratos.futurosCortos, 0);
+  // Un put VENDIDO tampoco cubre: solo cuentan los comprados.
+  assert.equal(r.toneladasCubiertas, 0);
 });
