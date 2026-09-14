@@ -59,6 +59,9 @@ export type PosicionNormalizada = {
   exchange: string;
   strike: number | null;
   settle_price: number | null;
+  open_price: number | null;
+  avg_price: number | null;
+  last_trade_date: string | null;
   market_value: number | null;
   dr_cr: string | null;
 };
@@ -177,6 +180,9 @@ export function normalizarPosicion(
       exchange: txt(primero(p, ["exchange"])) ?? "ICE COCOA",
       strike: num(primero(p, ["strike"])),
       settle_price: num(primero(p, ["settle_price", "settlePrice", "settle"])),
+      open_price: num(primero(p, ["open_price", "openPrice"])),
+      avg_price: num(primero(p, ["avg_price", "avgPrice"])),
+      last_trade_date: txt(primero(p, ["last_trade_date", "lastTradeDate"])),
       market_value: mv,
       dr_cr: txt(primero(p, ["dr_cr", "drCr"])) ?? (mv !== null && mv < 0 ? "DR" : "CR"),
     };
@@ -194,6 +200,9 @@ export function normalizarPosicion(
     exchange: t.exchange,
     strike: t.strike,
     settle_price: t.settle_price,
+    open_price: t.open_price,
+    avg_price: t.avg_price,
+    last_trade_date: t.last_trade_date,
     market_value: t.market_value,
     dr_cr: t.dr_cr,
   };

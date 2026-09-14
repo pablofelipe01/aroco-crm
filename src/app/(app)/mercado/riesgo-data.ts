@@ -85,6 +85,28 @@ export type DatosMercado = {
    */
   cobertura: { efectivaT: number; sinDeltaT: number } | null;
   /**
+   * Los contratos abiertos, uno por uno, tal como los declara el extracto.
+   *
+   * La pantalla solo tenía un contador —«futuros comprados: 1»— que no
+   * responde nada de lo que uno se pregunta mirando una posición: a cómo
+   * entré, cuánto llevo, cuándo vence, desde qué precio vuelvo a cero.
+   */
+  contratos: {
+    fecha: string | null;
+    instrumento: "Futuro" | "Call" | "Put";
+    contrato: string | null;
+    strike: number | null;
+    lado: "comprado" | "vendido" | null;
+    cantidad: number;
+    toneladas: number;
+    apertura: number | null;
+    cierre: number | null;
+    vence: string | null;
+    flotante: number | null;
+    /** Cuánto tiene que moverse el contrato para volver a cero, en USD/t. */
+    paraEmpatar: number | null;
+  }[];
+  /**
    * Lo anotado a mano durante el día y su efecto sobre la posición.
    *
    * `superados` son los que el extracto ya debería recoger: se enseñan para
@@ -135,7 +157,7 @@ export async function cargarMercado(
       .order("entry_date", { ascending: false, nullsFirst: false }),
     db.from("account_balance").select("*").order("statement_date", { ascending: false }).limit(1),
     db.from("broker_pnl").select("*").order("statement_date", { ascending: false }).limit(1),
-    db.from("broker_positions").select("option_type, long_qty, short_qty, strike, contract_month, statement_date").order("statement_date", { ascending: false }),
+    db.from("broker_positions").select("option_type, long_qty, short_qty, strike, contract_month, statement_date, open_price, avg_price, settle_price, last_trade_date, market_value, trade_date").order("statement_date", { ascending: false }),
     db.from("options_board").select("id, date, contract_month, underlying_price").not("underlying_price", "is", null).order("date", { ascending: false }).order("contract_month").limit(60),
     db.from("trm_data").select("date, trm").order("date", { ascending: false }).limit(1),
     db
@@ -234,6 +256,59 @@ export async function cargarMercado(
     ultimaFecha,
   );
   const posiciones: PosicionBroker[] = efectivas.posiciones;
+
+  /**
+   * El detalle de cada contrato abierto, para poder enseñarlo.
+   *
+   * Sale del extracto y NO del solape manual: lo anotado a mano no trae precio
+   * de apertura ni vencimiento, así que mezclarlos daría filas a medias. El
+   * solape se enseña aparte, en su propia tarjeta.
+   */
+  const contratos = delExtracto
+    .map((p) => {
+      const fila = p as PosicionBroker & {
+        open_price: number | string | null;
+        settle_price: number | string | null;
+        last_trade_date: string | null;
+        market_value: number | string | null;
+        trade_date: string | null;
+      };
+      const n = (v: number | string | null) => (v === null ? null : Number(v));
+      const largo = fila.long_qty > 0;
+      const cantidad = largo ? fila.long_qty : fila.short_qty;
+      const apertura = n(fila.open_price);
+      const cierre = n(fila.settle_price);
+      const tipo = (fila.option_type ?? "").toUpperCase();
+
+      return {
+        fecha: fila.trade_date,
+        instrumento: (tipo === "CALL" ? "Call" : tipo === "PUT" ? "Put" : "Futuro") as
+          | "Futuro"
+          | "Call"
+          | "Put",
+        contrato: fila.contract_month,
+        strike: fila.strike === null ? null : Number(fila.strike),
+        lado: (cantidad === 0 ? null : largo ? "comprado" : "vendido") as
+          | "comprado"
+          | "vendido"
+          | null,
+        cantidad,
+        toneladas: cantidad * 10,
+        apertura,
+        cierre,
+        vence: fila.last_trade_date,
+        flotante: n(fila.market_value),
+        // Cuánto le falta al contrato para volver al precio de entrada. En un
+        // comprado hay que subir; en un vendido, bajar.
+        paraEmpatar:
+          apertura !== null && cierre !== null
+            ? Math.round((apertura - cierre) * 100) / 100
+            : null,
+      };
+    })
+    // Las que quedaron sin lado no se esconden: son el aviso de que el extracto
+    // trajo contratos que no se pudieron interpretar.
+    .sort((a, b) => (b.cantidad || 0) - (a.cantidad || 0));
 
   // La cadena entera del vencimiento elegido: es lo que se pinta en pantalla.
   const { data: cadenaFilas } = board
@@ -413,6 +488,7 @@ export async function cargarMercado(
       momento,
       cierrePrevio,
     },
+    contratos,
     manual: {
       fechaExtracto: ultimaFecha,
       aplicados: efectivas.aplicados,

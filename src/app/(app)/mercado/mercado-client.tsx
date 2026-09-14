@@ -13,6 +13,7 @@ import { useToast } from "@/components/ui/toast";
 import { sincronizarAhora, subirTablero } from "./actions";
 import { AnalistaMercado } from "./analista";
 import { PosicionesManuales } from "./posiciones-manuales";
+import { PosicionesAbiertas } from "./posiciones-abiertas";
 import { Modal } from "@/components/ui/modal";
 import { Field, Input, Select } from "@/components/ui/input";
 import { PageHeader } from "@/components/ui/page-header";
@@ -331,8 +332,14 @@ export function MercadoClient({
           </Card>
         )}
 
-        {/* Va ANTES de la cadena: cuando alguien acaba de operar, lo primero
-            que busca es si su movimiento está reflejado, no los strikes. */}
+        {/* Primero QUÉ hay abierto, después lo que se movió hoy. El contador
+            de la tarjeta de cobertura dice cuántos contratos hay; esto dice
+            cuáles, a cómo se entró y cuánto llevan. */}
+        <PosicionesAbiertas
+          contratos={d.contratos}
+          fechaExtracto={d.manual.fechaExtracto}
+        />
+
         <PosicionesManuales manual={d.manual} />
 
         <CadenaOpciones

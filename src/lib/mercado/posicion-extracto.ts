@@ -32,6 +32,7 @@ export type PosicionCruda = {
   avg_price?: unknown;
   ote_amount?: unknown;
   ote_sign?: unknown;
+  last_trade_date?: unknown;
 };
 
 const txt = (v: unknown): string | null => {
@@ -200,6 +201,11 @@ export type PosicionTraducida = {
   exchange: string;
   strike: number | null;
   settle_price: number | null;
+  /** A cómo se abrió. Sin esto no hay punto de equilibrio que enseñar. */
+  open_price: number | null;
+  avg_price: number | null;
+  /** Último día de negociación: la fecha que nadie miró en el primer collar. */
+  last_trade_date: string | null;
   market_value: number | null;
   dr_cr: string | null;
   /** Por qué la posición quedó sin cantidades, cuando queda sin ellas. */
@@ -215,11 +221,17 @@ export function traducirPosicion(
   const contratos = Math.abs(Math.trunc(num(p.qty) ?? 0));
   const lado = ladoDe(p);
 
+  // Los precios se escalan una sola vez, aquí, y con la escala ya comprobada
+  // contra el flotante. Dejarlos crudos obligaría a repetir la comprobación en
+  // cada pantalla, y bastaría con que una se olvidara para publicar un precio
+  // de cacao con dos ceros de menos.
   const escala = escalaDePrecio(p);
   const cierre = num(p.close_price);
   const apertura = num(p.open_price);
-  const base = cierre ?? apertura;
-  const settle = escala !== null && base !== null ? base * escala : null;
+  const promedio = num(p.avg_price);
+  const escalar = (v: number | null) =>
+    escala !== null && v !== null ? Math.round(v * escala * 10_000) / 10_000 : null;
+  const settle = escalar(cierre ?? apertura);
 
   const flotante = num(p.ote_amount);
   const signo = txt(p.ote_sign)?.toLowerCase();
@@ -237,6 +249,9 @@ export function traducirPosicion(
     exchange: contrato?.replace(/^[A-Z]{3}\s*\d{2}\s*/i, "").trim() || "ICE COCOA",
     strike,
     settle_price: settle,
+    open_price: escalar(apertura),
+    avg_price: escalar(promedio),
+    last_trade_date: fechaOperacion(p.last_trade_date, fechaExtracto),
     market_value,
     dr_cr: market_value !== null && market_value < 0 ? "DR" : "CR",
     sinLado: lado === null && contratos > 0,

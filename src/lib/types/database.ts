@@ -250,6 +250,9 @@ export type Database = {
           exchange: string | null;
           strike: number | null;
           settle_price: number | null;
+          last_trade_date: string | null;
+          avg_price: number | null;
+          open_price: number | null;
           market_value: number | null;
           dr_cr: string | null;
           created_at: string;
@@ -267,6 +270,9 @@ export type Database = {
           exchange?: string | null;
           strike?: number | null;
           settle_price?: number | null;
+          last_trade_date?: string | null;
+          avg_price?: number | null;
+          open_price?: number | null;
           market_value?: number | null;
           dr_cr?: string | null;
           created_at?: string;
@@ -284,6 +290,9 @@ export type Database = {
           exchange?: string | null;
           strike?: number | null;
           settle_price?: number | null;
+          last_trade_date?: string | null;
+          avg_price?: number | null;
+          open_price?: number | null;
           market_value?: number | null;
           dr_cr?: string | null;
           created_at?: string;

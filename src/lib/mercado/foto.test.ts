@@ -97,6 +97,8 @@ const base: DatosMercado = {
     cierrePrevio: 6390,
   },
   cobertura: null,
+  // Sin contratos abiertos en el extracto de esta foto.
+  contratos: [],
   // Sin nada anotado a mano: la posición es la del extracto tal cual.
   manual: {
     fechaExtracto: "2026-08-28",
