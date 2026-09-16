@@ -3,6 +3,9 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { serverEnv } from "@/lib/env";
+import { sincronizarComisiones } from "@/lib/comisiones/sync";
 import { getSessionContext } from "@/lib/auth";
 import {
   simulateCommission,
@@ -130,4 +133,62 @@ export async function deleteMonthlyTonnage(id: string): Promise<ActionResult> {
   if (error) return { ok: false, error: error.message };
   revalidatePath("/comisiones");
   return { ok: true };
+}
+
+/**
+ * Lee la hoja de liquidación AHORA, sin esperar al cron.
+ *
+ * Hace falta por cómo trabaja Nicolás: la hoja liquida un mes a la vez y él
+ * cierra varios en una sesión, cambiando el parámetro «Mes a liquidar». El
+ * cron solo ve el que esté puesto a las 12:45 UTC, así que cerrar mayo por la
+ * mañana y pasar a junio antes del mediodía deja mayo sin capturar para
+ * siempre. Es lo que pasó con mayo, junio y julio.
+ *
+ * Con esto, cada mes que cierre se guarda en el momento y el cron queda como
+ * respaldo. Corre con `service_role` como el cron —las tablas de liquidación
+ * no aceptan escritura desde una sesión— pero solo después de comprobar el
+ * permiso, que es lo que la llave de servicio se saltaría.
+ */
+export async function importarLiquidacionAhora(): Promise<
+  ActionResult & { mes?: string; lineas?: number; sinAsignar?: string[] }
+> {
+  const session = await getSessionContext();
+  if (!session?.profile?.ve_comisiones_todas) {
+    return { ok: false, error: "Solo Dirección puede importar la liquidación." };
+  }
+
+  try {
+    const res = await fetch(serverEnv.COMISIONES_SHEET_CSV_URL, {
+      cache: "no-store",
+      redirect: "follow",
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status} al leer la hoja`);
+    const csv = await res.text();
+    if (csv.trimStart().startsWith("<!DOCTYPE")) {
+      throw new Error("La hoja no devolvió CSV (¿dejó de estar compartida?).");
+    }
+
+    const db = createAdminClient();
+    const r = await sincronizarComisiones(db, csv);
+
+    await db.from("inventory_sync_runs").insert({
+      source: "comisiones_sheet",
+      status: "ok",
+      rows_read: r.lineas + r.operaciones,
+      duration_ms: 0,
+      error: `Importado a mano por ${session.profile.full_name}${
+        r.sinAsignar.length ? ` · sin asignar: ${r.sinAsignar.join(", ")}` : ""
+      }`,
+    });
+
+    revalidatePath("/comisiones");
+    return {
+      ok: true,
+      mes: `${r.mesNombre} ${r.anio}`,
+      lineas: r.lineas,
+      sinAsignar: r.sinAsignar,
+    };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Error desconocido." };
+  }
 }

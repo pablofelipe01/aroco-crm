@@ -2,13 +2,16 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, Receipt, UserX } from "lucide-react";
+import { AlertTriangle, Receipt, RefreshCw, UserX } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardBody } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select } from "@/components/ui/input";
 import { StatCard } from "@/components/ui/stat-card";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Button } from "@/components/ui/button";
+import { useToast } from "@/components/ui/toast";
 import { formatCOP, formatDate, formatNumber, cn } from "@/lib/utils";
+import { importarLiquidacionAhora } from "./actions";
 
 /**
  * La liquidación del mes, tal como la cerró Nicolás en la hoja.
@@ -74,6 +77,47 @@ const MESES = [
 
 const etiquetaMes = (anio: number, mes: number) => `${MESES[mes] ?? mes} ${anio}`;
 
+/**
+ * Trae el mes que esté puesto en la hoja, sin esperar al cron.
+ *
+ * La hoja liquida un mes a la vez y Nicolás cierra varios en una sesión. El
+ * cron solo ve el que esté seleccionado a las 12:45 UTC, así que cerrar mayo
+ * por la mañana y pasar a junio antes del mediodía dejaba mayo sin capturar
+ * para siempre — es lo que pasó con mayo, junio y julio.
+ */
+function BotonImportar({ onHecho }: { onHecho: () => void }) {
+  const { toast } = useToast();
+  const [cargando, setCargando] = React.useState(false);
+
+  return (
+    <Button
+      size="sm"
+      variant="secondary"
+      loading={cargando}
+      onClick={async () => {
+        setCargando(true);
+        const r = await importarLiquidacionAhora();
+        setCargando(false);
+        if (!r.ok) {
+          toast({ tone: "error", title: "No se pudo importar", description: r.error });
+          return;
+        }
+        toast({
+          tone: r.sinAsignar?.length ? "warn" : "success",
+          title: `${r.mes} importado`,
+          description: r.sinAsignar?.length
+            ? `Sin asignar a nadie: ${r.sinAsignar.join(", ")}`
+            : `${r.lineas} comerciales`,
+        });
+        onHecho();
+      }}
+    >
+      <RefreshCw className="h-3.5 w-3.5" />
+      Importar el mes de la hoja
+    </Button>
+  );
+}
+
 export function Liquidacion({
   periodo,
   lineas,
@@ -105,7 +149,8 @@ export function Liquidacion({
           <EmptyState
             icon={<Receipt className="h-6 w-6" />}
             title="Todavía no hay ninguna liquidación"
-            description="Se lee de la hoja cada día a las 12:45 UTC. Si acabas de cerrar un mes, espera a la próxima corrida."
+            description="Se lee de la hoja cada día a las 12:45 UTC. Si acabas de cerrar un mes, tráelo ahora."
+            action={<BotonImportar onHecho={() => router.refresh()} />}
           />
         </CardBody>
       </Card>
@@ -137,6 +182,7 @@ export function Liquidacion({
               leída el {formatDate(periodo.syncedAt)}
             </span>
           )}
+          {veTodo && <BotonImportar onHecho={() => router.refresh()} />}
           <Select
             value={seleccion ? `${seleccion.anio}-${seleccion.mes}` : ""}
             onChange={(e) => {
@@ -166,6 +212,7 @@ export function Liquidacion({
             <StatCard
               label="Toneladas despachadas"
               value={Number(periodo.toneladas.toFixed(2))}
+              decimals={2}
               suffix=" t"
               hint={
                 periodo.umbralSeniorTon
@@ -175,9 +222,15 @@ export function Liquidacion({
             />
             <StatCard
               label="Utilidad del mes"
-              value={Math.round(periodo.utilidad / 1_000_000)}
+              // Dos decimales y la cifra exacta debajo. Redondear a millones
+              // enteros convertía $44.784.953 en «$45 M», y en una liquidación
+              // que se compara contra un Excel al peso, esa diferencia parece
+              // un error del CRM.
+              value={Math.round((periodo.utilidad / 1_000_000) * 100) / 100}
+              decimals={2}
               prefix="$ "
               suffix=" M"
+              hint={formatCOP(periodo.utilidad)}
             />
             <StatCard
               label="Total a pagar"

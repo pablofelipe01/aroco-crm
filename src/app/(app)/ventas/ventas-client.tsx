@@ -105,6 +105,7 @@ export function VentasClient({
         <StatCard
           label={t.ventas.vendidoAnio}
           value={Number((v.kgAnio / 1000).toFixed(1))}
+          decimals={1}
           suffix=" t"
           icon={Truck}
           hint={`${v.avancePct.toFixed(1)}% ${t.ventas.deLaMeta}`}
@@ -125,6 +126,7 @@ export function VentasClient({
         <StatCard
           label={t.ventas.faltaMeta}
           value={Number((faltan / 1000).toFixed(1))}
+          decimals={1}
           suffix=" t"
           icon={Target}
           hint={`${t.ventas.meta} ${f.numero(v.meta / 1000)} t`}
@@ -132,6 +134,7 @@ export function VentasClient({
         <StatCard
           label={t.ventas.proyeccionCierre}
           value={Number((v.proyeccionUltimosMeses / 1000).toFixed(1))}
+          decimals={1}
           suffix=" t"
           icon={TrendingUp}
           hint={`${t.ventas.alRitmoDe} ${v.mesesUsadosEnProyeccion} ${t.ventas.meses}`}

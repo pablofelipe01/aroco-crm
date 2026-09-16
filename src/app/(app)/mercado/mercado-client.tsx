@@ -163,7 +163,7 @@ export function MercadoClient({
                 : t.mercado.sinPrecio
             }
           />
-          <StatCard label={t.mercado.valorizacion} value={Math.round((r.pnlFisicoCop ?? 0) / 1_000_000)} prefix="$ " suffix=" M" icon={Coins}
+          <StatCard label={t.mercado.valorizacion} value={Math.round(((r.pnlFisicoCop ?? 0) / 1_000_000) * 100) / 100} decimals={2} prefix="$ " suffix=" M" icon={Coins}
             hint={t.mercado.contraCosto} />
         </motion.div>
 

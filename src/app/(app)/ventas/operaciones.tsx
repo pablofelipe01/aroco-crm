@@ -95,11 +95,16 @@ export function OperacionesMargen({ operaciones }: { operaciones: OperacionVista
           <StatCard
             label="Kilos"
             value={Number((kg / 1000).toFixed(1))}
+            decimals={1}
             suffix=" t"
           />
           <StatCard
             label="Margen"
-            value={Math.round(margen / 1_000_000)}
+            // Dos decimales sobre los millones: redondear a entero convierte
+            // $44,78 M en «$45 M» y la cifra exacta se pierde de vista. Va
+            // completa en el pie de la tarjeta.
+            value={Math.round((margen / 1_000_000) * 100) / 100}
+            decimals={2}
             prefix="$ "
             suffix=" M"
             hint={
