@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { serverEnv } from "@/lib/env";
 import { sincronizarComisiones } from "@/lib/comisiones/sync";
+import { rehacerMesesFaltantes } from "@/lib/comisiones/rehacer";
 import { getSessionContext } from "@/lib/auth";
 import {
   simulateCommission,
@@ -187,6 +188,46 @@ export async function importarLiquidacionAhora(): Promise<
       mes: `${r.mesNombre} ${r.anio}`,
       lineas: r.lineas,
       sinAsignar: r.sinAsignar,
+    };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Error desconocido." };
+  }
+}
+
+/**
+ * Rehace los meses que la hoja nunca alcanzó a dejar en el CRM.
+ *
+ * No pisa lo que Nicolás cerró: un mes de la hoja es la afirmación de lo que
+ * se paga, y uno calculado una reconstrucción. Cuando existen los dos, manda
+ * el de la hoja.
+ */
+export async function rehacerMeses(): Promise<
+  ActionResult & { calculados?: number; respetados?: number; detalle?: string }
+> {
+  const session = await getSessionContext();
+  if (!session?.profile?.ve_comisiones_todas) {
+    return { ok: false, error: "Solo Dirección puede rehacer la liquidación." };
+  }
+
+  try {
+    const res = await fetch(serverEnv.COMISIONES_SHEET_CSV_URL, {
+      cache: "no-store",
+      redirect: "follow",
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status} al leer la hoja`);
+    const csv = await res.text();
+
+    const db = createAdminClient();
+    const r = await rehacerMesesFaltantes(db, csv);
+
+    revalidatePath("/comisiones");
+    return {
+      ok: true,
+      calculados: r.calculados.length,
+      respetados: r.respetados.length,
+      detalle: r.calculados.length
+        ? r.calculados.map((c) => `${c.mes}/${c.anio}`).join(", ")
+        : undefined,
     };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Error desconocido." };

@@ -56,13 +56,49 @@ export function numero(v: string): number {
   return negativo ? -n : n;
 }
 
-/** «13/08/2026» → «2026-08-13»; también acepta ya-ISO. */
+/** Meses abreviados como los escribe la hoja: «17-feb-26». */
+const MES_ABREVIADO: Record<string, string> = {
+  ene: "01", feb: "02", mar: "03", abr: "04", may: "05", jun: "06",
+  jul: "07", ago: "08", sep: "09", set: "09", oct: "10", nov: "11", dic: "12",
+};
+
+/**
+ * Fecha a ISO, en los tres formatos que aparecen de verdad en la hoja.
+ *
+ * El que manda es «17-feb-26» —día, mes abreviado en español y año de dos
+ * cifras—. Al escribir el parser supuse «13/08/2026» y construí el fixture con
+ * ese formato, así que las pruebas pasaban en verde mientras la columna real
+ * no se leía: las 54 operaciones entraron con la fecha en null y el módulo de
+ * comisiones no podía agrupar por mes.
+ *
+ * La lección va escrita aquí para el próximo: el fixture se saca de los datos,
+ * no de lo que uno se imagina que traen.
+ */
 export function fechaISO(v: string): string | null {
   const s = (v ?? "").trim();
+  if (!s) return null;
   if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
-  const m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(s);
-  if (!m) return null;
-  return `${m[3]}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}`;
+
+  // «17-feb-26» · «6-mar-2026» · «31-dic-25»
+  const abrev = /^(\d{1,2})[-\s]([a-zA-Záéíóú]{3,10})\.?[-\s](\d{2,4})$/.exec(s);
+  if (abrev) {
+    const clave = abrev[2]
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .slice(0, 3);
+    const mes = MES_ABREVIADO[clave];
+    if (!mes) return null;
+    const anio = abrev[3].length === 4 ? abrev[3] : `20${abrev[3]}`;
+    return `${anio}-${mes}-${abrev[1].padStart(2, "0")}`;
+  }
+
+  const barras = /^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/.exec(s);
+  if (barras) {
+    const anio = barras[3].length === 4 ? barras[3] : `20${barras[3]}`;
+    return `${anio}-${barras[2].padStart(2, "0")}-${barras[1].padStart(2, "0")}`;
+  }
+  return null;
 }
 
 export type OperacionVenta = {

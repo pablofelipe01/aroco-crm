@@ -1044,6 +1044,7 @@ export type Database = {
           share_vendedor: number | null; share_comprador: number | null;
           transporte_kg: number | null; seleccion_kg: number | null;
           toneladas: number; utilidad: number; total_comisiones: number; suma_lineas: number;
+          origen: string;
           synced_at: string; created_at: string; updated_at: string;
         };
         Insert: {
@@ -1052,6 +1053,7 @@ export type Database = {
           share_vendedor?: number | null; share_comprador?: number | null;
           transporte_kg?: number | null; seleccion_kg?: number | null;
           toneladas?: number; utilidad?: number; total_comisiones?: number; suma_lineas?: number;
+          origen?: string;
           synced_at?: string; created_at?: string; updated_at?: string;
         };
         Update: {
@@ -1060,6 +1062,7 @@ export type Database = {
           share_vendedor?: number | null; share_comprador?: number | null;
           transporte_kg?: number | null; seleccion_kg?: number | null;
           toneladas?: number; utilidad?: number; total_comisiones?: number; suma_lineas?: number;
+          origen?: string;
           synced_at?: string; created_at?: string; updated_at?: string;
         };
         Relationships: [];
@@ -1072,6 +1075,7 @@ export type Database = {
           nivel: string | null; pct_techo: number | null;
           utilidad_venta: number; utilidad_compra: number;
           comision_venta: number; comision_compra: number; total_pagar: number;
+          origen: string;
           created_at: string;
         };
         Insert: {
@@ -1081,6 +1085,7 @@ export type Database = {
           nivel?: string | null; pct_techo?: number | null;
           utilidad_venta?: number; utilidad_compra?: number;
           comision_venta?: number; comision_compra?: number; total_pagar?: number;
+          origen?: string;
           created_at?: string;
         };
         Update: {
@@ -1090,6 +1095,7 @@ export type Database = {
           nivel?: string | null; pct_techo?: number | null;
           utilidad_venta?: number; utilidad_compra?: number;
           comision_venta?: number; comision_compra?: number; total_pagar?: number;
+          origen?: string;
           created_at?: string;
         };
         Relationships: [];

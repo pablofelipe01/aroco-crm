@@ -39,7 +39,7 @@ const i = (nombre: string, ocurrencia = 1) => {
 function fila(cambios: Record<number, string> = {}): string[] {
   const f = new Array(ENC.length).fill("");
   f[i("CLIENTE DESTINO")] = "LUKER";
-  f[i("FECHA  LLEGADA BTA")] = "13/08/2026";
+  f[i("FECHA  LLEGADA BTA")] = "13-ago-26";
   f[i("ODC")] = "ODC-52";
   f[i("REMISION AROCO")] = "2142";
   f[i("RECEPCION")] = "2411";
@@ -76,10 +76,23 @@ test("los montos en formato colombiano se leen con su signo", () => {
   assert.equal(numero(""), 0);
 });
 
-test("las fechas se pasan a ISO", () => {
+test("las fechas se leen en el formato REAL de la hoja", () => {
+  // Estos son los valores que trae la columna de verdad. El fixture original
+  // usaba «13/08/2026», un formato que no aparece en la hoja, así que la
+  // prueba pasaba en verde mientras las 54 operaciones entraban sin fecha.
+  assert.equal(fechaISO("17-feb-26"), "2026-02-17");
+  assert.equal(fechaISO("31-dic-25"), "2025-12-31");
+  assert.equal(fechaISO("6-mar-26"), "2026-03-06");
+  assert.equal(fechaISO("4-jun-2025"), "2025-06-04");
+
+  // Los otros dos formatos se siguen aceptando por si la hoja cambia.
   assert.equal(fechaISO("13/08/2026"), "2026-08-13");
+  assert.equal(fechaISO("1/8/26"), "2026-08-01");
   assert.equal(fechaISO("2026-08-13"), "2026-08-13");
+
   assert.equal(fechaISO("agosto"), null);
+  assert.equal(fechaISO("17-xyz-26"), null, "un mes que no existe no se inventa");
+  assert.equal(fechaISO(""), null);
 });
 
 test("los encabezados repetidos no se confunden entre sí", () => {

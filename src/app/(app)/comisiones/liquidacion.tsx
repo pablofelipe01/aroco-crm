@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, Receipt, RefreshCw, UserX } from "lucide-react";
+import { AlertTriangle, Calculator, Receipt, RefreshCw, UserX } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardBody } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select } from "@/components/ui/input";
@@ -11,7 +11,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
 import { formatCOP, formatDate, formatNumber, cn } from "@/lib/utils";
-import { importarLiquidacionAhora } from "./actions";
+import { importarLiquidacionAhora, rehacerMeses } from "./actions";
 
 /**
  * La liquidación del mes, tal como la cerró Nicolás en la hoja.
@@ -35,6 +35,8 @@ export type LiquidacionPeriodo = {
   totalComisiones: number;
   sumaLineas: number;
   umbralSeniorTon: number | null;
+  /** «hoja» = lo cerró Nicolás · «crm» = lo rehizo el CRM. */
+  origen: string;
   syncedAt: string;
 };
 
@@ -118,6 +120,49 @@ function BotonImportar({ onHecho }: { onHecho: () => void }) {
   );
 }
 
+/**
+ * Rehace los meses que nunca se capturaron, desde las operaciones.
+ *
+ * No toca los que cerró Nicolás: cuando existen los dos, manda el de la hoja.
+ */
+function BotonRehacer({ onHecho }: { onHecho: () => void }) {
+  const { toast } = useToast();
+  const [cargando, setCargando] = React.useState(false);
+
+  return (
+    <Button
+      size="sm"
+      variant="ghost"
+      loading={cargando}
+      onClick={async () => {
+        setCargando(true);
+        const r = await rehacerMeses();
+        setCargando(false);
+        if (!r.ok) {
+          toast({ tone: "error", title: "No se pudo rehacer", description: r.error });
+          return;
+        }
+        toast({
+          tone: "success",
+          title: r.calculados
+            ? `${r.calculados} ${r.calculados === 1 ? "mes calculado" : "meses calculados"}`
+            : "No faltaba ningún mes",
+          description: [
+            r.detalle,
+            r.respetados ? `${r.respetados} de la hoja, sin tocar` : null,
+          ]
+            .filter(Boolean)
+            .join(" · "),
+        });
+        onHecho();
+      }}
+    >
+      <Calculator className="h-3.5 w-3.5" />
+      Rehacer los que faltan
+    </Button>
+  );
+}
+
 export function Liquidacion({
   periodo,
   lineas,
@@ -129,7 +174,7 @@ export function Liquidacion({
   periodo: LiquidacionPeriodo | null;
   lineas: LiquidacionLinea[];
   operaciones: LiquidacionOperacion[];
-  meses: { anio: number; mes: number }[];
+  meses: { anio: number; mes: number; origen: string }[];
   seleccion: { anio: number; mes: number } | null;
   veTodo: boolean;
 }) {
@@ -182,6 +227,7 @@ export function Liquidacion({
               leída el {formatDate(periodo.syncedAt)}
             </span>
           )}
+          {veTodo && <BotonRehacer onHecho={() => router.refresh()} />}
           {veTodo && <BotonImportar onHecho={() => router.refresh()} />}
           <Select
             value={seleccion ? `${seleccion.anio}-${seleccion.mes}` : ""}
@@ -194,6 +240,7 @@ export function Liquidacion({
             {meses.map((p) => (
               <option key={`${p.anio}-${p.mes}`} value={`${p.anio}-${p.mes}`}>
                 {etiquetaMes(p.anio, p.mes)}
+                {p.origen === "crm" ? " · calculado" : ""}
               </option>
             ))}
           </Select>
@@ -201,11 +248,25 @@ export function Liquidacion({
       </CardHeader>
 
       <CardBody className="space-y-4">
-        <p className="text-xs text-fg-subtle">
-          Viene de la hoja que cierra Nicolás cada mes. El CRM todavía no la
-          calcula: para eso le falta la utilidad de cada operación, que hoy no
-          guarda.
-        </p>
+        {periodo?.origen === "crm" ? (
+          /* Un número calculado y uno que Nicolás cerró no valen lo mismo
+             cuando se trata de pagarle a alguien. La diferencia tiene que
+             verse antes que las cifras, no en una nota al pie. */
+          <div className="flex items-start gap-3 rounded-[var(--radius-md)] border border-info/40 bg-info-soft/40 p-3">
+            <Calculator className="mt-0.5 h-4 w-4 shrink-0 text-info" />
+            <p className="text-xs text-fg-muted">
+              <b>Este mes lo calculó el CRM</b>, no viene de la hoja: nunca se
+              capturó porque la hoja liquida un mes a la vez. Usa las mismas
+              reglas —el maestro de asignación, el umbral Senior y la matriz de
+              porcentajes— y reproduce septiembre al peso. Cuando Nicolás cierre
+              este mes en la hoja e importe, el suyo lo reemplaza.
+            </p>
+          </div>
+        ) : (
+          <p className="text-xs text-fg-subtle">
+            Viene de la hoja que cierra Nicolás cada mes.
+          </p>
+        )}
 
         {periodo && (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">

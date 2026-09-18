@@ -131,6 +131,16 @@ export type OperacionComision = {
   comisionComprador: number;
 };
 
+export type AsignacionMaestro = {
+  /** Palabra que se busca DENTRO del origen de la operación. */
+  clave: string;
+  proveedor: string;
+  vendedor: string;
+  comprador: string;
+};
+
+export type DestinoMercado = { destino: string; mercado: string };
+
 export type Liquidacion = {
   anio: number;
   mes: number;
@@ -146,6 +156,14 @@ export type Liquidacion = {
   seleccionKg: number;
   lineas: LineaComercial[];
   operaciones: OperacionComision[];
+  /**
+   * Quién se lleva el esfuerzo comercial de cada origen. La hoja lo llama
+   * «maestro de asignación» y es lo que permite saber, para una operación
+   * cualquiera, a quién le toca la comisión de compra.
+   */
+  maestro: AsignacionMaestro[];
+  /** Qué mercado es cada destino: decide el porcentaje que aplica. */
+  destinos: DestinoMercado[];
 };
 
 /**
@@ -256,6 +274,49 @@ export function parseLiquidacion(m: Matriz): Liquidacion {
     }
   }
 
+  // ── 3. Maestro de asignación y mercado por destino ────────────────────────
+  //
+  // Son los dos catálogos que convierten una operación suelta en una comisión:
+  // de quién es el esfuerzo comercial, y a qué mercado corresponde el destino.
+  // Sin ellos el CRM puede leer la liquidación pero no rehacerla.
+  const maestro: AsignacionMaestro[] = [];
+  const iMaestro = buscarFila(m, "3. MAESTRO DE ASIGNACION");
+  if (iMaestro >= 0) {
+    const iEncM = buscarFila(m, "Palabra clave", iMaestro);
+    if (iEncM >= 0) {
+      for (let i = iEncM + 1; i < m.length; i++) {
+        const clave = celda(m, i, 0);
+        // «REGLAS DE ENTRADA:…» cierra el bloque; es la nota, no una fila.
+        if (!clave || normalizar(clave).startsWith("reglas de entrada")) break;
+        if (normalizar(clave).startsWith("4.")) break;
+        maestro.push({
+          clave: clave.trim(),
+          proveedor: celda(m, i, 1),
+          vendedor: celda(m, i, 2),
+          comprador: celda(m, i, 3),
+        });
+      }
+    }
+  }
+
+  const destinos: DestinoMercado[] = [];
+  const iDest = (() => {
+    for (let i = 0; i < m.length; i++) {
+      for (let c = 0; c < (m[i]?.length ?? 0); c++) {
+        if (normalizar(m[i][c] ?? "").startsWith("mercado por destino")) return { fila: i, col: c };
+      }
+    }
+    return null;
+  })();
+  if (iDest) {
+    for (let i = iDest.fila + 2; i < m.length; i++) {
+      const destino = celda(m, i, iDest.col);
+      const mercado = celda(m, i, iDest.col + 1);
+      if (!destino) break;
+      destinos.push({ destino, mercado });
+    }
+  }
+
   return {
     anio,
     mes,
@@ -271,5 +332,7 @@ export function parseLiquidacion(m: Matriz): Liquidacion {
     seleccionKg: numero(valorDe(m, "Seleccion")),
     lineas,
     operaciones,
+    maestro,
+    destinos,
   };
 }

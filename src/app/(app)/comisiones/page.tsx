@@ -106,13 +106,15 @@ export default async function ComisionesPage({
 
   const { data: mesesData } = await supabase
     .from("comision_lineas")
-    .select("anio, mes")
+    .select("anio, mes, origen")
     .order("anio", { ascending: false })
     .order("mes", { ascending: false });
 
-  const meses: { anio: number; mes: number }[] = [];
+  const meses: { anio: number; mes: number; origen: string }[] = [];
   for (const m of mesesData ?? []) {
-    if (!meses.some((x) => x.anio === m.anio && x.mes === m.mes)) meses.push(m);
+    if (!meses.some((x) => x.anio === m.anio && x.mes === m.mes)) {
+      meses.push({ anio: m.anio, mes: m.mes, origen: m.origen });
+    }
   }
 
   const pedido = { anio: Number(anioParam), mes: Number(mesParam) };
@@ -172,6 +174,7 @@ export default async function ComisionesPage({
         totalComisiones: n(periodoData.total_comisiones),
         sumaLineas: n(periodoData.suma_lineas),
         umbralSeniorTon: periodoData.umbral_senior_ton === null ? null : n(periodoData.umbral_senior_ton),
+        origen: periodoData.origen,
         syncedAt: periodoData.synced_at,
       }
     : null;
