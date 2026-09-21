@@ -4,6 +4,9 @@
  * Funciones puras —sin base ni red— para poder probar el agrupado y el texto
  * sin mandar nada. El envío vive en `tareas-asignadas.ts`.
  */
+import { botonCorreo, escapar, fechaCorta, marcoCorreo, primerNombre, tarjetaTarea } from "./html";
+
+export { fechaCorta };
 
 export interface TareaCorreo {
   id: string;
@@ -70,29 +73,6 @@ export function agruparAsignaciones(filas: Asignacion[]): GrupoCorreo[] {
   return [...grupos.values()];
 }
 
-function escapar(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
-
-const MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
-
-/** «14-sep». El año solo si no es el actual: en un correo de hoy sobra. */
-export function fechaCorta(iso: string | null, hoy = new Date()): string | null {
-  const m = iso ? /^(\d{4})-(\d{2})-(\d{2})/.exec(iso) : null;
-  if (!m) return null;
-  const dia = `${Number(m[3])}-${MESES[Number(m[2]) - 1]}`;
-  return Number(m[1]) === hoy.getFullYear() ? dia : `${dia}-${m[1]}`;
-}
-
-function primerNombre(nombre: string): string {
-  return nombre.trim().split(/\s+/)[0] ?? nombre;
-}
-
 export function armarCorreoTareas(
   g: GrupoCorreo,
   baseUrl: string,
@@ -122,29 +102,24 @@ export function armarCorreoTareas(
   const enlace = unaSola ? `${base}/tareas?tarea=${unaSola.id}` : `${base}/tareas`;
   const boton = unaSola ? "Abrir la tarea" : "Ver mis tareas";
 
-  const html = `<!doctype html>
-<html lang="es"><body style="margin:0;padding:24px;background:#f6f5f2;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#1c1917">
-<table role="presentation" width="100%" style="max-width:560px;margin:0 auto;background:#ffffff;border:1px solid #e7e5e4;border-radius:12px">
-<tr><td style="padding:24px">
-<p style="margin:0 0 4px;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#78716c">AROCO · Tareas</p>
-<p style="margin:0 0 16px;font-size:15px">Hola, ${escapar(primerNombre(g.nombre))}. ${escapar(intro)}</p>
+  const html = marcoCorreo({
+    seccion: "Tareas",
+    cuerpo: `<p style="margin:0 0 16px;font-size:15px">Hola, ${escapar(primerNombre(g.nombre))}. ${escapar(intro)}</p>
 <ul style="margin:0 0 20px;padding:0;list-style:none">
 ${g.tareas
   .map((t) => {
     const vence = fechaCorta(t.vence, hoy);
-    const desc = t.descripcion ? t.descripcion.slice(0, 240) : "";
-    return `<li style="margin:0 0 10px;padding:10px 12px;border:1px solid #e7e5e4;border-radius:8px">
-<p style="margin:0;font-size:14px;font-weight:600">${escapar(t.nombre)}</p>
-${desc ? `<p style="margin:4px 0 0;font-size:13px;color:#57534e">${escapar(desc)}</p>` : ""}
-${vence ? `<p style="margin:4px 0 0;font-size:12px;color:#78716c">Vence el ${escapar(vence)}</p>` : ""}
-</li>`;
+    return tarjetaTarea({
+      nombre: t.nombre,
+      detalle: t.descripcion ? t.descripcion.slice(0, 240) : null,
+      nota: vence ? `Vence el ${vence}` : null,
+    });
   })
   .join("\n")}
 </ul>
-<a href="${escapar(enlace)}" style="display:inline-block;padding:10px 16px;border-radius:8px;background:#7c4a2d;color:#ffffff;text-decoration:none;font-size:14px;font-weight:600">${boton}</a>
-</td></tr></table>
-<p style="max-width:560px;margin:12px auto 0;font-size:11px;color:#a8a29e">Te llega porque eres responsable de estas tareas en el CRM de AROCO.</p>
-</body></html>`;
+${botonCorreo(boton, enlace)}`,
+    pie: "Te llega porque eres responsable de estas tareas en el CRM de AROCO.",
+  });
 
   const texto = [
     `Hola, ${primerNombre(g.nombre)}. ${intro}`,

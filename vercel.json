@@ -10,6 +10,14 @@
       "schedule": "0 21 * * *"
     },
     {
+      "path": "/api/cron/resumen-tareas?tipo=diario",
+      "schedule": "0 12 * * 1-5"
+    },
+    {
+      "path": "/api/cron/resumen-tareas?tipo=semanal",
+      "schedule": "5 12 * * 1"
+    },
+    {
       "path": "/api/cron/correos-tareas",
       "schedule": "30 13-23 * * 1-5"
     },

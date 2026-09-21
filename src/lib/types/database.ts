@@ -2943,6 +2943,39 @@ export type Database = {
         };
         Relationships: [];
       };
+      correos_resumenes: {
+        Row: {
+          created_at: string;
+          enviado_at: string | null;
+          estado: "enviando" | "enviado" | "error";
+          id: string;
+          motivo: string | null;
+          periodo: string;
+          team_member_id: string;
+          tipo: "diario" | "semanal";
+        };
+        Insert: {
+          created_at?: string;
+          enviado_at?: string | null;
+          estado?: "enviando" | "enviado" | "error";
+          id?: string;
+          motivo?: string | null;
+          periodo: string;
+          team_member_id: string;
+          tipo: "diario" | "semanal";
+        };
+        Update: {
+          created_at?: string;
+          enviado_at?: string | null;
+          estado?: "enviando" | "enviado" | "error";
+          id?: string;
+          motivo?: string | null;
+          periodo?: string;
+          team_member_id?: string;
+          tipo?: "diario" | "semanal";
+        };
+        Relationships: [];
+      };
       correos_tareas: {
         Row: {
           asignado_por: string | null;
