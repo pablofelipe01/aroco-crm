@@ -3,6 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { agruparActaPorTemas, extractActaTasks, type ActaContent } from "@/lib/ai/actas";
 import { hasGmailEnv, listActaMessageIds, fetchEmail } from "@/lib/gmail";
 import { serverEnv } from "@/lib/env";
+import { emparejarNombre, type Candidato } from "@/lib/actas/nombres";
 
 export interface IngestSummary {
   configured: boolean;
@@ -68,7 +69,7 @@ export async function ingestActasFromGmail(): Promise<IngestSummary> {
 
   const { data: team } = await db
     .from("team_members")
-    .select("id, name")
+    .select("id, name, profile_id")
     .eq("active", true);
   const members = team ?? [];
 
@@ -160,15 +161,20 @@ export async function ingestActasFromGmail(): Promise<IngestSummary> {
       // marca como restringida.
       if (attendees.length > 0) {
         const { data: profiles } = await db.from("profiles").select("id, email, full_name");
+        // El notetaker escribe el nombre completo y la cuenta suele tener el
+        // corto; el equipo guarda a veces el otro, así que cuentan los dos.
+        const candidatos: Candidato[] = [
+          ...(profiles ?? []).map((p) => ({ profileId: p.id, nombre: p.full_name })),
+          ...members.flatMap((m) => (m.profile_id ? [{ profileId: m.profile_id, nombre: m.name }] : [])),
+        ];
         const rows = attendees.map((raw) => {
           const isEmail = raw.includes("@");
           const value = raw.trim();
           const byEmail = isEmail
             ? (profiles ?? []).find((p) => p.email.toLowerCase() === value.toLowerCase())
             : undefined;
-          const byName = !isEmail
-            ? (profiles ?? []).find((p) => norm(p.full_name) === norm(value))
-            : undefined;
+          const profileId = !isEmail ? emparejarNombre(value, candidatos) : null;
+          const byName = (profiles ?? []).find((p) => p.id === profileId);
           const profile = byEmail ?? byName;
           return {
             meeting_id: meeting.id,

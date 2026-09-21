@@ -14,6 +14,7 @@
 import { config } from "dotenv";
 import { createClient } from "@supabase/supabase-js";
 import { extractActaAttendees } from "../src/lib/ai/actas";
+import { emparejarNombre } from "../src/lib/actas/nombres";
 import type { Database } from "../src/lib/types/database";
 
 config({ path: ".env.local" });
@@ -32,10 +33,6 @@ if (!process.env.ANTHROPIC_API_KEY) {
 const dry = process.argv.includes("--dry");
 const db = createClient<Database>(url, key, { auth: { persistSession: false } });
 
-/** minúsculas sin tildes, para que "Nicolás Rodríguez" case con "Nicolas Rodriguez". */
-const norm = (s: string) =>
-  s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
-
 async function main() {
   const [{ data: meetings }, { data: profiles }, { data: attendees }] = await Promise.all([
     db.from("meetings").select("id, title, meeting_date, notes").not("notes", "is", null),
@@ -46,6 +43,7 @@ async function main() {
   const yaTienen = new Set((attendees ?? []).map((a) => a.meeting_id));
   const pendientes = (meetings ?? []).filter((m) => !yaTienen.has(m.id));
   const people = profiles ?? [];
+  const candidatos = people.map((p) => ({ profileId: p.id, nombre: p.full_name }));
 
   console.log(
     `actas con texto: ${(meetings ?? []).length} · ya con invitados: ${yaTienen.size} · por procesar: ${pendientes.length}`,
@@ -67,14 +65,11 @@ async function main() {
 
     for (const raw of asistieron) {
       const isEmail = raw.includes("@");
+      const porNombre = isEmail ? null : emparejarNombre(raw, candidatos);
       const perfil = people.find((p) =>
-        isEmail
-          ? p.email.toLowerCase() === raw.toLowerCase()
-          : norm(p.full_name) === norm(raw) ||
-            // "Luis Ernesto Barrios" en el acta vs "Luis Barrios" en el perfil.
-            norm(p.full_name).split(" ").every((w) => norm(raw).includes(w)),
+        isEmail ? p.email.toLowerCase() === raw.toLowerCase() : p.id === porNombre,
       );
-      const clave = (perfil?.id ?? norm(raw)).toString();
+      const clave = perfil?.id ?? raw.trim().toLowerCase();
       if (vistos.has(clave)) continue;
       vistos.add(clave);
       if (!perfil) noResueltos.push(raw);
