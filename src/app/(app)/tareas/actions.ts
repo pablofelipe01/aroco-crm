@@ -195,3 +195,25 @@ export async function deleteTaskNote(id: string): Promise<ActionResult> {
   revalidatePath("/tareas");
   return { ok: true };
 }
+
+/**
+ * Resuelve una sugerencia de tarea repetida.
+ *
+ * Todo pasa en `resolver_tarea_parecida()` (0094), en una sola transacción y
+ * con la sesión de quien decide: unir toca dos tareas, sus responsables y las
+ * dos bitácoras, y a medio camino no puede quedar.
+ */
+export async function resolverParecida(
+  id: string,
+  decision: "misma" | "distinta",
+): Promise<ActionResult> {
+  await requireSession();
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("resolver_tarea_parecida", {
+    p_id: id,
+    p_decision: decision,
+  });
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/tareas");
+  return { ok: true, id };
+}

@@ -25,6 +25,7 @@ import {
   Trash2,
   Pencil,
   Archive,
+  Copy,
 } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
@@ -241,6 +242,44 @@ function FechasTarea({
   );
 }
 
+/**
+ * Aviso de que la IA cree que la tarea ya existía (0094). Abre la tarea, que
+ * es donde se decide; sin forma de abrirla es solo la etiqueta.
+ */
+function EtiquetaRepetida({
+  task,
+  onOpen,
+}: {
+  task: TaskWithPerson;
+  onOpen?: () => void;
+}) {
+  if (task.parecidas.length === 0) return null;
+  const titulo = `Parece repetida de «${task.parecidas[0]!.otra.name}»${
+    task.parecidas.length > 1 ? ` y ${task.parecidas.length - 1} más` : ""
+  }`;
+  const contenido = (
+    <Badge tone="warn">
+      <Copy className="h-3 w-3" />
+      ¿Repetida?
+    </Badge>
+  );
+  return onOpen ? (
+    <button
+      type="button"
+      onClick={onOpen}
+      title={titulo}
+      aria-label={`${titulo}. Abrir para decidir`}
+      className="shrink-0 rounded-full focus-visible:outline-2 focus-visible:outline-accent"
+    >
+      {contenido}
+    </button>
+  ) : (
+    <span title={titulo} className="shrink-0">
+      {contenido}
+    </span>
+  );
+}
+
 function TaskCard({
   task,
   onEdit,
@@ -269,6 +308,11 @@ function TaskCard({
         <p className="mt-1 line-clamp-2 text-xs text-fg-subtle">
           {task.description}
         </p>
+      )}
+      {task.parecidas.length > 0 && (
+        <div className="mt-2">
+          <EtiquetaRepetida task={task} onOpen={onEdit} />
+        </div>
       )}
       <div className="mt-2.5 flex items-center justify-between gap-2">
         <FechasTarea task={task} className="min-w-0 flex-wrap" />
@@ -436,6 +480,8 @@ export function TareasClient({
   const [fDepts, setFDepts] = React.useState<string[]>([]);
   const [fSources, setFSources] = React.useState<string[]>([]);
   const [fDue, setFDue] = React.useState<DueFilter>("");
+  // Solo las que la IA cree repetidas: la cola de revisión del equipo.
+  const [fRepetidas, setFRepetidas] = React.useState(false);
   const [formOpen, setFormOpen] = React.useState(false);
   const [editing, setEditing] = React.useState<TaskWithPerson | null>(null);
   const [calTask, setCalTask] = React.useState<TaskWithPerson | null>(null);
@@ -475,6 +521,7 @@ export function TareasClient({
         return false;
       if (fSources.length && !fSources.includes(t.source ?? SIN_ORIGEN)) return false;
       if (!matchesDue(t, fDue)) return false;
+      if (fRepetidas && t.parecidas.length === 0) return false;
       if (q) {
         const hay = `${t.name} ${t.description ?? ""} ${t.source ?? ""} ${gente
           .map((a) => a.name)
@@ -483,7 +530,13 @@ export function TareasClient({
       }
       return true;
     });
-  }, [tasks, query, fPeople, fStatus, fDepts, fSources, fDue]);
+  }, [tasks, query, fPeople, fStatus, fDepts, fSources, fDue, fRepetidas]);
+
+  /** Sugerencias pendientes, contadas una vez por par y no por tarea. */
+  const repetidasPendientes = React.useMemo(
+    () => new Set(tasks.flatMap((t) => t.parecidas.map((p) => p.id))).size,
+    [tasks],
+  );
 
   /** Áreas y orígenes que existen de verdad en los datos, no la lista teórica. */
   const areasDisponibles = React.useMemo(() => {
@@ -551,7 +604,8 @@ export function TareasClient({
     fStatus.length > 0 ||
     fDepts.length > 0 ||
     fSources.length > 0 ||
-    fDue !== "";
+    fDue !== "" ||
+    fRepetidas;
 
   function limpiarFiltros() {
     setQuery("");
@@ -560,6 +614,7 @@ export function TareasClient({
     setFDepts([]);
     setFSources([]);
     setFDue("");
+    setFRepetidas(false);
   }
 
   return (
@@ -663,6 +718,22 @@ export function TareasClient({
               onChange={setFSources}
               className="w-auto"
             />
+          )}
+          {repetidasPendientes > 0 && (
+            // Quita el filtro de persona al activarse: una tarea repetida
+            // suele estar a nombre de otro, y la revisión es de todo el equipo.
+            <Button
+              variant={fRepetidas ? "primary" : "secondary"}
+              size="sm"
+              aria-pressed={fRepetidas}
+              onClick={() => {
+                if (!fRepetidas) setFPeople([]);
+                setFRepetidas((v) => !v);
+              }}
+            >
+              <Copy className="h-3.5 w-3.5" />
+              Posibles repetidas ({repetidasPendientes})
+            </Button>
           )}
           {hasFilters && (
             <Button variant="ghost" size="sm" onClick={limpiarFiltros}>
@@ -818,6 +889,13 @@ export function TareasClient({
                     </p>
                   )}
                 </div>
+                <EtiquetaRepetida
+                  task={t}
+                  onOpen={() => {
+                    setEditing(t);
+                    setFormOpen(true);
+                  }}
+                />
                 <FechasTarea task={t} compacto className="shrink-0" />
                 <div className="flex shrink-0 items-center gap-1">
                   <button

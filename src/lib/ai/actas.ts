@@ -353,3 +353,174 @@ ${notes.slice(0, 24000)}`;
     })
     .filter((t): t is TemaExtraido => t !== null);
 }
+
+// ── Tareas repetidas entre actas ────────────────────────────────────────────
+//
+//  Un compromiso que no se cerró vuelve a salir en la reunión siguiente, con
+//  otras palabras, y el ingest lo crea otra vez. Se acordó que esto solo se
+//  SEÑALE: el modelo propone pares y una persona decide. Por eso la
+//  instrucción pide ser estricto — una sugerencia de más cuesta un clic, pero
+//  si abundan el equipo deja de mirarlas.
+
+export interface TareaParaComparar {
+  nombre: string;
+  descripcion: string | null;
+  responsables: string[];
+  /** Fecha del acta de donde salió, YYYY-MM-DD. */
+  fecha: string | null;
+}
+
+export interface ParecidaEncontrada {
+  /** Índice en la lista de tareas nuevas. */
+  nueva: number;
+  /** Índice en la lista de tareas existentes. */
+  existente: number;
+  motivo: string;
+}
+
+const PARECIDAS_TOOL: Anthropic.Tool = {
+  name: "marcar_repetidas",
+  description:
+    "Señala las tareas nuevas que repiten un compromiso que ya estaba registrado.",
+  input_schema: {
+    type: "object",
+    properties: {
+      repetidas: {
+        type: "array",
+        description:
+          "Pares (nueva, existente) que son el MISMO compromiso. No incluyas pares que hayas descartado. Lista vacía si no hay ninguno.",
+        items: {
+          type: "object",
+          properties: {
+            nueva: { type: "number", description: "Índice N de la tarea nueva." },
+            nombre_nueva: {
+              type: "string",
+              description: "Nombre de la tarea nueva, copiado EXACTAMENTE de la lista.",
+            },
+            existente: { type: "number", description: "Índice E de la tarea existente." },
+            nombre_existente: {
+              type: "string",
+              description: "Nombre de la tarea existente, copiado EXACTAMENTE de la lista.",
+            },
+            motivo: {
+              type: "string",
+              description: "Por qué son la misma, en una frase corta en español.",
+            },
+            confianza: {
+              type: "string",
+              enum: ["alta", "media", "baja"],
+              description:
+                "alta: misma acción sobre el mismo objeto, sin duda. media: probable pero con alguna diferencia de alcance o de paso. baja: mismo tema.",
+            },
+          },
+          required: ["nueva", "nombre_nueva", "existente", "nombre_existente", "motivo", "confianza"],
+        },
+      },
+    },
+    required: ["repetidas"],
+  },
+};
+
+/** Para comparar el nombre que el modelo copió con el de la lista. */
+function normNombre(s: string): string {
+  return s
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function lineaTarea(prefijo: string, i: number, t: TareaParaComparar): string {
+  const quien = t.responsables.length ? t.responsables.join(", ") : "sin responsable";
+  const detalle = t.descripcion ? ` — ${t.descripcion.slice(0, 160)}` : "";
+  return `${prefijo}${i}. ${t.nombre} [${quien}${t.fecha ? ` · ${t.fecha}` : ""}]${detalle}`;
+}
+
+/**
+ * Cuáles de las tareas nuevas repiten una que ya existe.
+ *
+ * Devuelve pares por índice, no por nombre, para que el modelo no pueda
+ * inventar ni reescribir tareas: solo señala entre las que se le dieron.
+ */
+export async function buscarTareasParecidas(
+  nuevas: TareaParaComparar[],
+  existentes: TareaParaComparar[],
+): Promise<ParecidaEncontrada[]> {
+  if (nuevas.length === 0 || existentes.length === 0) return [];
+  const anthropic = new Anthropic({ apiKey: serverEnv.ANTHROPIC_API_KEY });
+
+  const instruction = `Eres Renata, la asistente que toma las actas de AROCO (exportadora de cacao). Cada reunión crea sus tareas sin mirar las anteriores, así que un compromiso que no se cerró reaparece con otras palabras.
+
+Compara las TAREAS NUEVAS con las TAREAS YA REGISTRADAS y señala las nuevas que son el MISMO compromiso que una registrada.
+
+Son la misma cuando piden la misma acción concreta sobre el mismo objeto:
+- «Enviar precios de compra semanal del Cauca» y «Enviar precio de compra semanal al Cauca» → la misma.
+- «Programar reunión de simulación StoneX con Diego Felipe» y «Confirmar reunión con Diego Felipe (StoneX)» → la misma.
+
+NO son la misma:
+- Mismo tema pero distinta acción: «Pagar cuota de fomento» y «Revisar cálculo de la cuota de fomento».
+- Pasos distintos del mismo proyecto: «Contactar al maestro para formalizar la cotización de la ampliación» y «Redactar la propuesta de costos de la ampliación».
+- Una lleva a la otra: «Hablar con Milena para conseguir el contacto del proveedor de bandas» y «Conseguir cotizaciones de bandas».
+- Mismo verbo pero distinto objeto, cliente, proveedor, lote, mes o región: «Pagar cuota de fomento — orden Hunter» y «Pagar cuota de fomento de agosto».
+- Una es parte de la otra, o una es más amplia: «Avanzar en 3 contratos nuevos de proveedores» y «Conseguir 5 proveedores / 44 t para septiembre».
+- Comparten solo una persona: «Revisar proyecciones con Juan Carlos» y «Reunión para revisar presupuestos de la finca».
+
+Sé estricto: ante la duda, no la marques. El equipo revisa cada sugerencia a mano, y si abundan las falsas dejan de mirarlas. Que los responsables coincidan ayuda, pero no es necesario ni suficiente.
+
+Si al pensarlo concluyes que un par NO es el mismo, no lo incluyas: la lista es solo de los que sí. Copia los dos nombres exactamente como aparecen, y marca la confianza con honestidad: solo «alta» llega al equipo.
+
+Cada tarea nueva se empareja con UNA sola registrada, la más parecida. No emparejes tareas nuevas entre sí.
+
+TAREAS NUEVAS:
+${nuevas.map((t, i) => lineaTarea("N", i, t)).join("\n")}
+
+TAREAS YA REGISTRADAS:
+${existentes.map((t, i) => lineaTarea("E", i, t)).join("\n")}`;
+
+  const response = await anthropic.messages.create({
+    model: MODEL,
+    max_tokens: 4000,
+    tools: [PARECIDAS_TOOL],
+    tool_choice: { type: "tool", name: "marcar_repetidas" },
+    messages: [{ role: "user", content: instruction }],
+  });
+
+  const block = response.content.find((b) => b.type === "tool_use");
+  if (!block || block.type !== "tool_use") return [];
+  const out = block.input as { repetidas?: unknown };
+
+  // Tres filtros, porque en la primera corrida el modelo devolvió pares que él
+  // mismo había descartado, pares sueltos del mismo tema, y pares con el
+  // índice cruzado en listas de 400 tareas:
+  //  - solo confianza alta;
+  //  - los nombres copiados tienen que casar con los de esos índices;
+  //  - una sola sugerencia por tarea nueva.
+  const vistas = new Set<number>();
+  return (Array.isArray(out.repetidas) ? out.repetidas : [])
+    .map((r) => {
+      const o = r as Record<string, unknown>;
+      return {
+        nueva: Number(o.nueva),
+        existente: Number(o.existente),
+        nombreNueva: typeof o.nombre_nueva === "string" ? o.nombre_nueva : "",
+        nombreExistente: typeof o.nombre_existente === "string" ? o.nombre_existente : "",
+        confianza: o.confianza,
+        motivo: typeof o.motivo === "string" ? o.motivo.trim() : "",
+      };
+    })
+    .filter((p) => {
+      const n = nuevas[p.nueva];
+      const e = existentes[p.existente];
+      const valido =
+        Number.isInteger(p.nueva) && !!n &&
+        Number.isInteger(p.existente) && !!e &&
+        p.confianza === "alta" &&
+        normNombre(p.nombreNueva) === normNombre(n.nombre) &&
+        normNombre(p.nombreExistente) === normNombre(e.nombre) &&
+        !vistas.has(p.nueva);
+      if (valido) vistas.add(p.nueva);
+      return valido;
+    })
+    .map(({ nueva, existente, motivo }) => ({ nueva, existente, motivo }));
+}

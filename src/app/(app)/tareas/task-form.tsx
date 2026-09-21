@@ -15,8 +15,9 @@ import {
 import { useToast } from "@/components/ui/toast";
 import { TASK_STATUSES, TASK_STATUS_META } from "@/lib/status";
 import type { TeamMember } from "@/lib/types/database";
-import type { TaskWithPerson } from "./page";
-import { createTask, updateTask } from "./actions";
+import { Copy } from "lucide-react";
+import type { TaskWithPerson, TareaParecida } from "./page";
+import { createTask, updateTask, resolverParecida } from "./actions";
 import { TaskLog } from "./task-log";
 import { diasAbierta, fechasDeTarea } from "@/lib/tareas/fechas";
 import { formatDate } from "@/lib/utils";
@@ -108,6 +109,95 @@ function FichaFechas({ task }: { task: TaskWithPerson }) {
   );
 }
 
+/**
+ * Sugerencias de «esta tarea ya existía» (0094). La IA solo propone: aquí
+ * decide una persona. «Es la misma» cierra la repetida —la de la reunión más
+ * reciente— y la historia sigue en la original; «Son distintas» queda
+ * guardado para no volver a sugerir el par.
+ */
+function PanelParecidas({
+  parecidas,
+  onResuelta,
+}: {
+  parecidas: TareaParecida[];
+  onResuelta: () => void;
+}) {
+  const { toast } = useToast();
+  const [busy, setBusy] = React.useState<string | null>(null);
+
+  async function decidir(p: TareaParecida, decision: "misma" | "distinta") {
+    setBusy(`${p.id}:${decision}`);
+    const res = await resolverParecida(p.id, decision);
+    setBusy(null);
+    if (!res.ok) {
+      toast({ tone: "error", title: "No se pudo guardar", description: res.error });
+      return;
+    }
+    toast({
+      tone: "success",
+      title: decision === "misma" ? "Tareas unidas" : "Anotado: son distintas",
+      description:
+        decision === "misma"
+          ? p.esLaRepetida
+            ? `Esta se cerró; sigue en «${p.otra.name}».`
+            : `«${p.otra.name}» se cerró; sigue en esta.`
+          : undefined,
+    });
+    onResuelta();
+  }
+
+  return (
+    <section
+      aria-label="Posibles tareas repetidas"
+      className="mb-4 space-y-2 rounded-[var(--radius-md)] border border-warn/40 bg-warn-soft/40 px-3 py-2.5"
+    >
+      <p className="flex items-center gap-1.5 text-xs font-medium text-warn">
+        <Copy className="h-3.5 w-3.5" />
+        {parecidas.length === 1
+          ? "Renata cree que esta tarea ya existía"
+          : `Renata cree que esta tarea se parece a ${parecidas.length} otras`}
+      </p>
+      <ul className="space-y-2">
+        {parecidas.map((p) => (
+          <li key={p.id} className="rounded-[var(--radius-sm)] bg-surface px-3 py-2">
+            <p className="text-sm font-medium text-fg">{p.otra.name}</p>
+            <p className="text-xs text-fg-muted">
+              {[p.otra.acta, p.otra.fecha ? formatDate(p.otra.fecha) : null]
+                .filter(Boolean)
+                .join(" · ")}
+            </p>
+            {p.motivo && <p className="mt-1 text-xs text-fg-subtle">{p.motivo}</p>}
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <Button
+                size="sm"
+                onClick={() => decidir(p, "misma")}
+                loading={busy === `${p.id}:misma`}
+                disabled={busy !== null}
+              >
+                Es la misma
+              </Button>
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => decidir(p, "distinta")}
+                loading={busy === `${p.id}:distinta`}
+                disabled={busy !== null}
+              >
+                Son distintas
+              </Button>
+              <span className="text-xs text-fg-subtle">
+                {p.esLaRepetida
+                  ? "Si es la misma, se cierra esta y sigue en la otra."
+                  : "Si es la misma, se cierra la otra y sigue en esta."}
+              </span>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 export function TaskForm({
   open,
   onClose,
@@ -186,6 +276,10 @@ export function TaskForm({
       {/* Solo para una tarea que ya existe: una nueva todavía no tiene fecha
           de creación que enseñar. */}
       {initial && <FichaFechas task={initial} />}
+
+      {initial && initial.parecidas.length > 0 && (
+        <PanelParecidas parecidas={initial.parecidas} onResuelta={onSaved} />
+      )}
 
       <form onSubmit={onSubmit} className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Field label="Tarea *" className="sm:col-span-2">

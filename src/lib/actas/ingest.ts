@@ -4,6 +4,7 @@ import { agruparActaPorTemas, extractActaTasks, type ActaContent } from "@/lib/a
 import { hasGmailEnv, listActaMessageIds, fetchEmail } from "@/lib/gmail";
 import { serverEnv } from "@/lib/env";
 import { emparejarNombre, type Candidato } from "@/lib/actas/nombres";
+import { detectarParecidas } from "@/lib/tareas/parecidas";
 
 export interface IngestSummary {
   configured: boolean;
@@ -299,6 +300,23 @@ export async function ingestActasFromGmail(): Promise<IngestSummary> {
           summary.errors.push({
             emailId,
             error: `acta guardada, pero no se pudo agrupar por tema: ${
+              e instanceof Error ? e.message : String(e)
+            }`,
+          });
+        }
+      }
+
+      // ── Tareas que ya venían de otra reunión ─────────────────────────
+      //
+      //  Solo se señalan: el equipo decide si es la misma (acta del 15-sep).
+      //  Igual que los temas, un fallo aquí no puede costar el acta.
+      if (idsTareas.length > 0) {
+        try {
+          await detectarParecidas(db, idsTareas);
+        } catch (e) {
+          summary.errors.push({
+            emailId,
+            error: `acta guardada, pero no se pudieron buscar tareas repetidas: ${
               e instanceof Error ? e.message : String(e)
             }`,
           });

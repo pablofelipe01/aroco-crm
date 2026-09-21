@@ -2988,6 +2988,39 @@ export type Database = {
         };
         Relationships: [];
       };
+      task_parecidas: {
+        Row: {
+          created_at: string;
+          decidido_at: string | null;
+          decidido_por: string | null;
+          estado: "pendiente" | "misma" | "distinta";
+          id: string;
+          motivo: string | null;
+          parecida_a: string;
+          task_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          decidido_at?: string | null;
+          decidido_por?: string | null;
+          estado?: "pendiente" | "misma" | "distinta";
+          id?: string;
+          motivo?: string | null;
+          parecida_a: string;
+          task_id: string;
+        };
+        Update: {
+          created_at?: string;
+          decidido_at?: string | null;
+          decidido_por?: string | null;
+          estado?: "pendiente" | "misma" | "distinta";
+          id?: string;
+          motivo?: string | null;
+          parecida_a?: string;
+          task_id?: string;
+        };
+        Relationships: [];
+      };
       tasks: {
         Row: {
           completed_at: string | null;
@@ -3001,6 +3034,7 @@ export type Database = {
           notes: string | null;
           person_id: string | null;
           tema_id: string | null;
+          unida_a: string | null;
           person_name: string | null;
           source: string | null;
           start_date: string | null;
@@ -3019,6 +3053,7 @@ export type Database = {
           notes?: string | null;
           person_id?: string | null;
           tema_id?: string | null;
+          unida_a?: string | null;
           person_name?: string | null;
           source?: string | null;
           start_date?: string | null;
@@ -3037,6 +3072,7 @@ export type Database = {
           notes?: string | null;
           person_id?: string | null;
           tema_id?: string | null;
+          unida_a?: string | null;
           person_name?: string | null;
           source?: string | null;
           start_date?: string | null;
@@ -3441,6 +3477,10 @@ export type Database = {
       can_write: {
         Args: { depts: Database["public"]["Enums"]["department"][] };
         Returns: boolean;
+      };
+      resolver_tarea_parecida: {
+        Args: { p_id: string; p_decision: "misma" | "distinta" };
+        Returns: undefined;
       };
       puede_editar_acta: {
         Args: { p_meeting: string };
