@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { serverEnv } from "@/lib/env";
 import { ingestActasFromGmail } from "@/lib/actas/ingest";
+import { enviarTareasAsignadas } from "@/lib/correo/tareas-asignadas";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -23,9 +24,12 @@ export async function GET(request: NextRequest) {
 
   const startedAt = Date.now();
   const result = await ingestActasFromGmail();
+  // Las tareas que el acta repartió se avisan ya, no en el cron de la hora.
+  const correos = await enviarTareasAsignadas();
   return NextResponse.json({
     ok: result.errors.length === 0,
     ...result,
+    correos,
     ms: Date.now() - startedAt,
   });
 }

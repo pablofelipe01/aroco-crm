@@ -1,10 +1,12 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { getSessionContext } from "@/lib/auth";
 import { agruparActaPorTemas } from "@/lib/ai/actas";
+import { enviarTareasAsignadas } from "@/lib/correo/tareas-asignadas";
 
 export type ActaResult = { ok: boolean; error?: string; count?: number };
 
@@ -68,6 +70,8 @@ export async function createActaTasks(input: unknown): Promise<ActaResult> {
   if (links.length > 0) {
     const { error: aErr } = await supabase.from("task_assignees").insert(links);
     if (aErr) return { ok: false, error: aErr.message };
+    // Un correo por persona con sus tareas de esta acta (0095).
+    after(enviarTareasAsignadas);
   }
 
   revalidatePath("/tareas");

@@ -2943,6 +2943,39 @@ export type Database = {
         };
         Relationships: [];
       };
+      correos_tareas: {
+        Row: {
+          asignado_por: string | null;
+          created_at: string;
+          enviado_at: string | null;
+          estado: "pendiente" | "enviando" | "enviado" | "omitido" | "error";
+          id: string;
+          motivo: string | null;
+          task_id: string;
+          team_member_id: string;
+        };
+        Insert: {
+          asignado_por?: string | null;
+          created_at?: string;
+          enviado_at?: string | null;
+          estado?: "pendiente" | "enviando" | "enviado" | "omitido" | "error";
+          id?: string;
+          motivo?: string | null;
+          task_id: string;
+          team_member_id: string;
+        };
+        Update: {
+          asignado_por?: string | null;
+          created_at?: string;
+          enviado_at?: string | null;
+          estado?: "pendiente" | "enviando" | "enviado" | "omitido" | "error";
+          id?: string;
+          motivo?: string | null;
+          task_id?: string;
+          team_member_id?: string;
+        };
+        Relationships: [];
+      };
       task_assignees: {
         Row: {
           created_at: string;

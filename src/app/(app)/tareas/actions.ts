@@ -1,11 +1,13 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getSessionContext } from "@/lib/auth";
 import { taskSchema } from "@/lib/schemas/task";
 import type { TaskStatus } from "@/lib/status";
 import type { TaskNote } from "@/lib/types/database";
+import { enviarTareasAsignadas } from "@/lib/correo/tareas-asignadas";
 
 export type ActionResult = { ok: boolean; error?: string; id?: string };
 
@@ -49,6 +51,9 @@ async function setAssignees(
       .from("task_assignees")
       .insert(toAdd.map((team_member_id) => ({ task_id: taskId, team_member_id })));
     if (error) return error.message;
+    // El trigger ya los anotó en la cola (0095); el correo sale después de
+    // responder, para no hacer esperar el guardado por Resend.
+    after(enviarTareasAsignadas);
   }
   return null;
 }

@@ -497,6 +497,21 @@ export function TareasClient({
     router.replace("/tareas");
   }, [searchParams, router]);
 
+  // ?tarea=<id>: el enlace del correo de «te asignaron» abre esa tarea. Si no
+  // está en el tablero (ya se cerró, o la RLS no la deja ver) se queda en el
+  // tablero sin más: mejor eso que un modal vacío.
+  React.useEffect(() => {
+    const id = searchParams.get("tarea");
+    if (!id) return;
+    const t = initialTasks.find((x) => x.id === id);
+    if (t) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- open from deep link
+      setEditing(t);
+      setFormOpen(true);
+    }
+    router.replace("/tareas");
+  }, [searchParams, router, initialTasks]);
+
   // Mouse: 5px threshold. Touch: press-and-hold so swiping scrolls the board.
   const sensors = useSensors(
     useSensor(MouseSensor, { activationConstraint: { distance: 5 } }),
