@@ -14,6 +14,7 @@ import {
   RefreshCwOff,
   Store,
   Receipt,
+  CalendarClock,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { hasSupabaseEnv } from "@/lib/env";
@@ -31,6 +32,7 @@ const ICON: Record<string, React.ElementType> = {
   sync_error: RefreshCwOff,
   proveedor_nuevo: Store,
   cuenta_cobro: Receipt,
+  option_expiry: CalendarClock,
 };
 
 /**
@@ -45,6 +47,7 @@ const RUTA: Record<string, string> = {
   price_history: "/precios",
   proveedores_insumos: "/proveedores",
   cuentas_cobro: "/proveedores",
+  broker_positions: "/mercado",
 };
 
 const SEV_COLOR: Record<string, string> = {
