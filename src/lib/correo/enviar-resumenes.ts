@@ -14,7 +14,8 @@ import {
 
 /**
  * Envía los resúmenes de tareas (0096): el diario a cada persona con cuenta,
- * el semanal a cada jefe de área (quien figura como `manager_id` de alguien).
+ * el semanal a cada jefe de área (quien figura como `manager_id` de alguien),
+ * solo con sus reportes directos.
  *
  * Lo llama el cron `/api/cron/resumen-tareas`. Cada resumen se toma
  * insertando su fila en `correos_resumenes`; si ya existe, otro envío lo tiene
@@ -216,20 +217,9 @@ export async function enviarResumenes(
   for (const m of miembros) {
     if (m.manager_id) hijos.set(m.manager_id, [...(hijos.get(m.manager_id) ?? []), m]);
   }
-  const area = (jefeId: string): Miembro[] => {
-    const out: Miembro[] = [];
-    const vistos = new Set<string>([jefeId]);
-    const pila = [...(hijos.get(jefeId) ?? [])];
-    while (pila.length) {
-      const m = pila.shift()!;
-      // Un ciclo en la jerarquía (A jefe de B y B de A) no puede colgar el cron.
-      if (vistos.has(m.id)) continue;
-      vistos.add(m.id);
-      out.push(m);
-      pila.push(...(hijos.get(m.id) ?? []));
-    }
-    return out;
-  };
+  // Solo los reportes directos: con todo el subárbol, el semanal de Álvaro
+  // traía a la empresa entera (decisión del 23-sep).
+  const area = (jefeId: string): Miembro[] => (hijos.get(jefeId) ?? []).filter((m) => m.id !== jefeId);
 
   for (const jefe of miembros.filter((m) => hijos.has(m.id))) {
     const perfil = jefe.profile_id ? perfilDe.get(jefe.profile_id) : undefined;
