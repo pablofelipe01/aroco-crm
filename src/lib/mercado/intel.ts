@@ -14,7 +14,7 @@ import { llamarHerramienta, type McpConfig } from "@/lib/mcp/client";
  * leerse el reporte completo. El original queda para poder ir a la fuente.
  */
 
-const MODEL = serverEnv.ANTHROPIC_MODEL || "claude-opus-4-8";
+const MODEL = serverEnv.ANTHROPIC_MODEL || "claude-opus-5";
 
 export type Articulo = {
   article_id: string;
@@ -118,6 +118,8 @@ export async function resumir(a: Articulo): Promise<string | null> {
     const res = await anthropic.messages.create({
       model: MODEL,
       max_tokens: 300,
+      // Opus 5 razona por defecto y eso gasta max_tokens; aquí no hace falta.
+      thinking: { type: "disabled" },
       system: INSTRUCCIONES,
       messages: [
         {

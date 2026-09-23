@@ -11,7 +11,7 @@ import { resolveAgentContext } from "@/lib/ai/context";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const MODEL = serverEnv.ANTHROPIC_MODEL || "claude-opus-4-8";
+const MODEL = serverEnv.ANTHROPIC_MODEL || "claude-opus-5";
 const MAX_TOOL_ROUNDS = 6;
 
 const bodySchema = z.object({
@@ -136,7 +136,10 @@ export async function POST(request: NextRequest) {
       rounds++;
       const response = await anthropic.messages.create({
         model: MODEL,
-        max_tokens: 1500,
+        // Con razonamiento, max_tokens cubre lo que piensa más lo que responde.
+        max_tokens: 16000,
+        thinking: { type: "adaptive" },
+        output_config: { effort: "medium" },
         system,
         tools,
         messages,

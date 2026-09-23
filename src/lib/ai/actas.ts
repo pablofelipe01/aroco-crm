@@ -2,7 +2,7 @@ import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
 import { serverEnv } from "@/lib/env";
 
-const MODEL = serverEnv.ANTHROPIC_MODEL || "claude-opus-4-8";
+const MODEL = serverEnv.ANTHROPIC_MODEL || "claude-opus-5";
 
 export interface ExtractedTask {
   name: string;
@@ -130,6 +130,8 @@ ${notes.slice(0, 6000)}`;
   const response = await anthropic.messages.create({
     model: MODEL,
     max_tokens: 1000,
+    // Opus 5 razona por defecto y eso gasta max_tokens; aquí no hace falta.
+    thinking: { type: "disabled" },
     tools: [ATTENDEES_TOOL],
     tool_choice: { type: "tool", name: "extract_attendees" },
     messages: [{ role: "user", content: instruction }],
@@ -189,6 +191,8 @@ No inventes tareas que no estén en el acta, pero tampoco descartes ninguna que 
   const response = await anthropic.messages.create({
     model: MODEL,
     max_tokens: 8000,
+    // Opus 5 razona por defecto y eso gasta max_tokens; aquí no hace falta.
+    thinking: { type: "disabled" },
     tools: [EXTRACT_TOOL],
     tool_choice: { type: "tool", name: "extract_tasks" },
     messages: [{ role: "user", content: userContent }],
@@ -318,6 +322,8 @@ ${notes.slice(0, 24000)}`;
   const response = await anthropic.messages.create({
     model: MODEL,
     max_tokens: 4000,
+    // Opus 5 razona por defecto y eso gasta max_tokens; aquí no hace falta.
+    thinking: { type: "disabled" },
     tools: [TEMAS_TOOL],
     tool_choice: { type: "tool", name: "agrupar_por_tema" },
     messages: [{ role: "user", content: instruction }],
@@ -481,6 +487,8 @@ ${existentes.map((t, i) => lineaTarea("E", i, t)).join("\n")}`;
   const response = await anthropic.messages.create({
     model: MODEL,
     max_tokens: 4000,
+    // Opus 5 razona por defecto y eso gasta max_tokens; aquí no hace falta.
+    thinking: { type: "disabled" },
     tools: [PARECIDAS_TOOL],
     tool_choice: { type: "tool", name: "marcar_repetidas" },
     messages: [{ role: "user", content: instruction }],

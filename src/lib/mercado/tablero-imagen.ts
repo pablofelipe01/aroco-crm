@@ -18,7 +18,7 @@ import { serverEnv } from "@/lib/env";
  * necesidad.
  */
 
-const MODEL = serverEnv.ANTHROPIC_MODEL || "claude-opus-4-8";
+const MODEL = serverEnv.ANTHROPIC_MODEL || "claude-opus-5";
 
 export type StrikeTablero = {
   strike: number;
@@ -112,6 +112,8 @@ export async function leerTableroDeImagen(
   const res = await anthropic.messages.create({
     model: MODEL,
     max_tokens: 8192,
+    // Opus 5 razona por defecto y eso gasta max_tokens; aquí no hace falta.
+    thinking: { type: "disabled" },
     tools: [ESQUEMA],
     tool_choice: { type: "tool", name: ESQUEMA.name },
     messages: [

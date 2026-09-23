@@ -2,7 +2,7 @@ import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
 import { serverEnv } from "@/lib/env";
 
-const MODEL = serverEnv.ANTHROPIC_MODEL || "claude-opus-4-8";
+const MODEL = serverEnv.ANTHROPIC_MODEL || "claude-opus-5";
 
 export interface SlotSuggestion {
   date: string; // YYYY-MM-DD
@@ -81,6 +81,8 @@ Reglas:
   const response = await anthropic.messages.create({
     model: MODEL,
     max_tokens: 500,
+    // Opus 5 razona por defecto y eso gasta max_tokens; aquí no hace falta.
+    thinking: { type: "disabled" },
     tools: [SLOT_TOOL],
     tool_choice: { type: "tool", name: "suggest_slot" },
     messages: [{ role: "user", content: prompt }],
