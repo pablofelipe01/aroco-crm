@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { getSessionContext } from "@/lib/auth";
+import { antesDelPrimerMes } from "@/lib/comisiones/calcular";
 import { ComisionesClient } from "./comisiones-client";
 import { MonthlyTonnage } from "./monthly-tonnage";
 import { OcComisiones, type OcComisionRow } from "./oc-comisiones";
@@ -112,6 +113,7 @@ export default async function ComisionesPage({
 
   const meses: { anio: number; mes: number; origen: string }[] = [];
   for (const m of mesesData ?? []) {
+    if (antesDelPrimerMes(m.anio, m.mes)) continue;
     if (!meses.some((x) => x.anio === m.anio && x.mes === m.mes)) {
       meses.push({ anio: m.anio, mes: m.mes, origen: m.origen });
     }

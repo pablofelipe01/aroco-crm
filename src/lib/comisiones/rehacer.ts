@@ -2,7 +2,12 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/types/database";
 import { parseCsv } from "@/lib/ventas/sheet";
 import { parseLiquidacion } from "./hoja";
-import { calcularMes, REGLAS_POR_DEFECTO, type Reglas } from "./calcular";
+import {
+  antesDelPrimerMes,
+  calcularMes,
+  REGLAS_POR_DEFECTO,
+  type Reglas,
+} from "./calcular";
 
 /**
  * Rehace los meses que la hoja nunca alcanzó a dejar en el CRM.
@@ -79,6 +84,7 @@ export async function rehacerMesesFaltantes(
   for (const ym of meses) {
     const anio = Number(ym.slice(0, 4));
     const mes = Number(ym.slice(5, 7));
+    if (antesDelPrimerMes(anio, mes)) continue;
     if (deLaHoja.has(`${anio}-${mes}`)) {
       resultado.respetados.push({ anio, mes });
       continue;

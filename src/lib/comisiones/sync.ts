@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/types/database";
 import { parseCsv } from "@/lib/ventas/sheet";
 import { parseLiquidacion } from "./hoja";
+import { antesDelPrimerMes, PRIMER_MES_COMISIONES } from "./calcular";
 
 /**
  * Ingesta de la liquidación de comisiones.
@@ -39,6 +40,11 @@ export async function sincronizarComisiones(
   csv: string,
 ): Promise<ResultadoComisiones> {
   const L = parseLiquidacion(parseCsv(csv));
+  if (antesDelPrimerMes(L.anio, L.mes)) {
+    throw new Error(
+      `La hoja tiene puesto ${L.mes}/${L.anio}; las comisiones se liquidan desde ${PRIMER_MES_COMISIONES.mes}/${PRIMER_MES_COMISIONES.anio}.`,
+    );
+  }
 
   // ── A quién corresponde cada nombre ──────────────────────────────────────
   const { data: catalogo, error: eCat } = await db

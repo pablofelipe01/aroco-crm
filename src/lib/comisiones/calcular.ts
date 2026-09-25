@@ -21,6 +21,18 @@
  * meses que la hoja ya había liquidado: reproduce las cinco líneas al peso.
  */
 
+/**
+ * Primer mes que se liquida. Antes de mayo de 2026 no hay datos de comisiones
+ * en la base: lo que salga de las operaciones de marzo o abril es una
+ * reconstrucción sin nada contra qué compararla, y no se guarda ni se muestra.
+ */
+export const PRIMER_MES_COMISIONES = { anio: 2026, mes: 5 } as const;
+
+export function antesDelPrimerMes(anio: number, mes: number): boolean {
+  const p = PRIMER_MES_COMISIONES;
+  return anio < p.anio || (anio === p.anio && mes < p.mes);
+}
+
 export type OperacionParaCalculo = {
   fecha: string | null;
   cliente: string | null;
