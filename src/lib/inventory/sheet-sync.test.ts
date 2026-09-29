@@ -241,3 +241,31 @@ test("lotes distintos dan claves de despacho distintas", () => {
     assert.ok(clavesLote.has(p), `«${p}» no corresponde a ningún lote`);
   }
 });
+
+test("una fila de notas arriba y la unidad en el encabezado no tumban el sync", () => {
+  // El 13-sep la hoja ganó una fila «Letras en rojo = Columnas formuladas»
+  // encima del encabezado y sus columnas pasaron de «(KG)» a «(kilos)». Con
+  // las filas de encabezado fijas el sync estuvo diecisiete días en rojo.
+  const nueva = hoja()
+    .replace("\n", "\nLetras en rojo = Columnas formuladas \n")
+    .replace("CANTIDAD INGRESADA (KG)", "CANTIDAD INGRESADA (kilos)")
+    .replace("CANTIDAD SALIDA", "CANTIDAD SALIDA (kilos)");
+  const antes = parseInventorySheet(hoja());
+  const despues = parseInventorySheet(nueva);
+  assert.deepEqual(despues.lots, antes.lots);
+  assert.deepEqual(despues.dispatches, antes.dispatches);
+});
+
+test("una orden de compra que aún no llega no es un lote", () => {
+  // Filas del 14-sep: dos pedidos a Chocomet, sin remisión, sin recepción y
+  // sin kilos. Para el CRM eran el mismo lote y abortaban el upsert entero.
+  const lineas = hoja().split("\n");
+  const vacia = lineas[4]
+    .split(",")
+    .map((_, i) => (i === 0 ? "14-sept-2026" : i === 3 ? "COL-MET-GRA-140926 (CHOCOMET)" : ""))
+    .join(",");
+  lineas.splice(5, 0, vacia, vacia);
+  const { lots } = parseInventorySheet(lineas.join("\n"));
+  assert.equal(lots.length, 1);
+  assert.equal(lots[0].code, "CO-ANT-URA-050525");
+});

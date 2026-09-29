@@ -18,16 +18,16 @@ import {
   columna,
   columnaOpcional,
   campoSalida,
+  ubicarEncabezado,
   ColumnaFaltante,
 } from "@/lib/inventory/sheet-columns";
 
-/** First data row (0-based) — four header rows precede it. */
-export const DATA_START_ROW = 4;
-
-/** Fila del encabezado con los subgrupos (0-based). */
-const HEADER_SUB_ROW = 2;
-/** Fila del encabezado con los nombres finales de cada columna. */
-const HEADER_LEAF_ROW = 3;
+/**
+ * Celdas que identifican la fila de encabezado con los subgrupos. Justo debajo
+ * va la de los nombres finales (PREMIUM, FECHA…) y después los datos. No se
+ * fija el número de fila: la hoja ya ganó una fila de notas arriba una vez.
+ */
+const MARCAS_ENCABEZADO = ["Fecha", "CODIGO DE PROCEDENCIA"];
 
 export type LotRow = {
   code: string;
@@ -223,10 +223,13 @@ export function dominantQuality(row: {
  */
 export function parseInventorySheet(csv: string): ParsedSheet {
   const matrix = parseCsv(csv);
-  const mapa = construirMapa(
-    matrix[HEADER_SUB_ROW] ?? [],
-    matrix[HEADER_LEAF_ROW] ?? [],
-  );
+  const filaSub = ubicarEncabezado(matrix, MARCAS_ENCABEZADO);
+  if (filaSub < 0) {
+    throw new ColumnaFaltante(
+      "No se encontró la fila de encabezado (con «Fecha» y «CODIGO DE PROCEDENCIA»).",
+    );
+  }
+  const mapa = construirMapa(matrix[filaSub] ?? [], matrix[filaSub + 1] ?? []);
 
   // Se resuelven todas las columnas ANTES de recorrer las filas: si a la hoja
   // le cambiaron un encabezado, la corrida falla aquí y no después de haber
@@ -237,9 +240,9 @@ export function parseInventorySheet(csv: string): ParsedSheet {
     odc: columnaOpcional(mapa, "# ODC"),
     recepcion: columnaOpcional(mapa, "# Recepcion", "# Recepción"),
     code: columna(mapa, "CODIGO DE PROCEDENCIA Y/O DESTINO", "CODIGO DE PROCEDENCIA"),
-    bultosIn: columnaOpcional(mapa, "Inventario bultos|Bultos ingresan"),
-    bultosOut: columnaOpcional(mapa, "Inventario bultos|Bultos salen"),
-    bultosTotal: columnaOpcional(mapa, "Inventario bultos|Total bultos"),
+    bultosIn: columnaOpcional(mapa, "Inventario bultos|Bultos ingresan", "Inventario bultos (unidad)|Bultos ingresan"),
+    bultosOut: columnaOpcional(mapa, "Inventario bultos|Bultos salen", "Inventario bultos (unidad)|Bultos salen"),
+    bultosTotal: columnaOpcional(mapa, "Inventario bultos|Total bultos", "Inventario bultos (unidad)|Total bultos"),
     valorCompra: columnaOpcional(mapa, "VALOR DE COMPRA"),
     qtyRequested: columnaOpcional(mapa, "CANTIDAD SOLICITADA (KG)"),
     qtyIn: columna(mapa, "CANTIDAD INGRESADA (KG)"),
@@ -289,7 +292,7 @@ export function parseInventorySheet(csv: string): ParsedSheet {
   const dispatches: DispatchRow[] = [];
   let rowsRead = 0;
 
-  for (let r = DATA_START_ROW; r < matrix.length; r++) {
+  for (let r = filaSub + 2; r < matrix.length; r++) {
     const row = matrix[r];
     const code = cell(row, C.code);
     if (!code) continue; // blank separators and TOTAL rows have no code.
@@ -297,6 +300,11 @@ export function parseInventorySheet(csv: string): ParsedSheet {
 
     const remision = cell(row, C.remision) || null;
     const recepcion = cell(row, C.recepcion) || null;
+    // Sin remisión, sin recepción y sin kilos es una orden de compra que aún
+    // no llega, no un lote. La hoja las anota por ODC y dos del mismo
+    // proveedor el mismo día chocan en la clave del lote: el 14-sep dos
+    // pedidos a Chocomet dejaron el sync caído. Cuando llegue, trae remisión.
+    if (!remision && !recepcion && num(row, C.qtyIn) === 0) continue;
     const inPremium = num(row, C.inPremium);
     const inCorriente = num(row, C.inCorriente);
     const inCorrienteC = num(row, C.inCorrienteC);

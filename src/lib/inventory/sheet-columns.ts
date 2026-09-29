@@ -16,14 +16,39 @@
  * corromper los datos en silencio.
  */
 
-/** minúsculas, sin tildes y con espacios colapsados, para comparar encabezados. */
+/**
+ * minúsculas, sin tildes, sin la unidad y con espacios colapsados, para
+ * comparar encabezados. La unidad se quita porque la hoja la cambia sin
+ * avisar: «CANTIDAD INGRESADA (KG)» pasó a ser «(kilos)» y el sync estuvo
+ * diez días caído por eso.
+ */
 export function normalizarEncabezado(s: string): string {
   return s
     .toLowerCase()
     .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\(\s*(kg|kgs|kilos?)\s*\)/g, "")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+/**
+ * Busca la fila del encabezado: la primera que tenga, entre sus celdas, todas
+ * las `marcas` (comparadas por prefijo, ya normalizadas). Devuelve su índice o
+ * -1. Así una fila de notas añadida arriba —«Letras en rojo = Columnas
+ * formuladas»— no deja al parser leyendo los datos como si fueran encabezado.
+ */
+export function ubicarEncabezado(
+  matriz: string[][],
+  marcas: string[],
+  maxFilas = 15,
+): number {
+  const buscadas = marcas.map(normalizarEncabezado);
+  for (let r = 0; r < Math.min(maxFilas, matriz.length); r++) {
+    const celdas = (matriz[r] ?? []).map(normalizarEncabezado);
+    if (buscadas.every((m) => celdas.some((c) => c.startsWith(m)))) return r;
+  }
+  return -1;
 }
 
 /** Rellena a la derecha los huecos de las celdas combinadas del encabezado. */

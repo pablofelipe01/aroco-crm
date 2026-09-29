@@ -4,30 +4,42 @@
  * location split (licor / por llegar / Tolimax / bodega), purchase value and a
  * quality breakdown (B / C / Premium / Orgánico) plus an occasional cadmio tag.
  *
- * Three header rows precede the data (index 3 onward). Dates use merged cells,
- * so a blank Fecha inherits the previous row's date. The right-side columns
- * (13+) are ad-hoc analysis and are ignored. Pure module — unit testable.
+ * The header is split over two rows with no clean merging ("Valor compra"
+ * sits above a blank, "B" and "C" below "Corriente"), so each column is named
+ * by its lower cell or, failing that, its upper one. Columns are found by that
+ * name, never by position: a "Reservado" column inserted after "En bodega"
+ * once shifted every field one to the right — the purchase price landed in
+ * quality B and the organic kilos in cadmio. Dates use merged cells, so a
+ * blank Fecha inherits the previous row's date. The table ends at its TOTAL
+ * row; what sits below is ad-hoc analysis. Pure module — unit testable.
  */
 import { parseCsv, parseCoNumber, parseEsDate } from "@/lib/inventory/sheet-sync";
+import {
+  ColumnaFaltante,
+  normalizarEncabezado,
+  ubicarEncabezado,
+} from "@/lib/inventory/sheet-columns";
 
-/** First data row (0-based) — three header rows precede it. */
-export const DATA_START_ROW = 3;
+/** Name of each column: its lower header cell, or the upper one when blank. */
+function nombres(arriba: string[], abajo: string[]): Map<string, number> {
+  const out = new Map<string, number>();
+  const ancho = Math.max(arriba.length, abajo.length);
+  for (let i = 0; i < ancho; i++) {
+    const n = normalizarEncabezado(abajo[i] || arriba[i] || "");
+    if (n && !out.has(n)) out.set(n, i);
+  }
+  return out;
+}
 
-const COL = {
-  oc: 0,
-  fecha: 1,
-  procedencia: 2,
-  licor: 3,
-  porLlegar: 4,
-  tolimax: 5,
-  enBodega: 6,
-  valorCompra: 7,
-  b: 8,
-  c: 9,
-  premium: 10,
-  organico: 11,
-  cadmio: 12,
-} as const;
+function col(m: Map<string, number>, ...alts: string[]): number {
+  for (const a of alts) {
+    const i = m.get(normalizarEncabezado(a));
+    if (i != null) return i;
+  }
+  throw new ColumnaFaltante(
+    `No se encontró la columna «${alts[0]}» en la pestaña de inventario por calidad.`,
+  );
+}
 
 export type QualityRow = {
   position: number;
@@ -54,13 +66,38 @@ export function parseQualitySheet(csv: string): {
   rowsRead: number;
 } {
   const matrix = parseCsv(csv);
+  const filaHoja = ubicarEncabezado(matrix, ["Procedencia", "En bodega"]);
+  if (filaHoja < 1) {
+    throw new ColumnaFaltante(
+      "No se encontró el encabezado de inventario por calidad («Procedencia», «En bodega»).",
+    );
+  }
+  const m = nombres(matrix[filaHoja - 1] ?? [], matrix[filaHoja] ?? []);
+  const COL = {
+    oc: col(m, "OC # / CDC", "OC #"),
+    fecha: col(m, "Fecha entrada"),
+    procedencia: col(m, "Procedencia"),
+    licor: col(m, "Licor"),
+    porLlegar: col(m, "Por llegar"),
+    tolimax: col(m, "Tolimax"),
+    enBodega: col(m, "En bodega"),
+    valorCompra: col(m, "Valor compra"),
+    b: col(m, "B"),
+    c: col(m, "C"),
+    premium: col(m, "Premium"),
+    organico: col(m, "Organico"),
+    cadmio: col(m, "CADMIO"),
+  };
+
   const rows: QualityRow[] = [];
   let lastDate = "";
 
-  for (let r = DATA_START_ROW; r < matrix.length; r++) {
+  for (let r = filaHoja + 1; r < matrix.length; r++) {
     const row = matrix[r];
     const procedencia = cell(row, COL.procedencia);
-    if (!procedencia || /total/i.test(procedencia)) continue; // skip totals/blanks
+    // TOTAL closes the table; below it the sheet keeps another one.
+    if (/^total/i.test(procedencia)) break;
+    if (!procedencia) continue;
 
     // Merged date cells: inherit the previous row's date when blank.
     const rawDate = cell(row, COL.fecha);
