@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { AppShell, type ShellUser } from "@/components/layout/app-shell";
+import { Latido } from "@/components/layout/latido";
 import { getSessionContext, isOnboarded } from "@/lib/auth";
 import { proveedorEnSesion } from "@/lib/proveedor-sesion";
 import { hasSupabaseEnv } from "@/lib/env";
@@ -38,13 +39,14 @@ export default async function AppLayout({
     name: profile.full_name,
     department: profile.department,
     role: profile.role,
-    permisos: { ve_mercado: profile.ve_mercado },
+    permisos: { ve_mercado: profile.ve_mercado, ve_uso: profile.ve_uso },
   };
 
   // El perfil manda sobre la cookie: es lo que sigue a la persona de un
   // dispositivo a otro. La cookie solo cubre las pantallas que corren sin él.
   return (
     <AppShell user={user} idioma={normalizarIdioma(profile.idioma)}>
+      <Latido />
       {children}
     </AppShell>
   );

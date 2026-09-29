@@ -2670,6 +2670,7 @@ export type Database = {
           aprueba_compras: boolean;
           ve_comisiones_todas: boolean;
           ve_mercado: boolean;
+          ve_uso: boolean;
           verifica_proveedores: boolean;
           created_at: string;
           department: Database["public"]["Enums"]["department"] | null;
@@ -2686,6 +2687,7 @@ export type Database = {
           aprueba_compras?: boolean;
           ve_comisiones_todas?: boolean;
           ve_mercado?: boolean;
+          ve_uso?: boolean;
           verifica_proveedores?: boolean;
           created_at?: string;
           department?: Database["public"]["Enums"]["department"] | null;
@@ -2702,6 +2704,7 @@ export type Database = {
           aprueba_compras?: boolean;
           ve_comisiones_todas?: boolean;
           ve_mercado?: boolean;
+          ve_uso?: boolean;
           verifica_proveedores?: boolean;
           created_at?: string;
           department?: Database["public"]["Enums"]["department"] | null;
@@ -3540,6 +3543,18 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
+      registrar_latido: {
+        Args: { p_modulo: string };
+        Returns: undefined;
+      };
+      uso_crm: {
+        Args: { p_semanas?: number };
+        Returns: Json;
+      };
+      ve_uso: {
+        Args: Record<PropertyKey, never>;
+        Returns: boolean;
+      };
       can_write: {
         Args: { depts: Database["public"]["Enums"]["department"][] };
         Returns: boolean;

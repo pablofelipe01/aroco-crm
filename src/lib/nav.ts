@@ -13,6 +13,7 @@ import {
   LineChart,
   ListChecks,
   ClipboardList,
+  Activity,
   Route,
   Settings,
   type LucideIcon,
@@ -47,7 +48,7 @@ export interface NavItem {
    * márgenes, P&L— que no se hereda del cargo, y dar acceso de administrador no
    * puede meter a alguien de rebote ahí.
    */
-  permiso?: "ve_mercado";
+  permiso?: keyof Permisos;
 }
 
 export const NAV_ITEMS: NavItem[] = [
@@ -171,6 +172,14 @@ export const NAV_ITEMS: NavItem[] = [
     departments: "all",
   },
   {
+    href: "/uso",
+    llave: "uso",
+    label: "Uso del CRM",
+    icon: Activity,
+    departments: "all",
+    permiso: "ve_uso",
+  },
+  {
     href: "/equipo",
     llave: "equipo",
     label: "Equipo",
@@ -190,7 +199,10 @@ export const NAV_ITEMS: NavItem[] = [
  * faltaban pestañas que sí tenía permiso de abrir. El menú decía una cosa y la
  * base otra.
  */
-export type Permisos = { ve_mercado?: boolean | null };
+export type Permisos = {
+  ve_mercado?: boolean | null;
+  ve_uso?: boolean | null;
+};
 
 export function navForUser(
   department: Department | null,
