@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { todas } from "@/lib/supabase/todas";
 import { getSessionContext } from "@/lib/auth";
 import { LEAD_STAGES, LEAD_STAGE_WEIGHT, type LeadStage } from "@/lib/status";
 import { getMarketData, getInternationalSeries } from "@/lib/market";
@@ -48,17 +49,23 @@ export default async function DashboardPage() {
     .order("due_date", { ascending: true, nullsFirst: false })
     .limit(5);
 
-  const [leadsRes, stockRes, pricesRes, dispatchRes, market, tasksRes] =
+  const [leadsRes, stockRes, prices, dispatchRes, market, tasksRes] =
     await Promise.all([
       supabase.from("leads").select("status, potential_value_cop"),
       // Inventario real, lote por lote. Antes esto salía de `inventory_quality`
       // —la segunda pestaña de la hoja— que arrastraba filas ya despachadas y
       // mostraba 12.198 kg contra los 2.500 kg que hay de verdad.
       supabase.from("inventory_lots").select("code, qty_available_kg"),
-      supabase
-        .from("price_history")
-        .select("company, date, price_cop_kg")
-        .order("date", { ascending: true }),
+      // Más de 1000 filas desde 2026-10: sin paginar, el histórico se cortaba
+      // a mitad de septiembre y el «último» precio de Luker quedaba viejo.
+      todas((a, b) =>
+        supabase
+          .from("price_history")
+          .select("company, date, price_cop_kg")
+          .order("date", { ascending: true })
+          .order("company", { ascending: true })
+          .range(a, b),
+      ),
       supabase.from("dispatches").select("qty_kg"),
       getMarketData(),
       tasksQuery,
@@ -66,7 +73,6 @@ export default async function DashboardPage() {
 
   const leads = leadsRes.data ?? [];
   const stock = stockRes.data ?? [];
-  const prices = pricesRes.data ?? [];
   const dispatches = dispatchRes.data ?? [];
 
   // Pipeline by stage.

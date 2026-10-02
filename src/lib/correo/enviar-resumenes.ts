@@ -1,5 +1,6 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { todas } from "@/lib/supabase/todas";
 import { diaEnBogota } from "@/lib/tareas/fechas";
 import { correosActivos, enviarCorreo } from "./resend";
 import {
@@ -34,19 +35,6 @@ export interface ResumenEnvio {
   errores: string[];
   /** Solo con `simular`: los correos que habrían salido. */
   vistas?: { para: string; asunto: string; texto: string }[];
-}
-
-/** PostgREST devuelve 1000 filas como mucho: se pide por páginas. */
-async function todas<T>(
-  pagina: (desde: number, hasta: number) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>,
-): Promise<T[]> {
-  const out: T[] = [];
-  for (let desde = 0; ; desde += 1000) {
-    const { data, error } = await pagina(desde, desde + 999);
-    if (error) throw new Error(error.message);
-    out.push(...(data ?? []));
-    if (!data || data.length < 1000) return out;
-  }
 }
 
 interface Miembro {
