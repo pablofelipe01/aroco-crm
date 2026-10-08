@@ -23,6 +23,7 @@ const persona = (over: Partial<PersonaUso> = {}): PersonaUso => ({
   vencidas: 0,
   sin_fecha: 0,
   cerradas_30d: 0,
+  dias_30d: 0,
   tiene_tareas: true,
   semanas: [],
   modulos: [],
@@ -49,21 +50,20 @@ test("acciones no cuenta dos veces una tarea cerrada", () => {
   assert.equal(acciones(s), 4);
 });
 
-test("filaDeUso rellena las semanas sin actividad y promedia cuatro", () => {
+test("filaDeUso rellena las semanas sin actividad", () => {
   const lunes = semanasDelPeriodo("2026-09-07", "2026-09-29");
   const fila = filaDeUso(
     persona({
       semanas: [
         { ...semanaVacia("2026-09-14"), minutos: 120 },
-        { ...semanaVacia("2026-09-28"), minutos: 90, movidas: 2 },
+        { ...semanaVacia("2026-09-28"), minutos: 90, dias: 2, movidas: 2 },
       ],
     }),
     lunes,
   );
   assert.equal(fila.serie.length, 4);
   assert.equal(fila.serie[0].minutos, 0);
-  assert.equal(fila.horasSemana, 1.5);
-  assert.equal(fila.promedio4, (120 + 90) / 60 / 4);
+  assert.equal(fila.actual.dias, 2);
   assert.equal(fila.accionesSemana, 2);
   assert.equal(fila.estado, "activo");
 });
@@ -87,15 +87,44 @@ test("estado: poco si solo usó la semana pasada, inactivo si nada", () => {
   assert.equal(filaDeUso(persona(), lunes).estado, "inactivo");
 });
 
-test("ordenarFilas pone primero a los activos y luego por tiempo", () => {
+test("ordenarFilas pone primero a los activos y luego por días, no por horas", () => {
   const lunes = semanasDelPeriodo("2026-09-21", "2026-09-29");
-  const f = (id: string, min: number) =>
+  const f = (id: string, dias: number, minutos: number) =>
     filaDeUso(
-      persona({ id, nombre: id, semanas: min ? [{ ...semanaVacia("2026-09-28"), minutos: min }] : [] }),
+      persona({
+        id,
+        nombre: id,
+        semanas: dias ? [{ ...semanaVacia("2026-09-28"), dias, minutos }] : [],
+      }),
       lunes,
     );
-  const orden = ordenarFilas([f("nada", 0), f("poco", 10), f("mucho", 300)]).map((x) => x.persona.id);
-  assert.deepEqual(orden, ["mucho", "poco", "nada"]);
+  // «integracion» trabaja por Claude: muchos días, casi sin minutos.
+  const orden = ordenarFilas([f("nada", 0, 0), f("horas", 1, 300), f("integracion", 4, 5)]).map(
+    (x) => x.persona.id,
+  );
+  assert.deepEqual(orden, ["integracion", "horas", "nada"]);
+});
+
+test("a igual de días desempatan los días de 30 y las tareas cerradas", () => {
+  const lunes = semanasDelPeriodo("2026-09-21", "2026-09-29");
+  const f = (id: string, dias_30d: number, cerradas_30d: number) =>
+    filaDeUso(
+      persona({ id, nombre: id, dias_30d, cerradas_30d, semanas: [{ ...semanaVacia("2026-09-28"), dias: 2 }] }),
+      lunes,
+    );
+  const orden = ordenarFilas([f("a", 3, 1), f("b", 3, 9), f("c", 5, 0)]).map((x) => x.persona.id);
+  assert.deepEqual(orden, ["c", "b", "a"]);
+});
+
+test("usoCrmSchema tolera la respuesta previa a 0102, sin dias_30d", () => {
+  const d = usoCrmSchema.parse({
+    desde: "2026-09-28",
+    hoy: "2026-10-08",
+    medicion_desde: null,
+    eventos_desde: null,
+    personas: [{ ...persona(), dias_30d: undefined }],
+  });
+  assert.equal(d.personas[0].dias_30d, 0);
 });
 
 test("modulosDelEquipo suma por módulo entre personas", () => {

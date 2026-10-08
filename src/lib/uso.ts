@@ -35,6 +35,8 @@ const personaSchema = z.object({
   vencidas: n,
   sin_fecha: n,
   cerradas_30d: n,
+  /** Días con uso o con una acción a su nombre, últimos 30 (0102). */
+  dias_30d: n,
   tiene_tareas: z.boolean(),
   semanas: z.array(semanaSchema),
   modulos: z.array(z.object({ modulo: z.string(), minutos: n })),
@@ -59,9 +61,6 @@ export type FilaUso = {
   /** Una entrada por semana del periodo, en orden, con ceros donde no hubo nada. */
   serie: SemanaUso[];
   actual: SemanaUso;
-  horasSemana: number;
-  /** Promedio de horas de las últimas cuatro semanas, contando la actual. */
-  promedio4: number;
   /** Lo que la persona le metió al CRM esta semana (ver `acciones`). */
   accionesSemana: number;
   /** Leads y gestiones comerciales de las últimas cuatro semanas. */
@@ -138,11 +137,6 @@ export function filaDeUso(p: PersonaUso, lunes: string[]): FilaUso {
     persona: p,
     serie,
     actual,
-    horasSemana: actual.minutos / 60,
-    promedio4:
-      ultimas4.length === 0
-        ? 0
-        : ultimas4.reduce((a, s) => a + s.minutos, 0) / 60 / ultimas4.length,
     accionesSemana: acciones(actual),
     comercial4: ultimas4.reduce((a, s) => a + s.leads + s.gestiones, 0),
     ultimo: p.ultimo_uso
@@ -154,12 +148,18 @@ export function filaDeUso(p: PersonaUso, lunes: string[]): FilaUso {
 
 const PESO: Record<EstadoUso, number> = { activo: 0, poco: 1, inactivo: 2 };
 
-/** Primero quien está activo, y dentro de cada grupo quien más usa el CRM. */
+/**
+ * Primero quien está activo, y dentro de cada grupo quien entra más días y
+ * cierra más tareas. Las horas ya no ordenan: quien trabaja por la
+ * integración con Claude no deja minutos (reunión del 2026-10-08).
+ */
 export function ordenarFilas(filas: FilaUso[]): FilaUso[] {
   return [...filas].sort(
     (a, b) =>
       PESO[a.estado] - PESO[b.estado] ||
-      b.actual.minutos - a.actual.minutos ||
+      b.actual.dias - a.actual.dias ||
+      b.persona.dias_30d - a.persona.dias_30d ||
+      b.persona.cerradas_30d - a.persona.cerradas_30d ||
       b.accionesSemana - a.accionesSemana ||
       (b.ultimo.cuando ?? "").localeCompare(a.ultimo.cuando ?? "") ||
       a.persona.nombre.localeCompare(b.persona.nombre, "es"),
