@@ -33,23 +33,36 @@ export default async function DashboardPage() {
   const supabase = await createClient();
   const session = await getSessionContext();
 
-  const isAdmin = session?.profile?.role === "admin";
   const dept = session?.profile?.department ?? null;
 
-  // Próximas tareas pendientes. Ya no se filtra por departamento aquí: desde
-  // 0048 la RLS recorta por rama del organigrama, así que un SuperAdmin ve
-  // todo y un jefe ve lo suyo y lo de su gente. Filtrar además por área haría
-  // que Dirección dejara de ver el resto de la empresa.
-  const tasksQuery = supabase
-    .from("tasks")
-    .select(
-      "id, name, status, due_date, person_name, person:team_members!tasks_person_id_fkey(name, department)",
-    )
-    .neq("status", "done")
-    .order("due_date", { ascending: true, nullsFirst: false })
-    .limit(5);
+  // Próximas tareas: las mías y las de mi área, por responsable. La RLS de
+  // tareas (0048) no sirve de filtro aquí: casi todos son admin y la RLS les
+  // deja ver todo, así que «Departamento: Comercial» mostraba a toda la
+  // empresa (revisión 2026-10-08). Los responsables viven en task_assignees.
+  const { data: equipo } = await supabase
+    .from("team_members")
+    .select("id, profile_id, department")
+    .eq("active", true);
+  const yo = (equipo ?? []).find((m) => m.profile_id === session?.userId);
+  const idsMios = yo ? [yo.id] : [];
+  const idsArea = dept
+    ? (equipo ?? []).filter((m) => m.department === dept).map((m) => m.id)
+    : [];
 
-  const [leadsRes, stockRes, prices, dispatchRes, market, tasksRes] =
+  const proximasDe = (ids: string[]) =>
+    ids.length === 0
+      ? Promise.resolve({ data: [] as unknown[] })
+      : supabase
+          .from("tasks")
+          .select(
+            "id, name, status, due_date, person_name, filtro:task_assignees!inner(team_member_id), task_assignees(team_members(name))",
+          )
+          .in("filtro.team_member_id", ids)
+          .neq("status", "done")
+          .order("due_date", { ascending: true, nullsFirst: false })
+          .limit(5);
+
+  const [leadsRes, stockRes, prices, dispatchRes, market, misRes, areaRes] =
     await Promise.all([
       supabase.from("leads").select("status, potential_value_cop"),
       // Inventario real, lote por lote. Antes esto salía de `inventory_quality`
@@ -68,7 +81,8 @@ export default async function DashboardPage() {
       ),
       supabase.from("dispatches").select("qty_kg"),
       getMarketData(),
-      tasksQuery,
+      proximasDe(idsMios),
+      proximasDe(idsArea),
     ]);
 
   const leads = leadsRes.data ?? [];
@@ -147,17 +161,23 @@ export default async function DashboardPage() {
     status: string;
     due_date: string | null;
     person_name: string | null;
-    person: { name: string | null; department: string | null } | null;
+    task_assignees: { team_members: { name: string } | null }[] | null;
   };
   const today = new Date().toISOString().slice(0, 10);
-  const upcomingTasks = ((tasksRes.data ?? []) as unknown as TaskRow[]).map((t) => ({
-    id: t.id,
-    name: t.name,
-    person_name: t.person?.name ?? t.person_name ?? null,
-    due_date: t.due_date,
-    status: t.status,
-    overdue: !!t.due_date && t.due_date < today,
-  }));
+  const aProximas = (rows: unknown[] | null) =>
+    ((rows ?? []) as TaskRow[]).map((t) => {
+      const nombres = (t.task_assignees ?? [])
+        .map((a) => a.team_members?.name)
+        .filter((n): n is string => !!n);
+      return {
+        id: t.id,
+        name: t.name,
+        person_name: nombres.length > 0 ? nombres.join(", ") : t.person_name,
+        due_date: t.due_date,
+        status: t.status,
+        overdue: !!t.due_date && t.due_date < today,
+      };
+    });
 
   const data: DashboardData = {
     name: session?.profile?.full_name ?? "",
@@ -177,9 +197,8 @@ export default async function DashboardPage() {
       cocoaContract: market.cocoaContract,
       cacao,
     },
-    upcomingTasks,
-    // El rótulo se arma en el cliente, que es quien sabe el idioma.
-    tasksScopeDept: isAdmin && dept ? dept : null,
+    upcomingTasks: { mias: aProximas(misRes.data), area: aProximas(areaRes.data) },
+    tasksDept: dept,
     pipeline,
     pipelineValue: { weighted: pipelineWeighted, total: pipelineTotal },
     inventory: topRegions,

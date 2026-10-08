@@ -1,5 +1,6 @@
 "use client";
 
+import * as React from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import {
@@ -35,6 +36,15 @@ import {
   type PriceSeriesPoint,
 } from "@/components/charts/price-chart";
 
+export interface UpcomingTask {
+  id: string;
+  name: string;
+  person_name: string | null;
+  due_date: string | null;
+  status: string;
+  overdue: boolean;
+}
+
 export interface DashboardData {
   name: string;
   kpis: {
@@ -53,16 +63,10 @@ export interface DashboardData {
     cocoaContract: string | null;
     cacao: { company: string; price: number | null }[];
   };
-  upcomingTasks: {
-    id: string;
-    name: string;
-    person_name: string | null;
-    due_date: string | null;
-    status: string;
-    overdue: boolean;
-  }[];
-  /** El área cuyas tareas se están mirando, o null si son las propias. */
-  tasksScopeDept: string | null;
+  /** Próximas tareas propias y de mi área, por responsable. */
+  upcomingTasks: { mias: UpcomingTask[]; area: UpcomingTask[] };
+  /** Mi área, o null si no tengo: entonces no hay selector. */
+  tasksDept: string | null;
   pipeline: PipelineDatum[];
   pipelineValue: { weighted: number; total: number };
   inventory: InventoryDatum[];
@@ -83,6 +87,8 @@ export function DashboardView({ data }: { data: DashboardData }) {
   const { kpis } = data;
   const t = useT();
   const f = useFormatos();
+  const [vista, setVista] = React.useState<"mias" | "area">("mias");
+  const tareas = vista === "mias" ? data.upcomingTasks.mias : data.upcomingTasks.area;
   return (
     <div className="space-y-8">
       <PageHeader
@@ -190,20 +196,41 @@ export function DashboardView({ data }: { data: DashboardData }) {
               <ListChecks className="h-4 w-4 text-accent" />
               {t.dashboard.proximasTareas}
             </CardTitle>
-            <Badge tone="neutral">
-              {data.tasksScopeDept
-                ? `${t.dashboard.departamento}: ${data.tasksScopeDept}`
-                : t.dashboard.proximas}
-            </Badge>
+            {data.tasksDept ? (
+              <div
+                role="group"
+                aria-label={t.dashboard.proximasTareas}
+                className="inline-flex items-center rounded-[var(--radius-md)] border border-border bg-surface p-0.5"
+              >
+                {(["mias", "area"] as const).map((v) => (
+                  <button
+                    key={v}
+                    type="button"
+                    aria-pressed={vista === v}
+                    onClick={() => setVista(v)}
+                    className={cn(
+                      "rounded-[var(--radius-sm)] px-2 py-1 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                      vista === v
+                        ? "bg-accent text-accent-fg"
+                        : "text-fg-muted hover:bg-bg-subtle hover:text-fg",
+                    )}
+                  >
+                    {v === "mias" ? t.dashboard.mias : data.tasksDept}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <Badge tone="neutral">{t.dashboard.mias}</Badge>
+            )}
           </CardHeader>
           <CardBody className="p-0">
-            {data.upcomingTasks.length === 0 ? (
+            {tareas.length === 0 ? (
               <p className="px-5 py-8 text-center text-sm text-fg-subtle">
                 {t.dashboard.sinTareas}
               </p>
             ) : (
               <ul className="divide-y divide-border">
-                {data.upcomingTasks.map((tarea) => (
+                {tareas.map((tarea) => (
                   <li key={tarea.id} className="flex items-center gap-3 px-5 py-2.5">
                     <Badge
                       tone={
