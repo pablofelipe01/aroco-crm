@@ -94,14 +94,26 @@ export function NotificationsBell() {
   async function markAll() {
     if (!items.length) return;
     const supabase = createClient();
-    await supabase
-      .from("notifications")
-      .update({ read: true })
-      .in(
-        "id",
-        items.map((i) => i.id),
-      );
-    setItems([]);
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    // Los propios, todos: la lista carga 20 y antes solo se marcaban esos, así
+    // que con 40 avisos había que pulsar dos veces. Los de área (for_user
+    // null) comparten un solo «leído» con todo el departamento: de esos solo
+    // se marcan los que se están viendo, como siempre.
+    const visiblesDeArea = items.filter((i) => i.for_user == null).map((i) => i.id);
+    await Promise.all([
+      user &&
+        supabase
+          .from("notifications")
+          .update({ read: true })
+          .eq("for_user", user.id)
+          .eq("read", false),
+      visiblesDeArea.length > 0 &&
+        supabase.from("notifications").update({ read: true }).in("id", visiblesDeArea),
+    ]);
+    // Puede quedar algo de área que no cabía en la lista: se vuelve a cargar.
+    await load();
   }
 
   const count = items.length;
