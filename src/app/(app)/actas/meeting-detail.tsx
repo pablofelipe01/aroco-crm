@@ -96,13 +96,13 @@ function AccessPanel({
       </h3>
       <p className="mb-3 text-xs text-fg-subtle">
         {meeting.restricted
-          ? "El acta está restringida: solo la ven los marcados, más quienes la administran."
+          ? "Solo la ven los marcados, Dirección, quien la subió, quien la administra y quien tiene tareas en ella."
           : "El acta está abierta a todo el equipo. Estas marcas empiezan a aplicar cuando la restrinjas."}
       </p>
 
       {invitados.length === 0 ? (
         <p className="text-sm text-fg-subtle">
-          No hay nadie en la lista. Si la restringes, solo la verán quienes la administran.
+          No hay nadie en la lista. Restringida, solo la ven Dirección, quien la subió y quien tiene tareas en ella.
         </p>
       ) : (
         <ul className="space-y-1">

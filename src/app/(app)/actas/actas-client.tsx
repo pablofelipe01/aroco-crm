@@ -242,7 +242,7 @@ export function ActasClient({
   async function onToggleRestricted(m: MeetingWithCount) {
     if (!m.restricted && m.meeting_attendees.length === 0) {
       const ok = confirm(
-        `"${m.title}" no tiene invitados registrados. Si la restringes, solo la verán Dirección y quien la subió. ¿Continuar?`,
+        `"${m.title}" no tiene invitados registrados. Si la restringes, solo la verán Dirección, quien la subió y quien tenga tareas en ella. ¿Continuar?`,
       );
       if (!ok) return;
     }
@@ -256,7 +256,7 @@ export function ActasClient({
       title: m.restricted ? "Acta abierta al equipo" : "Acta restringida",
       description: m.restricted
         ? undefined
-        : `La verán ${m.meeting_attendees.length} invitados, Dirección y quien la subió.`,
+        : `La verán ${m.meeting_attendees.length} invitados, Dirección, quien la subió y quien tenga tareas en ella.`,
     });
     router.refresh();
   }
@@ -334,11 +334,11 @@ export function ActasClient({
                   tone="warn"
                   title={
                     m.meeting_attendees.length > 0
-                      ? `Solo la ven: ${m.meeting_attendees
+                      ? `La ven Dirección, quien tiene tareas en ella y: ${m.meeting_attendees
                           .map((a) => a.name ?? a.email)
                           .filter(Boolean)
                           .join(", ")}`
-                      : "Solo la ven Dirección y quien la subió — no hay invitados registrados"
+                      : "Solo la ven Dirección, quien la subió y quien tiene tareas en ella — no hay invitados registrados"
                   }
                 >
                   <Lock className="h-3 w-3" />
