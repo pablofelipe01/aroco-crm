@@ -6,46 +6,53 @@ import { Button } from "@/components/ui/button";
 import { Field, Input, Select } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/components/ui/toast";
-import { cotizar, type CotizadorInput, type Incoterm } from "@/lib/calc/cotizador";
+import { cotizar, esViable, type CotizadorInput, type Incoterm } from "@/lib/calc/cotizador";
+import { comisionPorDefecto, type Parametros } from "@/lib/cotizador-parametros";
+import { fijosDe, type Fijos } from "@/lib/schemas/quote";
 import { formatUSD, cn } from "@/lib/utils";
 import { useT, useFormatos } from "@/lib/i18n/provider";
 import type { Quote } from "@/lib/types/database";
 import { createQuote, updateQuote } from "./actions";
+import type { ReferenciasMercado } from "./page";
 
 type LeadOption = { id: string; company: string; market: string | null };
 
 type State = Record<string, string>;
 
-const DEFAULTS: State = {
-  incoterm: "FOB",
-  lead_id: "",
-  client_name: "",
-  market: "Internacional",
-  port_origin: "Buenaventura",
-  port_destination: "",
-  volume_tm: "25",
-  validity_days: "15",
-  trm: "4000",
-  cocoa_usd_t: "3900",
-  differential_pct: "5",
-  purchase_price_cop_kg: "12100",
-  commission_pct: "8",
-  target_utility_pct: "8",
-  transporte_bodega: "150",
-  seleccion: "83",
-  fumigacion: "0",
-  estibas: "0",
-  costales: "0",
-  coberturas: "0",
-  costos_exportacion: "720",
-  bonif_calidad: "0",
-  bonif_cadmio: "0",
-  bonif_trazabilidad: "0",
-  bonif_transporte: "0",
-};
+const pct = (r: number) => String(Math.round(r * 1e6) / 1e4);
+
+/** A new quote starts from the admin parameters and today's market. */
+function nuevoEstado(p: Parametros, ref: ReferenciasMercado): State {
+  return {
+    incoterm: "FOB",
+    lead_id: "",
+    client_name: "",
+    market: "Internacional",
+    port_origin: "Buenaventura",
+    port_destination: "",
+    volume_tm: "25",
+    validity_days: "15",
+    trm: ref.trm != null ? String(ref.trm) : "",
+    cocoa_usd_t: ref.cocoaUsdT != null ? String(ref.cocoaUsdT) : "",
+    differential_pct: "0",
+    purchase_price_cop_kg: "",
+    commission_pct: pct(comisionPorDefecto(p, "FOB")),
+    transporte_bodega: String(p.transporte_bodega),
+    seleccion: String(p.seleccion),
+    fumigacion: String(p.fumigacion),
+    estibas: String(p.estibas),
+    costales: String(p.costales),
+    coberturas: String(p.coberturas),
+    costos_exportacion: String(p.costos_exportacion),
+    bonif_calidad_proveedor_pct: pct(p.bonif_calidad_proveedor_pct),
+    bonif_cadmio: String(p.bonif_cadmio),
+    bonif_trazabilidad: String(p.bonif_trazabilidad),
+    bonif_transporte: String(p.bonif_transporte),
+  };
+}
 
 function quoteToState(q: Quote): State {
-  const s: State = { ...DEFAULTS };
+  const s: State = {};
   const set = (k: string, v: unknown) => (s[k] = v == null ? "" : String(v));
   set("incoterm", q.incoterm);
   set("lead_id", q.lead_id ?? "");
@@ -57,10 +64,9 @@ function quoteToState(q: Quote): State {
   set("validity_days", q.validity_days ?? 15);
   set("trm", q.trm);
   set("cocoa_usd_t", q.cocoa_usd_t);
-  set("differential_pct", q.differential * 100);
+  set("differential_pct", pct(q.differential));
   set("purchase_price_cop_kg", q.purchase_price_cop_kg);
-  set("commission_pct", q.commission_pct * 100);
-  set("target_utility_pct", q.target_utility_pct * 100);
+  set("commission_pct", pct(q.commission_pct));
   set("transporte_bodega", q.transporte_bodega);
   set("seleccion", q.seleccion);
   set("fumigacion", q.fumigacion);
@@ -68,7 +74,7 @@ function quoteToState(q: Quote): State {
   set("costales", q.costales);
   set("coberturas", q.coberturas);
   set("costos_exportacion", q.costos_exportacion);
-  set("bonif_calidad", q.bonif_calidad);
+  set("bonif_calidad_proveedor_pct", pct(q.bonif_calidad_proveedor_pct));
   set("bonif_cadmio", q.bonif_cadmio);
   set("bonif_trazabilidad", q.bonif_trazabilidad);
   set("bonif_transporte", q.bonif_transporte);
@@ -80,7 +86,7 @@ function n(s: State, k: string): number {
   return Number.isFinite(v) ? v : 0;
 }
 
-function stateToCotizador(s: State): CotizadorInput {
+function stateToCotizador(s: State, fijos: Fijos): CotizadorInput {
   return {
     incoterm: s.incoterm as Incoterm,
     trm: n(s, "trm"),
@@ -96,8 +102,11 @@ function stateToCotizador(s: State): CotizadorInput {
     costales: n(s, "costales"),
     coberturas: n(s, "coberturas"),
     costosExportacion: n(s, "costos_exportacion"),
-    targetUtilityPct: n(s, "target_utility_pct") / 100,
-    bonifCalidad: n(s, "bonif_calidad"),
+    fncPct: fijos.fnc_pct,
+    mermaPct: fijos.merma_pct,
+    factorNacional: fijos.factor_nacional,
+    bonifCalidadPct: fijos.bonif_calidad_pct,
+    bonifCalidadProveedorPct: n(s, "bonif_calidad_proveedor_pct") / 100,
     bonifCadmio: n(s, "bonif_cadmio"),
     bonifTrazabilidad: n(s, "bonif_trazabilidad"),
     bonifTransporte: n(s, "bonif_transporte"),
@@ -109,14 +118,16 @@ function NumField({
   value,
   onChange,
   suffix,
+  hint,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
   suffix?: string;
+  hint?: string;
 }) {
   return (
-    <Field label={label}>
+    <Field label={label} hint={hint}>
       <div className="relative">
         <Input
           type="number"
@@ -141,37 +152,64 @@ export function QuoteCalculator({
   leads,
   initial,
   onSaved,
+  parametros,
+  referencias,
 }: {
   open: boolean;
   onClose: () => void;
   leads: LeadOption[];
   initial: Quote | null;
   onSaved: () => void;
+  parametros: Parametros;
+  referencias: ReferenciasMercado;
 }) {
   const { toast } = useToast();
   const t = useT();
   const f = useFormatos();
-  const [s, setS] = React.useState<State>(DEFAULTS);
+  const [s, setS] = React.useState<State>(() => nuevoEstado(parametros, referencias));
   const [prevKey, setPrevKey] = React.useState("");
   const [saving, setSaving] = React.useState(false);
 
   const key = `${open}:${initial?.id ?? "new"}`;
   if (key !== prevKey) {
     setPrevKey(key);
-    if (open) setS(initial ? quoteToState(initial) : { ...DEFAULTS });
+    if (open) setS(initial ? quoteToState(initial) : nuevoEstado(parametros, referencias));
   }
 
   const set = (k: string, v: string) => setS((p) => ({ ...p, [k]: v }));
 
+  function onIncoterm(incoterm: Incoterm) {
+    setS((p) => ({
+      ...p,
+      incoterm,
+      commission_pct: pct(comisionPorDefecto(parametros, incoterm)),
+    }));
+  }
+
   const isNacional = s.incoterm === "NACIONAL";
+  // An existing quote keeps the parameters it was created with.
+  const fijos: Fijos = React.useMemo(() => fijosDe(initial ?? parametros), [initial, parametros]);
+  const umbral = parametros.umbral_viable;
 
   const result = React.useMemo(() => {
+    if (n(s, "purchase_price_cop_kg") <= 0) return null;
     try {
-      return cotizar(stateToCotizador(s));
+      return cotizar(stateToCotizador(s, fijos));
     } catch {
       return null;
     }
-  }, [s]);
+  }, [s, fijos]);
+
+  const hintCocoa =
+    referencias.cocoaUsdT == null
+      ? t.cotizador.sinPrecioMercado
+      : `ICE NY · ${referencias.cocoaEnVivo ? t.cotizador.enVivo : t.cotizador.cierre} ${
+          referencias.cocoaFecha ? f.fecha(referencias.cocoaFecha) : ""
+        } · ${f.numero(referencias.cocoaUsdT, 0)}`;
+  const hintTrm =
+    referencias.trm == null
+      ? undefined
+      : `${t.cotizador.trmOficial} ${referencias.trmFecha ? f.fecha(referencias.trmFecha) : ""} · ${f.numero(referencias.trm, 2)}`;
 
   function onPickLead(id: string) {
     const lead = leads.find((l) => l.id === id);
@@ -231,7 +269,7 @@ export function QuoteCalculator({
         <div className="space-y-5">
           <section className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             <Field label={t.cotizaciones.incoterm}>
-              <Select value={s.incoterm} onChange={(e) => set("incoterm", e.target.value)}>
+              <Select value={s.incoterm} onChange={(e) => onIncoterm(e.target.value as Incoterm)}>
                 <option value="NACIONAL">NACIONAL</option>
                 <option value="FOB">FOB</option>
                 <option value="CIF">CIF</option>
@@ -264,19 +302,16 @@ export function QuoteCalculator({
               {t.cotizador.precioVolumen}
             </h4>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-              <NumField label="TRM" value={s.trm} onChange={(v) => set("trm", v)} suffix="COP/USD" />
+              <NumField label="TRM" value={s.trm} onChange={(v) => set("trm", v)} suffix="COP/USD" hint={hintTrm} />
               <NumField label={t.cotizador.compra} value={s.purchase_price_cop_kg} onChange={(v) => set("purchase_price_cop_kg", v)} suffix="COP/kg" />
               <NumField label={t.cotizador.volumen} value={s.volume_tm} onChange={(v) => set("volume_tm", v)} suffix="TM" />
               {!isNacional && (
                 <>
-                  <NumField label={t.cotizador.cocoaRef} value={s.cocoa_usd_t} onChange={(v) => set("cocoa_usd_t", v)} suffix="USD/T" />
+                  <NumField label={t.cotizador.cocoaRef} value={s.cocoa_usd_t} onChange={(v) => set("cocoa_usd_t", v)} suffix="USD/T" hint={hintCocoa} />
                   <NumField label={t.cotizador.diferencial} value={s.differential_pct} onChange={(v) => set("differential_pct", v)} suffix="%" />
                 </>
               )}
               <NumField label={t.cotizador.comision} value={s.commission_pct} onChange={(v) => set("commission_pct", v)} suffix="%" />
-              {isNacional && (
-                <NumField label={t.cotizador.utilidadObj} value={s.target_utility_pct} onChange={(v) => set("target_utility_pct", v)} suffix="%" />
-              )}
             </div>
           </section>
 
@@ -296,16 +331,33 @@ export function QuoteCalculator({
                 <NumField label={t.cotizador.costosExport} value={s.costos_exportacion} onChange={(v) => set("costos_exportacion", v)} />
               )}
             </div>
+            <p className="mt-2 text-xs text-fg-subtle">
+              {t.cotizador.fijosNota}{" "}
+              <span className="font-mono tnum">
+                FNC {pct(fijos.fnc_pct)} % · {t.cotizador.merma} {pct(fijos.merma_pct)} %
+                {isNacional &&
+                  ` · ${t.cotizador.factorNacional} ${fijos.factor_nacional} · ${t.cotizador.calidad} ${pct(fijos.bonif_calidad_pct)} %`}
+              </span>
+            </p>
           </section>
 
           {isNacional && (
             <section>
               <h4 className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-fg-subtle">
                 {t.cotizador.bonificaciones}
-                <Badge tone="warn">{t.cotizador.bonifPendiente}</Badge>
               </h4>
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                <NumField label={t.cotizador.calidad} value={s.bonif_calidad} onChange={(v) => set("bonif_calidad", v)} suffix="USD/TM" />
+                <NumField
+                  label={t.cotizador.calidadProveedor}
+                  value={s.bonif_calidad_proveedor_pct}
+                  onChange={(v) => set("bonif_calidad_proveedor_pct", v)}
+                  suffix="%"
+                  hint={
+                    result
+                      ? `${t.cotizador.calidadAroco}: ${formatUSD(result.bonifCalidadUsdTm)} /TM`
+                      : undefined
+                  }
+                />
                 <NumField label={t.cotizador.cadmio} value={s.bonif_cadmio} onChange={(v) => set("bonif_cadmio", v)} suffix="COP/kg" />
                 <NumField label={t.cotizador.trazabilidad} value={s.bonif_trazabilidad} onChange={(v) => set("bonif_trazabilidad", v)} suffix="COP/kg" />
                 <NumField label={t.cotizador.transporte} value={s.bonif_transporte} onChange={(v) => set("bonif_transporte", v)} suffix="COP/kg" />
@@ -349,8 +401,17 @@ export function QuoteCalculator({
                   <Row
                     label={t.cotizador.utilidad}
                     value={`${(result.utilidadPct * 100).toFixed(2)}%`}
-                    tone={result.utilidadPct >= 0 ? "good" : "bad"}
+                    tone={esViable(result.utilidadPct, umbral) ? "good" : "bad"}
                   />
+                </div>
+                <div className="mt-3">
+                  {esViable(result.utilidadPct, umbral) ? (
+                    <Badge tone="success">{t.cotizador.viable}</Badge>
+                  ) : (
+                    <Badge tone="danger">
+                      {t.cotizador.noViable} (&lt; {pct(umbral)} %)
+                    </Badge>
+                  )}
                 </div>
 
                 <div className="mt-4 border-t border-border pt-3">

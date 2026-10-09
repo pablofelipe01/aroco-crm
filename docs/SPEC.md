@@ -43,6 +43,8 @@ RLS en **todas** las tablas; nada accesible sin política. Lectura/escritura seg
 ## 8. Lógica financiera (portar con fidelidad → `src/lib/calc`, con tests)
 
 ### 8.1 Cotizador
+> **Actualizado 2026-10-09:** el cálculo vigente es el de la hoja «Cotizador Comercial Aroco» de Nicolás, documentado en `src/lib/calc/cotizador.ts` y probado contra sus valores. Cambios frente a lo de abajo: comisión con piso 0; NACIONAL = compra ÷ 0,97 (no utilidad objetivo); Bonificación Calidad = 4,95 % del precio final × (1 − parte del proveedor); parámetros en `cotizador_parametros` (solo admin). Lo de abajo queda como historia.
+
 Por línea: `COP/TM = valor*1000`; `USD/TM = COP/TM / TRM`; `USD/kg = USD/TM/1000`; `FINAL_USD = USD/TM * volumenTM`.
 - Precio compra: `COP/TM = precioCompraKg*1000`. FNC = 3%×(compra USD/TM) solo export. Merma = 0,5%×(compra USD/TM) siempre.
 - Ceros por incoterm: FOB → Estibas=0; CIF → Transporte a bodega=0; NACIONAL → FNC=0.

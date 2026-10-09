@@ -3,7 +3,12 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getSessionContext } from "@/lib/auth";
-import { quoteSchema, buildQuoteRow } from "@/lib/schemas/quote";
+import { quoteSchema, buildQuoteRow, fijosDe, type Fijos } from "@/lib/schemas/quote";
+import {
+  cargarParametros,
+  PARAMETROS_HOJA,
+  type ClaveParametro,
+} from "@/lib/cotizador-parametros";
 import type { QuoteStatus } from "@/lib/types/database";
 
 export type ActionResult = { ok: boolean; error?: string; id?: string };
@@ -15,12 +20,16 @@ async function requireSession() {
 }
 
 /** Build the persisted DB row (inputs as ratios + computed snapshot). */
-function buildRow(input: unknown) {
+function buildRow(input: unknown, fijos: Fijos) {
   const parsed = quoteSchema.safeParse(input);
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Datos inválidos." } as const;
   }
-  return { row: buildQuoteRow(parsed.data) } as const;
+  try {
+    return { row: buildQuoteRow(parsed.data, fijos) } as const;
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Datos inválidos." } as const;
+  }
 }
 
 async function nextQuoteNumber(
@@ -34,10 +43,11 @@ async function nextQuoteNumber(
 }
 
 export async function createQuote(input: unknown): Promise<ActionResult> {
-  const built = buildRow(input);
-  if ("error" in built) return { ok: false, error: built.error };
   const session = await requireSession();
   const supabase = await createClient();
+  // A new quote takes today's admin parameters.
+  const built = buildRow(input, fijosDe(await cargarParametros(supabase)));
+  if ("error" in built) return { ok: false, error: built.error };
 
   const quote_number = await nextQuoteNumber(supabase);
   const { data, error } = await supabase
@@ -51,10 +61,17 @@ export async function createQuote(input: unknown): Promise<ActionResult> {
 }
 
 export async function updateQuote(id: string, input: unknown): Promise<ActionResult> {
-  const built = buildRow(input);
-  if ("error" in built) return { ok: false, error: built.error };
   await requireSession();
   const supabase = await createClient();
+  // An edit keeps the parameters the quote was created with.
+  const { data: actual, error: errActual } = await supabase
+    .from("quotes")
+    .select("fnc_pct, merma_pct, factor_nacional, bonif_calidad_pct")
+    .eq("id", id)
+    .single();
+  if (errActual) return { ok: false, error: errActual.message };
+  const built = buildRow(input, actual);
+  if ("error" in built) return { ok: false, error: built.error };
   const { error } = await supabase.from("quotes").update(built.row).eq("id", id);
   if (error) return { ok: false, error: error.message };
   revalidatePath("/cotizaciones");
@@ -103,4 +120,36 @@ export async function setQuoteStatus(
 
   revalidatePath("/cotizaciones");
   return { ok: true, id };
+}
+
+/** Admin only (RLS enforces it too): update the cotizador parameters. */
+export async function guardarParametros(
+  valores: Partial<Record<ClaveParametro, number>>,
+): Promise<ActionResult> {
+  const session = await requireSession();
+  if (session.profile?.role !== "admin") {
+    return { ok: false, error: "Solo un admin puede cambiar los parámetros." };
+  }
+  const supabase = await createClient();
+  for (const [clave, valor] of Object.entries(valores)) {
+    if (!(clave in PARAMETROS_HOJA)) return { ok: false, error: `Parámetro desconocido: ${clave}` };
+    if (typeof valor !== "number" || !Number.isFinite(valor) || valor < 0) {
+      return { ok: false, error: `Valor inválido para ${clave}.` };
+    }
+    if (clave === "factor_nacional" && valor === 0) {
+      return { ok: false, error: "El factor nacional no puede ser 0." };
+    }
+    if (clave === "bonif_calidad_proveedor_pct" && valor > 1) {
+      return { ok: false, error: "La parte del proveedor no puede pasar de 100 %." };
+    }
+    const { data, error } = await supabase
+      .from("cotizador_parametros")
+      .update({ valor, updated_at: new Date().toISOString(), updated_by: session.userId })
+      .eq("clave", clave)
+      .select("clave");
+    if (error) return { ok: false, error: error.message };
+    if (!data?.length) return { ok: false, error: `No se pudo guardar ${clave}.` };
+  }
+  revalidatePath("/cotizaciones");
+  return { ok: true };
 }

@@ -1,13 +1,18 @@
 import { z } from "zod";
 import { cotizar, type CotizadorInput, type Incoterm } from "@/lib/calc/cotizador";
+import type { Parametros } from "@/lib/cotizador-parametros";
 
 const num = z.coerce.number();
 const optNum = z.coerce.number().optional().default(0);
 
 /**
- * Quote form schema. Percentages (differential, commission, target utility) are
- * entered as whole numbers (5 = 5%) and converted to ratios in
- * `toCotizadorInput`. Modifiers are COP/kg; bonif_calidad is USD/TM.
+ * Quote form schema. Percentages (differential, commission, supplier share of
+ * the quality premium) are entered as whole numbers (5 = 5%) and converted to
+ * ratios in `toCotizadorInput`. Modifiers and bonificaciones are COP/kg.
+ *
+ * The admin-only parameters (FNC, merma, factor nacional, % Bonificación
+ * Calidad) are NOT part of the form: the server passes them as `Fijos`, from
+ * cotizador_parametros on create and from the quote's own snapshot on edit.
  */
 export const quoteSchema = z.object({
   incoterm: z.enum(["NACIONAL", "FOB", "CIF"]),
@@ -32,19 +37,33 @@ export const quoteSchema = z.object({
   coberturas: optNum,
   costos_exportacion: optNum,
 
-  bonif_calidad: optNum,
+  bonif_calidad_proveedor_pct: z.coerce.number().min(0).max(100).optional().default(0), // percent
   bonif_cadmio: optNum,
   bonif_trazabilidad: optNum,
   bonif_transporte: optNum,
 
   commission_pct: optNum, // percent
-  target_utility_pct: optNum, // percent
 });
 
 export type QuoteFormParsed = z.infer<typeof quoteSchema>;
 
+/** Admin-only parameters a quote is computed with (ratios). */
+export type Fijos = Pick<
+  Parametros,
+  "fnc_pct" | "merma_pct" | "factor_nacional" | "bonif_calidad_pct"
+>;
+
+export function fijosDe(p: Fijos): Fijos {
+  return {
+    fnc_pct: p.fnc_pct,
+    merma_pct: p.merma_pct,
+    factor_nacional: p.factor_nacional,
+    bonif_calidad_pct: p.bonif_calidad_pct,
+  };
+}
+
 /** Map validated quote form values → pure CotizadorInput (ratios). */
-export function toCotizadorInput(q: QuoteFormParsed): CotizadorInput {
+export function toCotizadorInput(q: QuoteFormParsed, fijos: Fijos): CotizadorInput {
   return {
     incoterm: q.incoterm as Incoterm,
     trm: q.trm,
@@ -60,8 +79,11 @@ export function toCotizadorInput(q: QuoteFormParsed): CotizadorInput {
     costales: q.costales,
     coberturas: q.coberturas,
     costosExportacion: q.costos_exportacion,
-    targetUtilityPct: q.target_utility_pct / 100,
-    bonifCalidad: q.bonif_calidad,
+    fncPct: fijos.fnc_pct,
+    mermaPct: fijos.merma_pct,
+    factorNacional: fijos.factor_nacional,
+    bonifCalidadPct: fijos.bonif_calidad_pct,
+    bonifCalidadProveedorPct: q.bonif_calidad_proveedor_pct / 100,
     bonifCadmio: q.bonif_cadmio,
     bonifTrazabilidad: q.bonif_trazabilidad,
     bonifTransporte: q.bonif_transporte,
@@ -73,8 +95,8 @@ export function toCotizadorInput(q: QuoteFormParsed): CotizadorInput {
  * validated form values. Shared by the Cotizaciones module and the AI assistant
  * so both compute identically. quote_number / created_by are added by the caller.
  */
-export function buildQuoteRow(q: QuoteFormParsed) {
-  const calc = cotizar(toCotizadorInput(q));
+export function buildQuoteRow(q: QuoteFormParsed, fijos: Fijos) {
+  const calc = cotizar(toCotizadorInput(q, fijos));
   return {
     incoterm: q.incoterm,
     lead_id: q.lead_id ?? null,
@@ -95,12 +117,13 @@ export function buildQuoteRow(q: QuoteFormParsed) {
     costales: q.costales,
     coberturas: q.coberturas,
     costos_exportacion: q.costos_exportacion,
-    bonif_calidad: q.bonif_calidad,
+    ...fijosDe(fijos),
+    bonif_calidad: calc.bonifCalidadUsdTm,
+    bonif_calidad_proveedor_pct: q.bonif_calidad_proveedor_pct / 100,
     bonif_cadmio: q.bonif_cadmio,
     bonif_trazabilidad: q.bonif_trazabilidad,
     bonif_transporte: q.bonif_transporte,
     commission_pct: q.commission_pct / 100,
-    target_utility_pct: q.target_utility_pct / 100,
     costo_total_usd_tm: calc.costoTotalUsdTm,
     utilidad_pct: calc.utilidadPct,
     precio_final_usd_tm: calc.precioFinalUsdTm,

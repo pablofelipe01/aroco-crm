@@ -38,6 +38,6 @@ estados de carga/error/vacío en cada vista.
 - Supabase: el usuario crea el proyecto y entrega las claves.
 - Registro: **solo por invitación de admin**.
 - Email/WhatsApp: automatizaciones construidas pero **desactivadas** tras env vars.
-- Pendiente: confirmar fórmula real de **Bonificación Calidad** del cotizador nacional (Fase 4).
+- Bonificación Calidad: 4,95 % del precio final, repartible con el proveedor (casilla de % por cotización). Pendiente con Nicolás: qué es cada componente, si el CIF suma flete y seguro, y si el umbral de 10 % es el criterio de viable.
 
 @AGENTS.md

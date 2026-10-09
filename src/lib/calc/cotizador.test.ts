@@ -1,8 +1,16 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { cotizar, FNC_PCT, MERMA_PCT, type CotizadorInput } from "./cotizador";
+import {
+  cotizar,
+  esViable,
+  FNC_PCT,
+  MERMA_PCT,
+  type CotizadorInput,
+} from "./cotizador";
 
-const TRM = 3557.81;
+// Reference values: «Cotizador Comercial Aroco», tabs FOB / CIF / NACIONAL,
+// as computed by Google Sheets on 2026-10-09.
+const TRM = 3205.65;
 
 function closeTo(actual: number, expected: number, tol: number, msg?: string) {
   assert.ok(
@@ -11,9 +19,11 @@ function closeTo(actual: number, expected: number, tol: number, msg?: string) {
   );
 }
 
-const baseModifiers = {
+const zeros = {
   trm: TRM,
-  precioCompraKg: 12100,
+  precioCompraKg: 15750,
+  cocoaUsdT: 5425,
+  diferencial: 0,
   volumenTM: 1,
   transporteBodega: 0,
   seleccion: 0,
@@ -24,108 +34,123 @@ const baseModifiers = {
   costosExportacion: 0,
 };
 
-// ── NACIONAL (fully reproducible from SPEC §8.1) ─────────────────────────────
-test("cotizador NACIONAL — reference values", () => {
-  const input: CotizadorInput = {
-    ...baseModifiers,
-    incoterm: "NACIONAL",
-    cocoaUsdT: 0,
-    diferencial: 0,
-    comisionPct: 0.05,
-    targetUtilityPct: 0.0884,
-    transporteBodega: 150,
-    seleccion: 83,
-    bonifCalidad: 113.95,
-    bonifCadmio: 280,
-    bonifTrazabilidad: 120,
-    bonifTransporte: 180,
-  };
-  const r = cotizar(input);
-  closeTo(r.netCostK!, 3206.49, 0.2, "K");
-  closeTo(r.precioFinalUsdTm, 3506.3, 0.5, "precioFinal");
-  closeTo(r.comisionUsdTm, 14.99, 0.1, "comisión");
-  closeTo(r.utilidadPct, 0.0884, 0.0005, "utilidad");
-  // FNC must be zero for NACIONAL.
+const nacional: CotizadorInput = {
+  ...zeros,
+  incoterm: "NACIONAL",
+  comisionPct: 0.05,
+  volumenTM: 13.919,
+  transporteBodega: 150,
+  seleccion: 83,
+  bonifCalidadPct: 0.0495,
+  bonifCalidadProveedorPct: 0,
+  bonifCadmio: 280,
+  bonifTrazabilidad: 120,
+  bonifTransporte: 180,
+};
+
+test("cotizador NACIONAL — hoja", () => {
+  const r = cotizar(nacional);
+  closeTo(r.precioFinalUsdTm, 5065.154774, 1e-5, "precioFinal (E45)");
+  closeTo(r.bonifCalidadUsdTm, 250.7251613, 1e-5, "bonif calidad (E35)");
+  closeTo(r.comisionUsdTm, 24.31800907, 1e-5, "comisión (E40)");
+  closeTo(r.costoTotalUsdTm, 4603.112602, 1e-5, "costo total (E42)");
+  closeTo(r.utilidadPct, 0.1003760308, 1e-9, "utilidad (E43)");
+  closeTo(r.totalOperacionUsd, 70501.8893, 1e-3, "operación (I45)");
   assert.equal(r.lines.find((l) => l.key === "fnc")!.usdPerTm, 0);
 });
 
-// ── FOB ──────────────────────────────────────────────────────────────────────
-// NOTE: fumigacion/costosExportacion below are the modifier set deduced to
-// reproduce the SPEC §8.1 reference aggregate. The per-line split should be
-// confirmed with AROCO (alongside bonifCalidad). The formula structure is the
-// validated part.
-test("cotizador FOB — reference values", () => {
-  const input: CotizadorInput = {
-    ...baseModifiers,
-    incoterm: "FOB",
-    cocoaUsdT: 3901,
-    diferencial: 0.05,
-    comisionPct: 0.08,
-    transporteBodega: 150,
-    seleccion: 83,
-    fumigacion: 60,
-    estibas: 0,
-    costosExportacion: 720,
-  };
-  const r = cotizar(input);
-  closeTo(r.precioFinalUsdTm, 4096.05, 0.01, "precioFinal");
-  closeTo(r.comisionUsdTm, 23.31, 0.1, "comisión");
-  closeTo(r.costoTotalUsdTm, 3828.03, 0.2, "costoTotal");
-  closeTo(r.utilidadPct, 0.07, 0.0005, "utilidad");
-  // Estibas zeroed for FOB.
-  assert.equal(r.lines.find((l) => l.key === "estibas")!.usdPerTm, 0);
-  // FNC and merma percentages.
-  const compraUsd = r.lines.find((l) => l.key === "compra")!.usdPerTm;
-  closeTo(r.lines.find((l) => l.key === "fnc")!.usdPerTm, FNC_PCT * compraUsd, 1e-6);
-  closeTo(
-    r.lines.find((l) => l.key === "merma")!.usdPerTm,
-    MERMA_PCT * compraUsd,
-    1e-6,
-  );
+test("cotizador NACIONAL — la parte del proveedor reduce la bonificación de AROCO", () => {
+  const todo = cotizar(nacional);
+  const mitad = cotizar({ ...nacional, bonifCalidadProveedorPct: 0.5 });
+  closeTo(mitad.bonifCalidadUsdTm, todo.bonifCalidadUsdTm / 2, 1e-9);
+  // Same price, higher cost → lower margin.
+  closeTo(mitad.precioFinalUsdTm, todo.precioFinalUsdTm, 1e-9);
+  assert.ok(mitad.utilidadPct < todo.utilidadPct);
+  const nada = cotizar({ ...nacional, bonifCalidadProveedorPct: 1 });
+  assert.equal(nada.bonifCalidadUsdTm, 0);
 });
 
-// ── CIF ──────────────────────────────────────────────────────────────────────
-test("cotizador CIF — reference values", () => {
-  const input: CotizadorInput = {
-    ...baseModifiers,
-    incoterm: "CIF",
-    cocoaUsdT: 3901,
-    diferencial: 0,
-    comisionPct: 0.1,
-    transporteBodega: 150, // zeroed by CIF rule
-    seleccion: 83,
-    fumigacion: 60,
-    estibas: 323,
-    costosExportacion: 720,
-  };
-  const r = cotizar(input);
-  closeTo(r.precioFinalUsdTm, 3901.0, 0.01, "precioFinal");
-  closeTo(r.comisionUsdTm, 4.76, 0.1, "comisión");
-  closeTo(r.costoTotalUsdTm, 3858.12, 0.2, "costoTotal");
-  closeTo(r.utilidadPct, 0.0111, 0.0005, "utilidad");
-  // Transporte a bodega zeroed for CIF.
-  assert.equal(
-    r.lines.find((l) => l.key === "transporte_bodega")!.usdPerTm,
-    0,
-  );
+test("cotizador NACIONAL — parte del proveedor fuera de 0..100 % falla", () => {
+  assert.throws(() => cotizar({ ...nacional, bonifCalidadProveedorPct: 1.2 }));
+  assert.throws(() => cotizar({ ...nacional, bonifCalidadProveedorPct: -0.1 }));
 });
 
-test("cotizador — operation totals scale with volume", () => {
-  const input: CotizadorInput = {
-    ...baseModifiers,
+test("cotizador NACIONAL — ignora costos de exportación", () => {
+  const r = cotizar({ ...nacional, costosExportacion: 720 });
+  closeTo(r.utilidadPct, 0.1003760308, 1e-9);
+});
+
+test("cotizador FOB — hoja", () => {
+  const r = cotizar({
+    ...zeros,
     incoterm: "FOB",
-    cocoaUsdT: 3901,
-    diferencial: 0.05,
     comisionPct: 0.08,
     volumenTM: 25,
-  };
-  const r = cotizar(input);
+    transporteBodega: 104,
+    seleccion: 83,
+    fumigacion: 90,
+    estibas: 53, // zeroed for FOB
+    costales: 226.1,
+    coberturas: 15,
+    costosExportacion: 836.14512,
+  });
+  closeTo(r.precioFinalUsdTm, 5425, 1e-9, "precioFinal (E41)");
+  assert.equal(r.comisionUsdTm, 0, "comisión con pérdida = 0 (E36)");
+  closeTo(r.costoTotalUsdTm, 5507.617837, 1e-5, "costo total (E38)");
+  closeTo(r.utilidadPct, -0.01500064814, 1e-9, "utilidad (E39)");
+  assert.equal(r.lines.find((l) => l.key === "estibas")!.usdPerTm, 0);
+  const compraUsd = r.lines.find((l) => l.key === "compra")!.usdPerTm;
+  closeTo(r.lines.find((l) => l.key === "fnc")!.usdPerTm, FNC_PCT * compraUsd, 1e-9);
+  closeTo(r.lines.find((l) => l.key === "merma")!.usdPerTm, MERMA_PCT * compraUsd, 1e-9);
+});
+
+test("cotizador CIF — hoja", () => {
+  const r = cotizar({
+    ...zeros,
+    incoterm: "CIF",
+    comisionPct: 0.1,
+    volumenTM: 5,
+    transporteBodega: 600, // zeroed for CIF
+    seleccion: 83,
+    fumigacion: 100,
+    estibas: 53,
+    costales: 215,
+    coberturas: 15,
+    costosExportacion: 720,
+  });
+  assert.equal(r.comisionUsdTm, 0);
+  closeTo(r.costoTotalUsdTm, 5455.133904, 1e-5, "costo total (E38)");
+  closeTo(r.utilidadPct, -0.005523953166, 1e-9, "utilidad (E39)");
+  assert.equal(r.lines.find((l) => l.key === "transporte_bodega")!.usdPerTm, 0);
+});
+
+test("cotizador FOB — comisión sobre la utilidad cuando hay ganancia", () => {
+  const r = cotizar({ ...zeros, incoterm: "FOB", comisionPct: 0.08, diferencial: 0.1 });
+  const compraUsd = (15750 * 1000) / TRM;
+  const sinComision = compraUsd * (1 + FNC_PCT + MERMA_PCT);
+  closeTo(r.comisionUsdTm, 0.08 * (5425 * 1.1 - sinComision), 1e-9);
+});
+
+test("cotizador — parámetros de admin reemplazan los de la hoja", () => {
+  const r = cotizar({ ...zeros, incoterm: "FOB", comisionPct: 0, fncPct: 0, mermaPct: 0.01 });
+  assert.equal(r.lines.find((l) => l.key === "fnc")!.usdPerTm, 0);
+  closeTo(r.lines.find((l) => l.key === "merma")!.usdPerTm, (0.01 * 15750 * 1000) / TRM, 1e-9);
+  const n = cotizar({ ...nacional, factorNacional: 0.95 });
+  closeTo(n.precioFinalUsdTm, (15750 * 1000) / TRM / 0.95, 1e-9);
+});
+
+test("cotizador — totales de la operación escalan con el volumen", () => {
+  const r = cotizar({ ...zeros, incoterm: "FOB", comisionPct: 0.08, volumenTM: 25 });
   closeTo(r.totalOperacionUsd, r.precioFinalUsdTm * 25, 1e-6);
   closeTo(r.totalOperacionCop, r.precioFinalCopTm * 25, 1e-6);
 });
 
-test("cotizador — TRM <= 0 throws", () => {
-  assert.throws(() =>
-    cotizar({ ...baseModifiers, trm: 0, incoterm: "FOB", cocoaUsdT: 3901, diferencial: 0, comisionPct: 0.08 }),
-  );
+test("cotizador — TRM <= 0 falla", () => {
+  assert.throws(() => cotizar({ ...zeros, trm: 0, incoterm: "FOB", comisionPct: 0.08 }));
+});
+
+test("esViable — umbral 10 % inclusive", () => {
+  assert.equal(esViable(0.1), true);
+  assert.equal(esViable(0.0999), false);
+  assert.equal(esViable(0.05, 0.05), true);
 });

@@ -5,7 +5,8 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { getSessionContext } from "@/lib/auth";
 import { LEAD_STAGES } from "@/lib/status";
-import { quoteSchema, buildQuoteRow } from "@/lib/schemas/quote";
+import { quoteSchema, buildQuoteRow, fijosDe } from "@/lib/schemas/quote";
+import { cargarParametros } from "@/lib/cotizador-parametros";
 
 export type ExecuteResult = { ok: boolean; message?: string; error?: string };
 
@@ -186,7 +187,7 @@ export async function executeAgentAction(input: unknown): Promise<ExecuteResult>
     .from("quotes")
     .select("id", { count: "exact", head: true });
   const quote_number = `COT-${new Date().getFullYear()}-${String((count ?? 0) + 1).padStart(4, "0")}`;
-  const row = buildQuoteRow(p.quote);
+  const row = buildQuoteRow(p.quote, fijosDe(await cargarParametros(supabase)));
   const { error } = await supabase
     .from("quotes")
     .insert({ ...row, quote_number, status: "borrador", created_by: session.userId });

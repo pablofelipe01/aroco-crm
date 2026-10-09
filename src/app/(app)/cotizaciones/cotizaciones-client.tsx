@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Plus, FileText, Pencil, Trash2, FileDown } from "lucide-react";
+import { Plus, FileText, Pencil, Trash2, FileDown, SlidersHorizontal } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -12,9 +12,11 @@ import { useToast } from "@/components/ui/toast";
 import { QUOTE_STATUS_META } from "@/lib/status";
 import { formatUSD } from "@/lib/utils";
 import { useT, useFormatos } from "@/lib/i18n/provider";
-import type { QuoteStatus } from "@/lib/types/database";
-import type { QuoteWithLead } from "./page";
+import type { CotizadorParametro, QuoteStatus } from "@/lib/types/database";
+import type { Parametros } from "@/lib/cotizador-parametros";
+import type { QuoteWithLead, ReferenciasMercado } from "./page";
 import { QuoteCalculator } from "./quote-calculator";
+import { ParametrosModal } from "./parametros-modal";
 import { deleteQuote, setQuoteStatus } from "./actions";
 
 const STATUSES: QuoteStatus[] = ["borrador", "enviada", "aceptada", "rechazada"];
@@ -23,10 +25,18 @@ export function CotizacionesClient({
   initialQuotes,
   leads,
   canWrite,
+  isAdmin,
+  parametros,
+  filasParametros,
+  referencias,
 }: {
   initialQuotes: QuoteWithLead[];
   leads: { id: string; company: string; market: string | null }[];
   canWrite: boolean;
+  isAdmin: boolean;
+  parametros: Parametros;
+  filasParametros: CotizadorParametro[];
+  referencias: ReferenciasMercado;
 }) {
   const router = useRouter();
   const { toast } = useToast();
@@ -34,6 +44,7 @@ export function CotizacionesClient({
   const f = useFormatos();
   const [open, setOpen] = React.useState(false);
   const [editing, setEditing] = React.useState<QuoteWithLead | null>(null);
+  const [verParametros, setVerParametros] = React.useState(false);
 
   // Deep links from the command palette (?new=1 / ?quote=<id>).
   const searchParams = useSearchParams();
@@ -100,18 +111,26 @@ export function CotizacionesClient({
         title={t.cotizaciones.titulo}
         description={`${initialQuotes.length} ${t.cotizaciones.enHistorial}`}
         actions={
-          canWrite && (
-            <Button
-              size="sm"
-              onClick={() => {
-                setEditing(null);
-                setOpen(true);
-              }}
-            >
-              <Plus className="h-4 w-4" />
-              {t.cotizaciones.nueva}
-            </Button>
-          )
+          <div className="flex gap-2">
+            {isAdmin && (
+              <Button variant="secondary" size="sm" onClick={() => setVerParametros(true)}>
+                <SlidersHorizontal className="h-4 w-4" />
+                {t.cotizador.parametros}
+              </Button>
+            )}
+            {canWrite && (
+              <Button
+                size="sm"
+                onClick={() => {
+                  setEditing(null);
+                  setOpen(true);
+                }}
+              >
+                <Plus className="h-4 w-4" />
+                {t.cotizaciones.nueva}
+              </Button>
+            )}
+          </div>
         }
       />
 
@@ -327,11 +346,20 @@ export function CotizacionesClient({
         onClose={() => setOpen(false)}
         leads={leads}
         initial={editing}
+        parametros={parametros}
+        referencias={referencias}
         onSaved={() => {
           setOpen(false);
           router.refresh();
         }}
       />
+      {isAdmin && (
+        <ParametrosModal
+          open={verParametros}
+          onClose={() => setVerParametros(false)}
+          filas={filasParametros}
+        />
+      )}
     </div>
   );
 }

@@ -3,7 +3,8 @@ import type Anthropic from "@anthropic-ai/sdk";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/types/database";
 import { cotizar } from "@/lib/calc/cotizador";
-import { quoteSchema, toCotizadorInput } from "@/lib/schemas/quote";
+import { quoteSchema, toCotizadorInput, fijosDe } from "@/lib/schemas/quote";
+import { cargarParametros, comisionPorDefecto } from "@/lib/cotizador-parametros";
 import { getMarketData } from "@/lib/market";
 import { scopeLabel, type AgentContext } from "@/lib/ai/context";
 import { DEPARTMENTS as DEPARTMENT_LIST } from "@/lib/departments";
@@ -379,7 +380,7 @@ export const AI_TOOLS: Anthropic.Tool[] = [
   {
     name: "propose_create_quote",
     description:
-      "PREPARA (no ejecuta) una cotización en BORRADOR — el usuario debe confirmarla. Úsalo cuando pidan 'cotiza…' o 'haz una cotización'. Reúne incoterm, volumen, precio de compra (COP/kg), TRM y referencia; los modificadores que no menciones quedan en 0 y el usuario los ajusta en el módulo Cotizaciones. Nunca afirmes que se creó hasta que el usuario confirme.",
+      "PREPARA (no ejecuta) una cotización en BORRADOR — el usuario debe confirmarla. Úsalo cuando pidan 'cotiza…' o 'haz una cotización'. Reúne incoterm, volumen, precio de compra (COP/kg), TRM y referencia; los modificadores, bonificaciones y la comisión que no menciones toman los valores por defecto del cotizador y el usuario los ajusta en el módulo Cotizaciones. Nunca afirmes que se creó hasta que el usuario confirme.",
     input_schema: {
       type: "object",
       properties: {
@@ -390,8 +391,7 @@ export const AI_TOOLS: Anthropic.Tool[] = [
         trm: { type: "number", description: "TRM USD/COP." },
         cocoa_usd_t: { type: "number", description: "Precio cocoa USD/T (export)." },
         differential_pct: { type: "number", description: "Diferencial % (export)." },
-        commission_pct: { type: "number", description: "Comisión %." },
-        target_utility_pct: { type: "number", description: "Utilidad objetivo % (NACIONAL)." },
+        commission_pct: { type: "number", description: "Comisión %. Si no se dice, la del incoterm." },
       },
       required: ["incoterm", "purchase_price_cop_kg", "trm"],
     },
@@ -1476,6 +1476,11 @@ export async function executeTool(
           market = data[0].market;
         }
       }
+      const par = await cargarParametros(db);
+      const comision =
+        input.commission_pct != null
+          ? Number(input.commission_pct) || 0
+          : comisionPorDefecto(par, incoterm as "NACIONAL" | "FOB" | "CIF") * 100;
       const quote = {
         incoterm,
         lead_id,
@@ -1486,25 +1491,25 @@ export async function executeTool(
         differential_pct: Number(input.differential_pct) || 0,
         purchase_price_cop_kg: Number(input.purchase_price_cop_kg) || 0,
         volume_tm: Number(input.volume_tm) || 1,
-        commission_pct: Number(input.commission_pct) || 0,
-        target_utility_pct: Number(input.target_utility_pct) || 0,
-        transporte_bodega: 0,
-        seleccion: 0,
-        fumigacion: 0,
-        estibas: 0,
-        costales: 0,
-        coberturas: 0,
-        costos_exportacion: 0,
-        bonif_calidad: 0,
-        bonif_cadmio: 0,
-        bonif_trazabilidad: 0,
-        bonif_transporte: 0,
+        commission_pct: comision,
+        transporte_bodega: par.transporte_bodega,
+        seleccion: par.seleccion,
+        fumigacion: par.fumigacion,
+        estibas: par.estibas,
+        costales: par.costales,
+        coberturas: par.coberturas,
+        costos_exportacion: par.costos_exportacion,
+        bonif_calidad_proveedor_pct: par.bonif_calidad_proveedor_pct * 100,
+        bonif_cadmio: par.bonif_cadmio,
+        bonif_trazabilidad: par.bonif_trazabilidad,
+        bonif_transporte: par.bonif_transporte,
         validity_days: 15,
       };
       let preview: number | null = null;
       try {
         const parsed = quoteSchema.parse(quote);
-        preview = Math.round(cotizar(toCotizadorInput(parsed)).precioFinalUsdTm * 100) / 100;
+        preview =
+          Math.round(cotizar(toCotizadorInput(parsed, fijosDe(par))).precioFinalUsdTm * 100) / 100;
       } catch {
         /* preview optional */
       }

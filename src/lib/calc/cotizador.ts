@@ -1,32 +1,41 @@
 /**
  * AROCO cotizador — cocoa quote by incoterm (NACIONAL / FOB / CIF).
  *
- * Faithful port of the validated Excel logic (SPEC §8.1). Pure functions, no
+ * Port of Nicolás's «Cotizador Comercial Aroco» sheet (tabs FOB, CIF, NACIONAL,
+ * read 2026-10-09), which replaced the SPEC §8.1 version. Pure functions, no
  * side effects. All monetary line items are computed in USD/TM internally;
  * helpers expose COP/TM, USD/kg and operation totals for display & persistence.
  *
  * Per line:  COP/TM = valor(COP/kg) × 1000 ;  USD/TM = COP/TM / TRM
- * FNC   = 3.0% × compra(USD/TM)   — export only (FOB/CIF), 0 for NACIONAL
- * Merma = 0.5% × compra(USD/TM)   — always
+ * FNC   = fncPct (3 %) × compra(USD/TM)     — export only (FOB/CIF), 0 for NACIONAL
+ * Merma = mermaPct (0,5 %) × compra(USD/TM) — always
  * Zero by incoterm: FOB → estibas = 0 ; CIF → transporte_bodega = 0 ;
- *                   NACIONAL → FNC = 0
+ *                   NACIONAL → FNC = 0, costos de exportación = 0
+ *
+ * base       = Σ líneas (compra..coberturas incl. FNC, merma) en USD/TM
+ * comision   = max(comisionPct × (precioFinal − costo sin comisión), 0)
+ * costoTotal = costo sin comisión + comision
+ * utilidad % = (precioFinal − costoTotal) / costoTotal   (markup sobre costo)
  *
  * EXPORT (FOB/CIF):
- *   precioFinal = cocoaUsdT × (1 + diferencial)
- *   base        = Σ líneas (compra..coberturas incl. FNC, merma) en USD/TM
- *   comision    = comisionPct × (precioFinal − (base + costosExportacion))
- *   costoTotal  = base + costosExportacion + comision
+ *   precioFinal         = cocoaUsdT × (1 + diferencial)
+ *   costo sin comisión  = base + costosExportacion
  *
- * NACIONAL (bonificaciones reducen el costo neto; comisión circular en forma
- * cerrada):
- *   K           = base − (bonifCalidad + bonifCadmio + bonifTrazab + bonifTransp)
- *   precioFinal = K(1−m)(1+u) / (1 − m(1+u))   con m=comisionPct, u=utilObjetivo
- *   comision    = m × (precioFinal − K)
- *   costoTotal  = K + comision
+ * NACIONAL (las bonificaciones son ingreso de AROCO y restan del costo):
+ *   precioFinal         = compra(USD/TM) / factorNacional (0,97)
+ *   bonifCalidad        = bonifCalidadPct × precioFinal × (1 − parte del proveedor)
+ *   costo sin comisión  = base − (bonifCalidad + cadmio + trazabilidad + transporte)
+ *
+ * La parte del proveedor reparte la Bonificación Calidad: con un proveedor en
+ * particular se le cede la mitad (0,5); la hoja hoy la deja toda para AROCO (0).
  */
 
 export const FNC_PCT = 0.03;
 export const MERMA_PCT = 0.005;
+export const FACTOR_NACIONAL = 0.97;
+/** 3,85 % + 1,75 % + 1 % − 1,65 % (NACIONAL!M13); componentes por confirmar con Nicolás. */
+export const BONIF_CALIDAD_PCT = 0.0495;
+export const UMBRAL_VIABLE = 0.1;
 
 export type Incoterm = "NACIONAL" | "FOB" | "CIF";
 
@@ -34,7 +43,7 @@ export interface CotizadorInput {
   incoterm: Incoterm;
   trm: number; // USD/COP
   precioCompraKg: number; // COP/kg
-  cocoaUsdT: number; // USD/T (export reference price)
+  cocoaUsdT: number; // USD/T (export reference price, ICE NY)
   diferencial: number; // ratio (0.05 = 5%) — export only
   volumenTM: number;
   comisionPct: number; // ratio
@@ -48,9 +57,14 @@ export interface CotizadorInput {
   coberturas: number;
   costosExportacion: number;
 
+  // Admin parameters (ratios); default to the sheet's values.
+  fncPct?: number;
+  mermaPct?: number;
+
   // NACIONAL only.
-  targetUtilityPct?: number; // ratio (u)
-  bonifCalidad?: number; // USD/TM (direct value — SPEC §8.1, pending confirmation)
+  factorNacional?: number; // precioFinal = compra / factor
+  bonifCalidadPct?: number; // ratio of precioFinal
+  bonifCalidadProveedorPct?: number; // ratio 0..1 of the quality premium ceded to the supplier
   bonifCadmio?: number; // COP/kg
   bonifTrazabilidad?: number; // COP/kg
   bonifTransporte?: number; // COP/kg
@@ -70,7 +84,9 @@ export interface CotizadorResult {
   lines: CostLine[];
   base: CostLine; // Σ líneas (USD/TM etc.)
   costosExportacion: CostLine;
-  netCostK: number | null; // K (NACIONAL only)
+  netCostK: number | null; // costo sin comisión, neto de bonificaciones (NACIONAL only)
+  bonifCalidadUsdTm: number; // parte de AROCO (NACIONAL only, 0 otherwise)
+  bonificacionesUsdTm: number; // Σ bonificaciones (NACIONAL only)
   comisionUsdTm: number;
   costoTotalUsdTm: number;
   precioFinalUsdTm: number;
@@ -136,9 +152,11 @@ export function cotizar(input: CotizadorInput): CotizadorResult {
   const costales = lineFromCopKg("costales", "Costales", input.costales, trm);
   const coberturas = lineFromCopKg("coberturas", "Coberturas", input.coberturas, trm);
 
-  const fncUsd = incoterm === "NACIONAL" ? 0 : FNC_PCT * compraUsd;
-  const fnc = lineFromUsd("fnc", "FNC (3%)", fncUsd, trm);
-  const merma = lineFromUsd("merma", "Merma (0,5%)", MERMA_PCT * compraUsd, trm);
+  const fncPct = input.fncPct ?? FNC_PCT;
+  const mermaPct = input.mermaPct ?? MERMA_PCT;
+  const fncUsd = incoterm === "NACIONAL" ? 0 : fncPct * compraUsd;
+  const fnc = lineFromUsd("fnc", "FNC", fncUsd, trm);
+  const merma = lineFromUsd("merma", "Merma", mermaPct * compraUsd, trm);
 
   const lines = [
     compra,
@@ -157,38 +175,43 @@ export function cotizar(input: CotizadorInput): CotizadorResult {
   const costosExportacion = lineFromCopKg(
     "costos_exportacion",
     "Costos de exportación",
-    input.costosExportacion,
+    incoterm === "NACIONAL" ? 0 : input.costosExportacion,
     trm,
   );
 
   let precioFinalUsdTm: number;
-  let comisionUsdTm: number;
-  let costoTotalUsdTm: number;
+  let costoSinComision: number;
   let netCostK: number | null = null;
+  let bonifCalidadUsdTm = 0;
+  let bonificacionesUsdTm = 0;
 
   if (incoterm === "NACIONAL") {
-    const m = input.comisionPct;
-    const u = input.targetUtilityPct ?? 0;
-    const bonifs =
-      (input.bonifCalidad ?? 0) +
+    const factor = input.factorNacional ?? FACTOR_NACIONAL;
+    if (factor <= 0) throw new Error("El factor de precio nacional debe ser mayor que 0.");
+    const proveedor = input.bonifCalidadProveedorPct ?? 0;
+    if (proveedor < 0 || proveedor > 1)
+      throw new Error("La parte del proveedor debe estar entre 0 % y 100 %.");
+
+    precioFinalUsdTm = compraUsd / factor;
+    bonifCalidadUsdTm =
+      (input.bonifCalidadPct ?? BONIF_CALIDAD_PCT) * precioFinalUsdTm * (1 - proveedor);
+    bonificacionesUsdTm =
+      bonifCalidadUsdTm +
       ((input.bonifCadmio ?? 0) * 1000) / trm +
       ((input.bonifTrazabilidad ?? 0) * 1000) / trm +
       ((input.bonifTransporte ?? 0) * 1000) / trm;
-
-    const K = baseUsd - bonifs;
-    netCostK = K;
-
-    const denom = 1 - m * (1 + u);
-    if (denom === 0) throw new Error("Comisión/utilidad inválidas (denominador 0).");
-    precioFinalUsdTm = (K * (1 - m) * (1 + u)) / denom;
-    comisionUsdTm = m * (precioFinalUsdTm - K);
-    costoTotalUsdTm = K + comisionUsdTm;
+    costoSinComision = baseUsd - bonificacionesUsdTm;
+    netCostK = costoSinComision;
   } else {
     precioFinalUsdTm = input.cocoaUsdT * (1 + input.diferencial);
-    comisionUsdTm =
-      input.comisionPct * (precioFinalUsdTm - (baseUsd + costosExportacion.usdPerTm));
-    costoTotalUsdTm = baseUsd + costosExportacion.usdPerTm + comisionUsdTm;
+    costoSinComision = baseUsd + costosExportacion.usdPerTm;
   }
+
+  const comisionUsdTm = Math.max(
+    input.comisionPct * (precioFinalUsdTm - costoSinComision),
+    0,
+  );
+  const costoTotalUsdTm = costoSinComision + comisionUsdTm;
 
   const valorUtilidadUsdTm = precioFinalUsdTm - costoTotalUsdTm;
   const utilidadPct =
@@ -201,6 +224,8 @@ export function cotizar(input: CotizadorInput): CotizadorResult {
     base,
     costosExportacion,
     netCostK,
+    bonifCalidadUsdTm,
+    bonificacionesUsdTm,
     comisionUsdTm,
     costoTotalUsdTm,
     precioFinalUsdTm,
@@ -210,4 +235,9 @@ export function cotizar(input: CotizadorInput): CotizadorResult {
     totalOperacionUsd: precioFinalUsdTm * volumenTM,
     totalOperacionCop: precioFinalCopTm * volumenTM,
   };
+}
+
+/** Criterio de la hoja (formato condicional): viable si la utilidad llega al umbral. */
+export function esViable(utilidadPct: number, umbral = UMBRAL_VIABLE): boolean {
+  return utilidadPct >= umbral;
 }

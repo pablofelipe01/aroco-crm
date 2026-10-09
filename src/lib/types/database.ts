@@ -551,6 +551,36 @@ export type Database = {
         };
         Relationships: [];
       };
+      cotizador_parametros: {
+        Row: {
+          clave: string;
+          valor: number;
+          unidad: "ratio" | "cop_kg";
+          descripcion: string;
+          orden: number;
+          updated_at: string;
+          updated_by: string | null;
+        };
+        Insert: {
+          clave: string;
+          valor: number;
+          unidad: "ratio" | "cop_kg";
+          descripcion: string;
+          orden?: number;
+          updated_at?: string;
+          updated_by?: string | null;
+        };
+        Update: {
+          clave?: string;
+          valor?: number;
+          unidad?: "ratio" | "cop_kg";
+          descripcion?: string;
+          orden?: number;
+          updated_at?: string;
+          updated_by?: string | null;
+        };
+        Relationships: [];
+      };
       proveedores_insumos: {
         Row: {
           id: string;
@@ -2722,6 +2752,11 @@ export type Database = {
         Row: {
           bonif_cadmio: number;
           bonif_calidad: number;
+          bonif_calidad_pct: number;
+          bonif_calidad_proveedor_pct: number;
+          factor_nacional: number;
+          fnc_pct: number;
+          merma_pct: number;
           bonif_transporte: number;
           bonif_trazabilidad: number;
           client_name: string | null;
@@ -2761,6 +2796,11 @@ export type Database = {
         Insert: {
           bonif_cadmio?: number;
           bonif_calidad?: number;
+          bonif_calidad_pct?: number;
+          bonif_calidad_proveedor_pct?: number;
+          factor_nacional?: number;
+          fnc_pct?: number;
+          merma_pct?: number;
           bonif_transporte?: number;
           bonif_trazabilidad?: number;
           client_name?: string | null;
@@ -2800,6 +2840,11 @@ export type Database = {
         Update: {
           bonif_cadmio?: number;
           bonif_calidad?: number;
+          bonif_calidad_pct?: number;
+          bonif_calidad_proveedor_pct?: number;
+          factor_nacional?: number;
+          fnc_pct?: number;
+          merma_pct?: number;
           bonif_transporte?: number;
           bonif_trazabilidad?: number;
           client_name?: string | null;
@@ -3543,6 +3588,15 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
+      cotizador_referencias: {
+        Args: Record<PropertyKey, never>;
+        Returns: {
+          cocoa_usd_t: number | null;
+          cocoa_fecha: string | null;
+          trm: number | null;
+          trm_fecha: string | null;
+        }[];
+      };
       registrar_latido: {
         Args: { p_modulo: string };
         Returns: undefined;
@@ -3692,6 +3746,7 @@ export type TeamMember = Tables<"team_members">;
 export type Lead = Tables<"leads">;
 export type LeadActivity = Tables<"lead_activities">;
 export type Quote = Tables<"quotes">;
+export type CotizadorParametro = Tables<"cotizador_parametros">;
 export type InventoryLot = Tables<"inventory_lots">;
 export type InventoryMovement = Tables<"inventory_movements">;
 export type InventoryQuality = Tables<"inventory_quality">;
