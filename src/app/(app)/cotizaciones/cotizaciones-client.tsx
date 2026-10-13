@@ -215,6 +215,15 @@ export function CotizacionesClient({
                 >
                   <FileDown className="h-4 w-4" />
                 </a>
+                <a
+                  href={`/print/cotizacion/${q.id}/cliente`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="rounded p-1.5 text-fg-subtle hover:bg-bg-subtle hover:text-fg"
+                  title={t.cotizaciones.exportarPdfCliente}
+                >
+                  <FileText className="h-4 w-4" />
+                </a>
                 {canWrite && (
                   <>
                     <button
@@ -321,6 +330,15 @@ export function CotizacionesClient({
                         title={t.cotizaciones.exportarPdf}
                       >
                         <FileDown className="h-4 w-4" />
+                      </a>
+                      <a
+                        href={`/print/cotizacion/${q.id}/cliente`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="rounded p-1.5 text-fg-subtle hover:bg-bg-subtle hover:text-fg"
+                        title={t.cotizaciones.exportarPdfCliente}
+                      >
+                        <FileText className="h-4 w-4" />
                       </a>
                       {canWrite && (
                         <>
