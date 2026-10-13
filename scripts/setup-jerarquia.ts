@@ -51,7 +51,7 @@ const ORGANIGRAMA: Persona[] = [
   { nombre: "Juan Carlos García", ficha: "Juan Carlos", correo: "fincaelmilagro@aroco.co", cargo: "Coordinador Producción", area: "Finca", jefe: "Ángela María Acosta", nivel: "member" },
 
   // Gerencia de Operaciones vacante (TBD): su equipo sube a Álvaro.
-  { nombre: "John Saenz", ficha: "John Saenz", correo: "jesc.saenz@gmail.com", cargo: "Coord. QA/QC", area: "Operaciones", jefe: "Álvaro Acosta", nivel: "member" },
+  { nombre: "John Saenz", ficha: "John Saenz", correo: "john.saenz@aroco.co", cargo: "Coord. QA/QC", area: "Operaciones", jefe: "Álvaro Acosta", nivel: "member" },
   { nombre: "Juan David Alarcón", ficha: "Juan David Alarcón", correo: "bodegabogota@aroco.co", cargo: "Aux. Calidad y Bodega Central Bogotá", area: "Bodega Central", jefe: "Álvaro Acosta", nivel: "member" },
   { nombre: "Fernando Mejía Paz", ficha: "Fernando Mejía Paz", correo: "fernandojosemejiapaz1@gmail.com", cargo: "Oper. Postcosecha Cauca", area: "Operaciones", jefe: "Álvaro Acosta", nivel: "member" },
   { nombre: "Maribel Romero", ficha: null, cargo: "Oper. Postcosecha Chaparral", area: "Operaciones", jefe: "Álvaro Acosta" },
