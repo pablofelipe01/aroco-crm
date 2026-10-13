@@ -23,6 +23,7 @@ import { TASK_STATUS_META, etiquetaTarea, type TaskStatus } from "@/lib/status";
 import { useT, useFormatos } from "@/lib/i18n/provider";
 import { cn } from "@/lib/utils";
 import { staggerContainer } from "@/lib/motion";
+import type { EstadoEquilibrio, Lado, Negocio } from "@/lib/calc/equilibrio";
 import {
   PipelineChart,
   type PipelineDatum,
@@ -68,10 +69,78 @@ export interface DashboardData {
   /** Mi área, o null si no tengo: entonces no hay selector. */
   tasksDept: string | null;
   pipeline: PipelineDatum[];
-  pipelineValue: { weighted: number; total: number };
+  /** Ventas y compras por separado (no se suman). */
+  negocios: Record<Negocio, Lado>;
+  equilibrio: { estado: EstadoEquilibrio; cobertura: number | null };
   inventory: InventoryDatum[];
   priceSeries: PriceSeriesPoint[];
   priceCompanies: string[];
+}
+
+const TONO_EQUILIBRIO = {
+  falta: "warn",
+  sobra: "info",
+  equilibrado: "success",
+  sin_datos: "neutral",
+} as const;
+
+/** Toneladas por comprar frente a toneladas por vender (±20 % es parejo). */
+function Equilibrio({
+  estado,
+  cobertura,
+  compras,
+  ventas,
+}: {
+  estado: EstadoEquilibrio;
+  cobertura: number | null;
+  compras: number;
+  ventas: number;
+}) {
+  const t = useT();
+  const f = useFormatos();
+  const ton = (v: number) => `${f.numero(v, 0)} ${t.unidades.tm}`;
+  const etiqueta = {
+    falta: t.dashboard.faltaOferta,
+    sobra: t.dashboard.sobraOferta,
+    equilibrado: t.dashboard.equilibrado,
+    sin_datos: t.dashboard.sinToneladas,
+  }[estado];
+  return (
+    <div className="mb-4 rounded-[var(--radius-md)] border border-border p-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-[11px] uppercase tracking-wide text-fg-subtle">
+          {t.dashboard.equilibrio}
+        </p>
+        <Badge tone={TONO_EQUILIBRIO[estado]}>
+          {etiqueta}
+          {cobertura != null && (
+            <span className="font-mono tnum"> · {f.numero(cobertura * 100, 0)} %</span>
+          )}
+        </Badge>
+      </div>
+      {estado !== "sin_datos" && (
+        <>
+          {/* La marca del medio es 1:1; la barra llega a 2:1. */}
+          <div
+            className="relative mt-2 h-2 overflow-hidden rounded-full bg-bg-subtle"
+            role="img"
+            aria-label={etiqueta}
+          >
+            <div
+              className="h-full rounded-full bg-accent"
+              style={{ width: `${Math.min((cobertura ?? 2) / 2, 1) * 100}%` }}
+            />
+            <div className="absolute inset-y-0 left-1/2 w-px bg-border-strong" />
+          </div>
+          <p className="mt-1.5 text-xs text-fg-muted">
+            {t.dashboard.equilibrioDetalle
+              .replace("{compras}", ton(compras))
+              .replace("{ventas}", ton(ventas))}
+          </p>
+        </>
+      )}
+    </div>
+  );
 }
 
 function shortCompany(c: string): string {
@@ -273,30 +342,45 @@ export function DashboardView({ data }: { data: DashboardData }) {
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-2">
           <CardHeader>
-            <CardTitle>{t.dashboard.embudo}</CardTitle>
+            <CardTitle>{t.dashboard.embudoVentas}</CardTitle>
             <Badge tone="neutral">
               {kpis.totalLeads} {t.dashboard.leads}
             </Badge>
           </CardHeader>
           <CardBody>
-            {data.pipelineValue.weighted > 0 && (
-              <div className="mb-4 flex flex-wrap items-end justify-between gap-x-3 gap-y-1">
-                <div>
-                  <p className="text-[11px] uppercase tracking-wide text-fg-subtle">
-                    {t.dashboard.valorPonderado}
-                  </p>
-                  <p className="mt-0.5 font-mono text-2xl font-bold tnum text-fg">
-                    {f.cop(data.pipelineValue.weighted)}
-                  </p>
-                </div>
-                {data.pipelineValue.total > 0 && (
-                  <p className="text-xs text-fg-subtle">
-                    {t.comun.de} {f.cop(data.pipelineValue.total)}{" "}
-                    {t.dashboard.dePotencial}
-                  </p>
-                )}
-              </div>
-            )}
+            <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {(["Venta", "Compra"] as const).map((n) => {
+                const lado = data.negocios[n];
+                return (
+                  <div
+                    key={n}
+                    className="rounded-[var(--radius-md)] border border-border bg-bg-subtle/40 p-3"
+                  >
+                    <p className="text-[11px] uppercase tracking-wide text-fg-subtle">
+                      {n === "Venta" ? t.dashboard.potencialVentas : t.dashboard.potencialCompras}
+                      {" · "}
+                      {t.dashboard.valorPonderado}
+                    </p>
+                    <p className="mt-0.5 font-mono text-xl font-bold tnum text-fg">
+                      {f.cop(lado.ponderado)}
+                    </p>
+                    <p className="text-xs text-fg-subtle">
+                      {t.comun.de} <span className="font-mono tnum">{f.cop(lado.total)}</span>{" "}
+                      {t.dashboard.dePotencial} ·{" "}
+                      <span className="font-mono tnum">
+                        {f.numero(lado.toneladas, 0)} {t.unidades.tm}
+                      </span>
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+            <Equilibrio
+              estado={data.equilibrio.estado}
+              cobertura={data.equilibrio.cobertura}
+              compras={data.negocios.Compra.toneladas}
+              ventas={data.negocios.Venta.toneladas}
+            />
             {data.pipeline.some((p) => p.count > 0) ? (
               <PipelineChart data={data.pipeline} />
             ) : (

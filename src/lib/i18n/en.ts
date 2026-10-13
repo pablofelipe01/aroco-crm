@@ -124,6 +124,15 @@ export const en: Diccionario = {
     sinTareas: "Nothing pending. 🎉",
     verTareas: "See all tasks →",
     embudo: "Pipeline funnel",
+    embudoVentas: "Sales funnel",
+    potencialVentas: "Sales",
+    potencialCompras: "Purchases",
+    equilibrio: "Supply / demand balance",
+    equilibrioDetalle: "{compras} to buy for {ventas} to sell",
+    faltaOferta: "Short on cocoa to buy",
+    sobraOferta: "More supply than sales",
+    equilibrado: "Balanced",
+    sinToneladas: "No tonnage on the leads.",
     leads: "leads",
     valorPonderado: "Weighted pipeline value",
     dePotencial: "potential",
@@ -194,6 +203,11 @@ export const en: Diccionario = {
     Internacional: "International",
   },
 
+  negocios: {
+    Venta: "Sale",
+    Compra: "Purchase",
+  },
+
   tiposLead: {
     Comprador: "Buyer",
     "Proveedor potencial": "Potential supplier",
@@ -223,6 +237,14 @@ export const en: Diccionario = {
     noSePudoMover: "The lead could not be moved",
 
     pipelineProbabilidad: "Pipeline by probability",
+    pipelineVentas: "Sales pipeline by probability",
+    pipelineCompras: "Purchase pipeline by probability",
+    negocio: "Deal type",
+    region: "Region (department)",
+    cadmio: "Cadmium",
+    cadmioBajo: "Low",
+    cadmioAlto: "High",
+    datosCompra: "Purchase details",
     valorEsperado: "Expected value:",
     etapa: "Stage",
     prob: "Prob.",

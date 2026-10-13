@@ -124,6 +124,15 @@ export const es = {
     sinTareas: "No hay tareas pendientes. 🎉",
     verTareas: "Ver todas las tareas →",
     embudo: "Embudo del pipeline",
+    embudoVentas: "Embudo de ventas",
+    potencialVentas: "Ventas",
+    potencialCompras: "Compras",
+    equilibrio: "Equilibrio oferta / demanda",
+    equilibrioDetalle: "{compras} por comprar para {ventas} por vender",
+    faltaOferta: "Falta cacao por comprar",
+    sobraOferta: "Sobra oferta de compra",
+    equilibrado: "Equilibrado",
+    sinToneladas: "Sin toneladas cargadas en los leads.",
     leads: "leads",
     valorPonderado: "Valor ponderado del pipeline",
     dePotencial: "potencial",
@@ -194,6 +203,11 @@ export const es = {
     Internacional: "Internacional",
   },
 
+  negocios: {
+    Venta: "Venta",
+    Compra: "Compra",
+  },
+
   tiposLead: {
     Comprador: "Comprador",
     "Proveedor potencial": "Proveedor potencial",
@@ -223,6 +237,14 @@ export const es = {
     noSePudoMover: "No se pudo mover el lead",
 
     pipelineProbabilidad: "Pipeline por probabilidad",
+    pipelineVentas: "Pipeline de ventas por probabilidad",
+    pipelineCompras: "Pipeline de compras por probabilidad",
+    negocio: "Tipo de negocio",
+    region: "Región (departamento)",
+    cadmio: "Cadmio",
+    cadmioBajo: "Bajo",
+    cadmioAlto: "Alto",
+    datosCompra: "Datos de la compra",
     valorEsperado: "Valor esperado:",
     etapa: "Etapa",
     prob: "Prob.",

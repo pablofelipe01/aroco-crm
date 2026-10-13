@@ -1642,6 +1642,9 @@ export type Database = {
           product_interest: string | null;
           source: string | null;
           status: Database["public"]["Enums"]["lead_status"];
+          negocio: "Compra" | "Venta";
+          region: string | null;
+          cadmio: "Alto" | "Bajo" | null;
           toneladas: number | null;
           type: Database["public"]["Enums"]["lead_type"] | null;
           updated_at: string;
@@ -1666,6 +1669,9 @@ export type Database = {
           product_interest?: string | null;
           source?: string | null;
           status?: Database["public"]["Enums"]["lead_status"];
+          negocio?: "Compra" | "Venta" | null;
+          region?: string | null;
+          cadmio?: "Alto" | "Bajo" | null;
           toneladas?: number | null;
           type?: Database["public"]["Enums"]["lead_type"] | null;
           updated_at?: string;
@@ -1690,6 +1696,9 @@ export type Database = {
           product_interest?: string | null;
           source?: string | null;
           status?: Database["public"]["Enums"]["lead_status"];
+          negocio?: "Compra" | "Venta" | null;
+          region?: string | null;
+          cadmio?: "Alto" | "Bajo" | null;
           toneladas?: number | null;
           type?: Database["public"]["Enums"]["lead_type"] | null;
           updated_at?: string;

@@ -1,13 +1,15 @@
 "use client";
 
 import * as React from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
 import { Field, Input, Select, Textarea } from "@/components/ui/input";
 import { useToast } from "@/components/ui/toast";
+import { cn } from "@/lib/utils";
 import { LEAD_STAGES } from "@/lib/status";
-import { MARKETS, LEAD_TYPES } from "@/lib/schemas/lead";
+import { MARKETS, NEGOCIOS, TIPOS_POR_NEGOCIO, CADMIO, type Negocio } from "@/lib/schemas/lead";
+import { DEPARTAMENTOS } from "@/lib/colombia";
 import { useT, useFormatos } from "@/lib/i18n/provider";
 import {
   leadValueForMarket,
@@ -20,6 +22,7 @@ import type { LeadWithOwner } from "./page";
 import { createLead, updateLead } from "./actions";
 
 interface FormValues {
+  negocio: Negocio;
   company: string;
   contact_name: string;
   contact_email: string;
@@ -37,10 +40,13 @@ interface FormValues {
   next_action: string;
   next_action_date: string;
   notes: string;
+  region: string;
+  cadmio: string;
 }
 
-function toValues(lead: LeadWithOwner | null): FormValues {
+function toValues(lead: LeadWithOwner | null, negocio: Negocio): FormValues {
   return {
+    negocio: lead?.negocio ?? negocio,
     company: lead?.company ?? "",
     contact_name: lead?.contact_name ?? "",
     contact_email: lead?.contact_email ?? "",
@@ -59,6 +65,8 @@ function toValues(lead: LeadWithOwner | null): FormValues {
     next_action: lead?.next_action ?? "",
     next_action_date: lead?.next_action_date ?? "",
     notes: lead?.notes ?? "",
+    region: lead?.region ?? "",
+    cadmio: lead?.cadmio ?? "",
   };
 }
 
@@ -69,6 +77,7 @@ export function LeadForm({
   initial,
   prices,
   onSaved,
+  negocioInicial,
 }: {
   open: boolean;
   onClose: () => void;
@@ -76,17 +85,33 @@ export function LeadForm({
   initial: LeadWithOwner | null;
   prices: ReferencePrices;
   onSaved: () => void;
+  /** Un lead nuevo nace del lado de la pestaña abierta. */
+  negocioInicial: Negocio;
 }) {
   const { toast } = useToast();
   const t = useT();
   const f = useFormatos();
-  const { register, handleSubmit, reset, watch, formState } = useForm<FormValues>({
-    defaultValues: toValues(initial),
-  });
+  const { register, handleSubmit, reset, control, setValue, getValues, formState } =
+    useForm<FormValues>({
+      defaultValues: toValues(initial, negocioInicial),
+    });
+  const negocio = useWatch({ control, name: "negocio" });
+  const esCompra = negocio === "Compra";
+
+  // Cambiar de lado deja el tipo coherente (la base no acepta un proveedor en
+  // ventas ni un comprador en compras). Una compra casi siempre es nacional.
+  function elegirNegocio(n: Negocio) {
+    setValue("negocio", n);
+    const tipo = getValues("type");
+    if (tipo && !(TIPOS_POR_NEGOCIO[n] as readonly string[]).includes(tipo)) {
+      setValue("type", n === "Compra" ? "Proveedor potencial" : "");
+    }
+    if (n === "Compra" && !getValues("market")) setValue("market", "Nacional");
+  }
 
   // Live preview: valor = toneladas × 1000 × precio(mercado).
-  const tonWatch = watch("toneladas");
-  const marketWatch = watch("market");
+  const tonWatch = useWatch({ control, name: "toneladas" });
+  const marketWatch = useWatch({ control, name: "market" });
   const ton = Number(String(tonWatch ?? "").replace(/[^0-9.-]/g, ""));
   const market = (marketWatch || null) as Market | null;
   const refPrice = pickReferencePrice(market, prices);
@@ -101,7 +126,7 @@ export function LeadForm({
   const key = `${open}:${initial?.id ?? "new"}`;
   if (key !== prevKey) {
     setPrevKey(key);
-    if (open) reset(toValues(initial));
+    if (open) reset(toValues(initial, negocioInicial));
   }
 
   const onSubmit = handleSubmit(async (values) => {
@@ -110,6 +135,8 @@ export function LeadForm({
       market: values.market || null,
       type: values.type || null,
       commercial_owner: values.commercial_owner || null,
+      region: esCompra ? values.region : "",
+      cadmio: esCompra ? values.cadmio : "",
     };
     const res = initial
       ? await updateLead(initial.id, payload)
@@ -151,6 +178,29 @@ export function LeadForm({
       }
     >
       <form onSubmit={onSubmit} className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <Field label={`${t.comercial.negocio} *`} className="sm:col-span-2">
+          <div
+            role="radiogroup"
+            aria-label={t.comercial.negocio}
+            className="inline-flex rounded-[var(--radius-md)] border border-border bg-surface p-0.5"
+          >
+            {NEGOCIOS.map((n) => (
+              <button
+                key={n}
+                type="button"
+                role="radio"
+                aria-checked={negocio === n}
+                onClick={() => elegirNegocio(n)}
+                className={cn(
+                  "rounded-[var(--radius-sm)] px-4 py-1.5 text-sm font-medium transition-colors",
+                  negocio === n ? "bg-accent text-accent-fg" : "text-fg-muted hover:text-fg",
+                )}
+              >
+                {t.negocios[n]}
+              </button>
+            ))}
+          </div>
+        </Field>
         <Field label={`${t.comercial.empresa} *`} className="sm:col-span-2">
           <Input
             {...register("company", { required: true })}
@@ -226,7 +276,7 @@ export function LeadForm({
         <Field label={t.comercial.tipo}>
           <Select {...register("type")} defaultValue="">
             <option value="">—</option>
-            {LEAD_TYPES.map((tipo) => (
+            {TIPOS_POR_NEGOCIO[negocio].map((tipo) => (
               <option key={tipo} value={tipo}>
                 {t.tiposLead[tipo]}
               </option>
@@ -242,6 +292,30 @@ export function LeadForm({
             ))}
           </Select>
         </Field>
+        {esCompra && (
+          <>
+            <Field label={t.comercial.region}>
+              <Select {...register("region")} defaultValue="">
+                <option value="">—</option>
+                {DEPARTAMENTOS.map((d) => (
+                  <option key={d} value={d}>
+                    {d}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            <Field label={t.comercial.cadmio}>
+              <Select {...register("cadmio")} defaultValue="">
+                <option value="">—</option>
+                {CADMIO.map((c) => (
+                  <option key={c} value={c}>
+                    {c === "Alto" ? t.comercial.cadmioAlto : t.comercial.cadmioBajo}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+          </>
+        )}
         <Field label={t.comercial.volumenDescriptivo}>
           <Input {...register("volume")} placeholder={t.comercial.ejemploVolumen} />
         </Field>

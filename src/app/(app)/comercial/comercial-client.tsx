@@ -11,7 +11,7 @@ import { useToast } from "@/components/ui/toast";
 import { cn } from "@/lib/utils";
 import { useT } from "@/lib/i18n/provider";
 import { LEAD_STAGES } from "@/lib/status";
-import { MARKETS } from "@/lib/schemas/lead";
+import { MARKETS, NEGOCIOS, type Negocio } from "@/lib/schemas/lead";
 import type { TeamMember } from "@/lib/types/database";
 import type { LeadWithOwner } from "./page";
 import { LeadKanban } from "./lead-kanban";
@@ -50,6 +50,9 @@ export function ComercialClient({
     setLeads(initialLeads);
   }
 
+  // Ventas y compras no se suman: mezclarlas inflaba el pipeline con lo que
+  // le compramos a los proveedores (revisión del 2026-10-09).
+  const [negocio, setNegocio] = React.useState<Negocio>("Venta");
   const [view, setView] = React.useState<View>("kanban");
   const [query, setQuery] = React.useState("");
   const [fStatus, setFStatus] = React.useState<string[]>([]);
@@ -68,8 +71,11 @@ export function ComercialClient({
     if (!leadId && !isNew) return;
     if (leadId) {
       const l = leads.find((x) => x.id === leadId);
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- open from deep link
-      if (l) setSelected(l);
+      if (l) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- open from deep link
+        setNegocio(l.negocio);
+        setSelected(l);
+      }
     } else if (isNew && canWrite) {
       setEditing(null);
       setFormOpen(true);
@@ -77,9 +83,11 @@ export function ComercialClient({
     router.replace("/comercial");
   }, [searchParams, leads, canWrite, router]);
 
+  const delLado = React.useMemo(() => leads.filter((l) => l.negocio === negocio), [leads, negocio]);
+
   const filtered = React.useMemo(() => {
     const q = query.trim().toLowerCase();
-    return leads.filter((l) => {
+    return delLado.filter((l) => {
       if (fStatus.length && !fStatus.includes(l.status)) return false;
       if (fMarket.length && (!l.market || !fMarket.includes(l.market))) return false;
       if (fOwner.length && (!l.commercial_owner || !fOwner.includes(l.commercial_owner)))
@@ -87,12 +95,12 @@ export function ComercialClient({
       if (q) {
         const hay = `${l.company} ${l.contact_name ?? ""} ${l.contact_email ?? ""} ${
           l.contact_phone ?? ""
-        } ${l.country ?? ""} ${l.product_interest ?? ""}`.toLowerCase();
+        } ${l.country ?? ""} ${l.region ?? ""} ${l.product_interest ?? ""}`.toLowerCase();
         if (!hay.includes(q)) return false;
       }
       return true;
     });
-  }, [leads, query, fStatus, fMarket, fOwner]);
+  }, [delLado, query, fStatus, fMarket, fOwner]);
 
   const hasFilters =
     !!query || fStatus.length > 0 || fMarket.length > 0 || fOwner.length > 0;
@@ -132,7 +140,7 @@ export function ComercialClient({
     <div className="space-y-6">
       <PageHeader
         title={t.comercial.titulo}
-        description={`${leads.length} ${t.comercial.leadsPipeline}${
+        description={`${delLado.length} ${t.comercial.leadsPipeline}${
           hasFilters ? ` · ${filtered.length} ${t.comercial.filtrados}` : ""
         }`}
         actions={
@@ -145,7 +153,36 @@ export function ComercialClient({
         }
       />
 
-      <PipelineSummary leads={filtered} prices={prices} />
+      <div
+        role="tablist"
+        aria-label={t.comercial.negocio}
+        className="inline-flex rounded-[var(--radius-md)] border border-border bg-surface p-0.5"
+      >
+        {NEGOCIOS.map((n) => {
+          const cuantos = leads.filter((l) => l.negocio === n).length;
+          return (
+            <button
+              key={n}
+              role="tab"
+              aria-selected={negocio === n}
+              onClick={() => setNegocio(n)}
+              className={cn(
+                "flex items-center gap-2 rounded-[var(--radius-sm)] px-4 py-1.5 text-sm font-medium transition-colors",
+                negocio === n ? "bg-accent text-accent-fg" : "text-fg-muted hover:text-fg",
+              )}
+            >
+              {n === "Venta" ? t.dashboard.potencialVentas : t.dashboard.potencialCompras}
+              <span className="font-mono text-xs tnum opacity-80">{cuantos}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      <PipelineSummary
+        leads={filtered}
+        prices={prices}
+        titulo={negocio === "Venta" ? t.comercial.pipelineVentas : t.comercial.pipelineCompras}
+      />
 
       {/* Toolbar */}
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -240,6 +277,7 @@ export function ComercialClient({
         team={team}
         initial={editing}
         prices={prices}
+        negocioInicial={negocio}
         onSaved={() => {
           setFormOpen(false);
           router.refresh();

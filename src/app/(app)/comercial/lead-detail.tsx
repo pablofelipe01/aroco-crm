@@ -161,6 +161,16 @@ export function LeadDetail({
       t.comercial.tipo,
       lead.type ? (t.tiposLead[lead.type as keyof typeof t.tiposLead] ?? lead.type) : null,
     ],
+    // Solo en compras; en una venta quedan vacíos y la fila no se muestra.
+    [t.comercial.region, lead.region],
+    [
+      t.comercial.cadmio,
+      lead.cadmio === "Alto"
+        ? t.comercial.cadmioAlto
+        : lead.cadmio === "Bajo"
+          ? t.comercial.cadmioBajo
+          : null,
+    ],
     [t.comercial.interes, lead.product_interest],
     [t.comercial.volumen, lead.volume],
     [
@@ -191,6 +201,7 @@ export function LeadDetail({
       }
       subtitle={
         <div className="flex flex-wrap items-center gap-2">
+          <Badge tone="neutral">{t.negocios[lead.negocio]}</Badge>
           <Badge tone={LEAD_STAGE_TONE[lead.status as LeadStage]} dot>
             {t.etapas[lead.status as LeadStage]}
           </Badge>

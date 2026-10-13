@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { todas } from "@/lib/supabase/todas";
 import { getSessionContext } from "@/lib/auth";
 import { LEAD_STAGES, LEAD_STAGE_WEIGHT, type LeadStage } from "@/lib/status";
+import { equilibrio, porNegocio } from "@/lib/calc/equilibrio";
 import { getMarketData, getInternationalSeries } from "@/lib/market";
 import { regionFromCode } from "@/lib/inventory/region";
 import { DashboardView, type DashboardData } from "./dashboard-view";
@@ -64,7 +65,7 @@ export default async function DashboardPage() {
 
   const [leadsRes, stockRes, prices, dispatchRes, market, misRes, areaRes] =
     await Promise.all([
-      supabase.from("leads").select("status, potential_value_cop"),
+      supabase.from("leads").select("status, potential_value_cop, negocio, toneladas"),
       // Inventario real, lote por lote. Antes esto salía de `inventory_quality`
       // —la segunda pestaña de la hoja— que arrastraba filas ya despachadas y
       // mostraba 12.198 kg contra los 2.500 kg que hay de verdad.
@@ -89,25 +90,21 @@ export default async function DashboardPage() {
   const stock = stockRes.data ?? [];
   const dispatches = dispatchRes.data ?? [];
 
-  // Pipeline by stage.
+  // Embudo de ventas: los proveedores (compras) no son clientes por cerrar.
   const stageCount = new Map<string, number>();
-  leads.forEach((l) => stageCount.set(l.status, (stageCount.get(l.status) ?? 0) + 1));
+  leads
+    .filter((l) => l.negocio === "Venta")
+    .forEach((l) => stageCount.set(l.status, (stageCount.get(l.status) ?? 0) + 1));
   const pipeline = LEAD_STAGES.map((stage) => ({
     stage,
     count: stageCount.get(stage) ?? 0,
     color: STAGE_COLOR[stage],
   }));
 
-  // Weighted pipeline value: each lead's potential value × its stage
-  // probability (10% Nuevo … 100% Cerrado). `total` excludes discarded leads.
-  let pipelineWeighted = 0;
-  let pipelineTotal = 0;
-  for (const l of leads) {
-    const v = Number(l.potential_value_cop) || 0;
-    if (v <= 0) continue;
-    pipelineWeighted += v * (LEAD_STAGE_WEIGHT[l.status as LeadStage] ?? 0);
-    if (l.status !== "Descartado") pipelineTotal += v;
-  }
+  // Valor potencial y ponderado (× probabilidad de la etapa), ventas y compras
+  // por separado: sumados daban ~20.000 millones mezclando proveedores con
+  // clientes (revisión del 2026-10-09).
+  const negocios = porNegocio(leads, (s) => LEAD_STAGE_WEIGHT[s as LeadStage] ?? 0);
 
   // Inventario disponible por región. Solo cuentan los lotes con saldo: los
   // agotados siguen en la tabla y sumarlos al conteo daría "89 lotes" para
@@ -200,7 +197,8 @@ export default async function DashboardPage() {
     upcomingTasks: { mias: aProximas(misRes.data), area: aProximas(areaRes.data) },
     tasksDept: dept,
     pipeline,
-    pipelineValue: { weighted: pipelineWeighted, total: pipelineTotal },
+    negocios,
+    equilibrio: equilibrio(negocios.Compra.toneladas, negocios.Venta.toneladas),
     inventory: topRegions,
     priceSeries,
     priceCompanies,

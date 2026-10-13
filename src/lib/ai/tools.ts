@@ -121,7 +121,7 @@ export const AI_TOOLS: Anthropic.Tool[] = [
   {
     name: "get_pipeline_summary",
     description:
-      "Conteo de leads por etapa del pipeline y por mercado. Para '¿cómo va el pipeline?' o '¿cuántos leads activos hay?'.",
+      "Conteo de leads por etapa y por mercado, separado en ventas (clientes) y compras (proveedores de cacao). Para '¿cómo va el pipeline?' o '¿cuántos leads activos hay?'. No sumes ventas con compras.",
     input_schema: { type: "object", properties: {} },
   },
   {
@@ -743,7 +743,7 @@ export async function executeTool(
       let q = db
         .from("leads")
         .select(
-          "company, contact_name, contact_email, contact_phone, country, city, market, type, status, product_interest, next_action, owner:team_members!leads_commercial_owner_fkey(name)",
+          "company, negocio, contact_name, contact_email, contact_phone, country, city, region, cadmio, market, type, status, product_interest, next_action, owner:team_members!leads_commercial_owner_fkey(name)",
         )
         .limit(25);
       if (typeof input.status === "string")
@@ -878,15 +878,18 @@ export async function executeTool(
     }
 
     case "get_pipeline_summary": {
-      const { data, error } = await db.from("leads").select("status, market");
+      const { data, error } = await db.from("leads").select("status, market, negocio");
       if (error) return { error: error.message };
-      const byStatus: Record<string, number> = {};
-      const byMarket: Record<string, number> = {};
+      // Ventas (clientes) y compras (proveedores) van aparte: sumarlas mezcla
+      // a quién se le vende con a quién se le compra.
+      const lados: Record<string, { total: number; por_estado: Record<string, number>; por_mercado: Record<string, number> }> = {};
       for (const l of data ?? []) {
-        byStatus[l.status] = (byStatus[l.status] ?? 0) + 1;
-        if (l.market) byMarket[l.market] = (byMarket[l.market] ?? 0) + 1;
+        const lado = (lados[l.negocio] ??= { total: 0, por_estado: {}, por_mercado: {} });
+        lado.total++;
+        lado.por_estado[l.status] = (lado.por_estado[l.status] ?? 0) + 1;
+        if (l.market) lado.por_mercado[l.market] = (lado.por_mercado[l.market] ?? 0) + 1;
       }
-      return { total: data?.length ?? 0, por_estado: byStatus, por_mercado: byMarket };
+      return { ventas: lados.Venta ?? null, compras: lados.Compra ?? null };
     }
 
     case "query_tasks": {

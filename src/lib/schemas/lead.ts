@@ -7,6 +7,18 @@ const LEAD_TYPES = [
   "Proveedor potencial",
   "Comprador/Broker",
 ] as const;
+
+/** De qué lado está el lead: a quién le compramos cacao o a quién se lo vendemos. */
+const NEGOCIOS = ["Venta", "Compra"] as const;
+type Negocio = (typeof NEGOCIOS)[number];
+const CADMIO = ["Bajo", "Alto"] as const;
+
+/** Tipos que cuadran con cada negocio (la base lo exige: 0108). */
+const TIPOS_POR_NEGOCIO: Record<Negocio, readonly (typeof LEAD_TYPES)[number][]> = {
+  Venta: ["Comprador", "Comprador/Broker"],
+  Compra: ["Proveedor potencial"],
+};
+
 const ACTIVITY_TYPES = [
   "Nota",
   "Llamada",
@@ -63,25 +75,42 @@ const optionalPhone = z
     "El teléfono es muy corto.",
   );
 
-export const leadSchema = z.object({
-  company: z.string().trim().min(1, "La empresa es obligatoria."),
-  contact_name: optionalText,
-  contact_email: optionalEmail,
-  contact_phone: optionalPhone,
-  country: optionalText,
-  city: optionalText,
-  market: z.enum(MARKETS).nullable().optional(),
-  type: z.enum(LEAD_TYPES).nullable().optional(),
-  status: z.enum(LEAD_STAGES),
-  product_interest: optionalText,
-  volume: optionalText,
-  toneladas: optionalAmount,
-  potential_value_cop: optionalAmount,
-  next_action: optionalText,
-  next_action_date: optionalText,
-  commercial_owner: z.string().uuid().nullable().optional(),
-  notes: optionalText,
-});
+export const leadSchema = z
+  .object({
+    negocio: z.enum(NEGOCIOS),
+    company: z.string().trim().min(1, "La empresa es obligatoria."),
+    contact_name: optionalText,
+    contact_email: optionalEmail,
+    contact_phone: optionalPhone,
+    country: optionalText,
+    city: optionalText,
+    market: z.enum(MARKETS).nullable().optional(),
+    type: z.enum(LEAD_TYPES).nullable().optional(),
+    status: z.enum(LEAD_STAGES),
+    product_interest: optionalText,
+    volume: optionalText,
+    toneladas: optionalAmount,
+    potential_value_cop: optionalAmount,
+    next_action: optionalText,
+    next_action_date: optionalText,
+    commercial_owner: z.string().uuid().nullable().optional(),
+    notes: optionalText,
+    region: optionalText.optional(),
+    cadmio: z
+      .union([z.enum(CADMIO), z.literal("")])
+      .transform((v) => (v === "" ? null : v))
+      .nullable()
+      .optional(),
+  })
+  .refine((l) => !l.type || TIPOS_POR_NEGOCIO[l.negocio].includes(l.type), {
+    message:
+      "El tipo no corresponde al negocio: un proveedor es una compra y un comprador, una venta.",
+    path: ["type"],
+  })
+  // Región y cadmio son de compra; en una venta no se guardan (la base también los limpia).
+  .transform((l) =>
+    l.negocio === "Venta" ? { ...l, region: null, cadmio: null } : l,
+  );
 
 export type LeadInput = z.input<typeof leadSchema>;
 
@@ -91,4 +120,12 @@ export const activitySchema = z.object({
   description: z.string().trim().min(1, "Describe la actividad."),
 });
 
-export { MARKETS, LEAD_TYPES, ACTIVITY_TYPES };
+export {
+  MARKETS,
+  LEAD_TYPES,
+  ACTIVITY_TYPES,
+  NEGOCIOS,
+  CADMIO,
+  TIPOS_POR_NEGOCIO,
+};
+export type { Negocio };

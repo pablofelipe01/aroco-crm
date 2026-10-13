@@ -21,9 +21,11 @@ const ACTIVE_STAGES = LEAD_STAGES.filter((s) => s !== "Descartado");
 export function PipelineSummary({
   leads,
   prices,
+  titulo,
 }: {
   leads: LeadWithOwner[];
   prices: ReferencePrices;
+  titulo: string;
 }) {
   const t = useT();
   const f = useFormatos();
@@ -61,7 +63,7 @@ export function PipelineSummary({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>{t.comercial.pipelineProbabilidad}</CardTitle>
+        <CardTitle>{titulo}</CardTitle>
         <span className="text-xs text-fg-subtle">
           {t.comercial.valorEsperado}{" "}
           <span className="font-mono tnum font-semibold text-fg">
