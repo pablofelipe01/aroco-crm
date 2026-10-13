@@ -15,7 +15,7 @@ import {
 import { useToast } from "@/components/ui/toast";
 import { TASK_STATUSES, TASK_STATUS_META } from "@/lib/status";
 import type { TeamMember } from "@/lib/types/database";
-import { Copy } from "lucide-react";
+import { Copy, ExternalLink, FileText, Lock } from "lucide-react";
 import type { TaskWithPerson, TareaParecida } from "./page";
 import { createTask, updateTask, resolverParecida } from "./actions";
 import { TaskLog } from "./task-log";
@@ -106,6 +106,45 @@ function FichaFechas({ task }: { task: TaskWithPerson }) {
     <p className="mb-4 rounded-[var(--radius-md)] border border-border bg-bg-subtle/40 px-3 py-2 text-xs text-fg-muted">
       {partes.join(" · ")}
     </p>
+  );
+}
+
+/**
+ * De qué acta salió la tarea, para leer el contexto cuando el enunciado no
+ * basta. Se abre en otra pestaña para no perder la tarea a medio editar.
+ *
+ * Si el acta es reservada para esta persona (0105: tener una tarea no da
+ * acceso), se dice que existe pero no se muestra ni el título.
+ */
+function OrigenActa({ acta }: { acta: NonNullable<TaskWithPerson["acta"]> }) {
+  if (acta === "reservada") {
+    return (
+      <p className="mb-4 flex items-start gap-2 rounded-[var(--radius-md)] border border-border bg-bg-subtle/40 px-3 py-2 text-xs text-fg-muted">
+        <Lock className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+        Viene de un acta reservada. Si necesitas el contexto, pídele acceso a quien la
+        administra.
+      </p>
+    );
+  }
+  return (
+    <a
+      href={`/actas?acta=${acta.id}`}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="mb-4 flex items-center gap-2 rounded-[var(--radius-md)] border border-border bg-bg-subtle/40 px-3 py-2 text-xs text-fg-muted transition-colors hover:border-accent hover:text-fg"
+    >
+      <FileText className="h-3.5 w-3.5 shrink-0" />
+      <span className="min-w-0 flex-1 truncate">
+        Viene del acta <span className="font-medium text-fg">«{acta.titulo}»</span>
+        {acta.fecha && (
+          <span className="font-mono tnum"> · {formatDate(acta.fecha)}</span>
+        )}
+      </span>
+      <span className="flex shrink-0 items-center gap-1 font-medium text-accent">
+        Abrir acta
+        <ExternalLink className="h-3 w-3" />
+      </span>
+    </a>
   );
 }
 
@@ -276,6 +315,7 @@ export function TaskForm({
       {/* Solo para una tarea que ya existe: una nueva todavía no tiene fecha
           de creación que enseñar. */}
       {initial && <FichaFechas task={initial} />}
+      {initial?.acta && <OrigenActa acta={initial.acta} />}
 
       {initial && initial.parecidas.length > 0 && (
         <PanelParecidas parecidas={initial.parecidas} onResuelta={onSaved} />

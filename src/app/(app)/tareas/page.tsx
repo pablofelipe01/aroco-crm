@@ -31,13 +31,19 @@ export type TaskWithPerson = Task & {
   assignees: TaskAssignee[];
   /** Sugerencias pendientes de «esta tarea ya existía». */
   parecidas: TareaParecida[];
+  /**
+   * El acta de donde salió, para entender el contexto. «reservada» cuando la
+   * tarea viene de un acta que esta persona no puede ver: desde 0105 tener una
+   * tarea no abre el acta, y aquí no se revela ni el título.
+   */
+  acta: { id: string; titulo: string; fecha: string | null } | "reservada" | null;
 };
 
 const SELECT =
   "*, person:team_members!tasks_person_id_fkey(id,name,color,department), task_assignees(team_members(id,name,color,department))";
 
 /** PostgREST devuelve la tabla puente anidada; se aplana a una lista simple. */
-type RawTask = Omit<TaskWithPerson, "assignees" | "parecidas"> & {
+type RawTask = Omit<TaskWithPerson, "assignees" | "parecidas" | "acta"> & {
   task_assignees: { team_members: TaskAssignee | null }[] | null;
 };
 
@@ -48,7 +54,23 @@ function aplanar(tasks: unknown): TaskWithPerson[] {
       .map((a) => a.team_members)
       .filter((m): m is TaskAssignee => m != null),
     parecidas: [],
+    acta: null,
   }));
+}
+
+/** Cuelga de cada tarea su acta, si la RLS de `meetings` dejó verla. */
+function conActa(
+  tareas: TaskWithPerson[],
+  actas: Map<string, { title: string; meeting_date: string | null }>,
+): TaskWithPerson[] {
+  return tareas.map((t) => {
+    if (!t.meeting_id) return t;
+    const a = actas.get(t.meeting_id);
+    return {
+      ...t,
+      acta: a ? { id: t.meeting_id, titulo: a.title, fecha: a.meeting_date } : "reservada",
+    };
+  });
 }
 
 /**
@@ -156,19 +178,19 @@ export default async function TareasPage({
     ]);
 
   const tablero = aplanar(tasks);
-  // De qué acta viene cada tarea de una sugerencia: es lo que deja reconocer
-  // la otra sin abrirla.
+  const delArchivo = aplanar(archivadas?.data);
+  // De qué acta viene cada tarea: para abrirla desde la tarea y entender el
+  // contexto, y en las sugerencias para reconocer la otra sin abrirla. La RLS
+  // de `meetings` (0105) solo devuelve las que esta persona puede ver.
   const idsActas = [
     ...new Set(
-      tablero
-        .filter((t) => (pares ?? []).some((p) => p.task_id === t.id || p.parecida_a === t.id))
-        .map((t) => t.meeting_id)
-        .filter((id): id is string => !!id),
+      [...tablero, ...delArchivo].map((t) => t.meeting_id).filter((id): id is string => !!id),
     ),
   ];
   const { data: actas } = idsActas.length
     ? await supabase.from("meetings").select("id, title, meeting_date").in("id", idsActas)
     : { data: [] };
+  const actaDe = new Map((actas ?? []).map((a) => [a.id, a]));
 
   const members = (team ?? []) as TeamMember[];
   // Miembro del equipo del usuario conectado (para filtrar sus tareas por defecto).
@@ -177,11 +199,7 @@ export default async function TareasPage({
 
   return (
     <TareasClient
-      initialTasks={conParecidas(
-        tablero,
-        pares ?? [],
-        new Map((actas ?? []).map((a) => [a.id, a])),
-      )}
+      initialTasks={conActa(conParecidas(tablero, pares ?? [], actaDe), actaDe)}
       team={members}
       currentPersonId={currentPersonId}
       currentUserId={session?.userId}
@@ -190,7 +208,7 @@ export default async function TareasPage({
         hoy,
       )}
       mesArchivo={rango ? (archivo ?? null) : null}
-      archivadas={aplanar(archivadas?.data)}
+      archivadas={conActa(delArchivo, actaDe)}
     />
   );
 }

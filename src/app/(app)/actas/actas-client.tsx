@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   Plus,
   ClipboardList,
@@ -148,6 +148,25 @@ export function ActasClient({
   const [busy, setBusy] = React.useState(false);
   const [review, setReview] = React.useState<Review | null>(null);
   const [reading, setReading] = React.useState<MeetingWithCount | null>(null);
+
+  // Enlace desde una tarea (?acta=<id>): abre esa acta para leer el contexto.
+  // Si no llegó en la lista es que la RLS no la deja ver (0105).
+  const searchParams = useSearchParams();
+  React.useEffect(() => {
+    const id = searchParams.get("acta");
+    if (!id) return;
+    const m = meetings.find((x) => x.id === id);
+    if (m) {
+      setReading(m);
+    } else {
+      toast({
+        tone: "error",
+        title: "No tienes acceso a esa acta",
+        description: "Pídele acceso a quien la administra.",
+      });
+    }
+    router.replace("/actas");
+  }, [searchParams, meetings, router, toast]);
 
   function reset() {
     setPhase("upload");
