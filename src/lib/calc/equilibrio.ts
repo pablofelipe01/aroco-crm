@@ -16,14 +16,17 @@ export interface LeadPipeline {
   toneladas: number | string | null;
 }
 
+/** Ni los descartados ni los en pausa cuentan (0109). */
+const FUERA = new Set(["Descartado", "En pausa"]);
+
 export interface Lado {
-  /** Leads que no están descartados. */
+  /** Leads que cuentan: ni descartados ni en pausa. */
   activos: number;
-  /** Σ valor potencial de los no descartados (COP). */
+  /** Σ valor potencial de los que cuentan (COP). */
   total: number;
   /** Σ valor × probabilidad de la etapa (COP). */
   ponderado: number;
-  /** Σ toneladas de los no descartados. */
+  /** Σ toneladas de los que cuentan. */
   toneladas: number;
 }
 
@@ -34,7 +37,7 @@ export function porNegocio(
   const vacio = (): Lado => ({ activos: 0, total: 0, ponderado: 0, toneladas: 0 });
   const r: Record<Negocio, Lado> = { Venta: vacio(), Compra: vacio() };
   for (const l of leads) {
-    if (l.status === "Descartado") continue;
+    if (FUERA.has(l.status)) continue;
     const lado = r[l.negocio];
     const v = Number(l.potential_value_cop) || 0;
     lado.activos++;

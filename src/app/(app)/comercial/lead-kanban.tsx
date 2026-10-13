@@ -78,7 +78,8 @@ function Column({
   );
   return (
     <div className="flex w-72 shrink-0 flex-col">
-      <div className="mb-2 flex items-center justify-between gap-2 px-1">
+      {/* Encabezado fijo al bajar por una columna larga (revisión del 2026-10-09). */}
+      <div className="sticky top-0 z-10 mb-2 flex items-center justify-between gap-2 bg-bg-base/95 px-1 py-1.5 backdrop-blur-sm">
         <div className="flex items-center gap-1.5">
           <Badge tone={LEAD_STAGE_TONE[stage]} dot>
             {t.etapas[stage]}
@@ -119,7 +120,7 @@ function Column({
         )}
       </motion.div>
       {/* Totales de la etapa: toneladas y valor potencial. */}
-      <div className="mt-2 flex items-center justify-between gap-2 rounded-[var(--radius-md)] border border-border bg-surface px-3 py-2">
+      <div className="sticky bottom-0 z-10 mt-2 flex items-center justify-between gap-2 rounded-[var(--radius-md)] border border-border bg-surface px-3 py-2">
         <span className="text-[11px] font-medium uppercase tracking-wide text-fg-subtle">
           {t.comun.total}
         </span>
@@ -183,7 +184,9 @@ export function LeadKanban({
       onDragEnd={onDragEnd}
       onDragCancel={() => setActiveId(null)}
     >
-      <div className="flex gap-4 overflow-x-auto pb-4">
+      {/* El tablero lleva su propio scroll vertical: con overflow-x, un sticky
+          no se pega al scroll de la página, y así los encabezados quedan fijos. */}
+      <div className="flex max-h-[calc(100dvh-9rem)] gap-4 overflow-auto pb-4">
         {LEAD_STAGES.map((stage) => (
           <Column
             key={stage}

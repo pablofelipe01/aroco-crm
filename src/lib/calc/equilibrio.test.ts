@@ -13,12 +13,13 @@ const lead = (p: Partial<LeadPipeline>): LeadPipeline => ({
   ...p,
 });
 
-test("ventas y compras se suman por separado y sin los descartados", () => {
+test("ventas y compras se suman por separado, sin descartados ni en pausa", () => {
   const r = porNegocio(
     [
       lead({ potential_value_cop: 1000, toneladas: 10 }),
       lead({ status: "Negociación", potential_value_cop: "2000", toneladas: "5" }),
       lead({ status: "Descartado", potential_value_cop: 9999, toneladas: 99 }),
+      lead({ status: "En pausa", potential_value_cop: 7777, toneladas: 77 }),
       lead({ negocio: "Compra", status: "Cerrado", potential_value_cop: 500, toneladas: 12 }),
     ],
     peso,

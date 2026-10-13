@@ -6,13 +6,15 @@ import {
   LEAD_STAGES,
   LEAD_STAGE_TONE,
   LEAD_STAGE_WEIGHT,
+  cuentaEnPipeline,
 } from "@/lib/status";
 import { useT, useFormatos } from "@/lib/i18n/provider";
 import { leadDisplayValue, type Market } from "@/lib/calc/lead-value";
 import type { ReferencePrices } from "@/lib/calc/lead-value";
 import type { LeadWithOwner } from "./page";
 
-const ACTIVE_STAGES = LEAD_STAGES.filter((s) => s !== "Descartado");
+// Ni los descartados ni los en pausa suman al pipeline (revisión del 2026-10-09).
+const ACTIVE_STAGES = LEAD_STAGES.filter(cuentaEnPipeline);
 
 /**
  * Totaliza el pipeline por probabilidad de cierre: por cada etapa (10% … 100%),
@@ -59,6 +61,9 @@ export function PipelineSummary({
     }),
     { count: 0, tons: 0, value: 0, weighted: 0 },
   );
+
+  const enPausa = leads.filter((l) => l.status === "En pausa");
+  const tonPausa = enPausa.reduce((s, l) => s + (l.toneladas ?? 0), 0);
 
   return (
     <Card>
@@ -142,6 +147,13 @@ export function PipelineSummary({
             </tfoot>
           </table>
         </div>
+        {enPausa.length > 0 && (
+          <p className="border-t border-border px-4 py-2.5 text-xs text-fg-subtle">
+            {t.comercial.fueraDelPipeline
+              .replace("{n}", String(enPausa.length))
+              .replace("{ton}", ton(tonPausa))}
+          </p>
+        )}
       </CardBody>
     </Card>
   );

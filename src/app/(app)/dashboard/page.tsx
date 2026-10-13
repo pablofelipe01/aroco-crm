@@ -16,6 +16,7 @@ const STAGE_COLOR: Record<LeadStage, string> = {
   Negociación: "#B45309",
   Enviado: "#2D6A4F",
   "En espera": "#9B9790",
+  "En pausa": "#C9C4BB",
   Cerrado: "#1B4332",
   Descartado: "#991B1B",
 };

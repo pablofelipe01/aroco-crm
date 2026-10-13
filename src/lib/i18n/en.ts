@@ -237,6 +237,7 @@ export const en: Diccionario = {
     noSePudoMover: "The lead could not be moved",
 
     pipelineProbabilidad: "Pipeline by probability",
+    fueraDelPipeline: "{n} paused ({ton}) do not count toward the close rate.",
     pipelineVentas: "Sales pipeline by probability",
     pipelineCompras: "Purchase pipeline by probability",
     negocio: "Deal type",
@@ -637,6 +638,7 @@ export const en: Diccionario = {
     "Negociación": "Negotiating",
     Enviado: "Sent",
     "En espera": "On hold",
+    "En pausa": "Paused",
     Cerrado: "Won",
     Descartado: "Dropped",
   },

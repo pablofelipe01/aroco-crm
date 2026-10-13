@@ -3750,6 +3750,7 @@ export type Database = {
         | "Negociación"
         | "Enviado"
         | "En espera"
+        | "En pausa"
         | "Cerrado"
         | "Descartado";
       lead_type: "Comprador" | "Proveedor potencial" | "Comprador/Broker";

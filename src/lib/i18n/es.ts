@@ -237,6 +237,7 @@ export const es = {
     noSePudoMover: "No se pudo mover el lead",
 
     pipelineProbabilidad: "Pipeline por probabilidad",
+    fueraDelPipeline: "{n} en pausa ({ton}) no cuentan para el % de cierre.",
     pipelineVentas: "Pipeline de ventas por probabilidad",
     pipelineCompras: "Pipeline de compras por probabilidad",
     negocio: "Tipo de negocio",
@@ -645,6 +646,7 @@ export const es = {
     "Negociación": "Negociación",
     Enviado: "Enviado",
     "En espera": "En espera",
+    "En pausa": "En pausa",
     Cerrado: "Cerrado",
     Descartado: "Descartado",
   },

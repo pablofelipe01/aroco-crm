@@ -164,7 +164,9 @@ export function LeadList({
       </ul>
 
       {/* Desktop: sortable table */}
-      <div className="hidden overflow-x-auto rounded-[var(--radius-lg)] border border-border bg-surface sm:block">
+      {/* Scroll propio para que la fila de encabezados quede fija al bajar
+          (con overflow-x, un sticky no se pega al scroll de la página). */}
+      <div className="hidden max-h-[calc(100dvh-9rem)] overflow-auto rounded-[var(--radius-lg)] border border-border bg-surface sm:block">
       <table className="w-full min-w-[760px] text-sm">
         <thead>
           {table.getHeaderGroups().map((hg) => (
@@ -175,7 +177,8 @@ export function LeadList({
                   <th
                     key={h.id}
                     onClick={h.column.getToggleSortingHandler()}
-                    className="cursor-pointer select-none px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-fg-subtle hover:text-fg"
+                    // El borde va como sombra: el de la fila no viaja con un th fijo.
+                    className="sticky top-0 z-10 cursor-pointer select-none bg-surface px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-fg-subtle shadow-[inset_0_-1px_0_var(--color-border)] hover:text-fg"
                   >
                     <span className="inline-flex items-center gap-1">
                       {flexRender(h.column.columnDef.header, h.getContext())}

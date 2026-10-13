@@ -8,6 +8,7 @@ export const LEAD_STAGES = [
   "Enviado",
   "En espera",
   "Cerrado",
+  "En pausa",
   "Descartado",
 ] as const;
 
@@ -18,6 +19,9 @@ export type LeadStage = (typeof LEAD_STAGES)[number];
  * 2026-06-30 CRM review: 10% (Nuevo) → 30 → 50 → 70 → 80 (En espera) → 100%
  * (Cerrado); 0% if "Descartado". Multiply a lead's potential value by its
  * stage weight to get its expected (weighted) value.
+ *
+ * «En pausa» (revisión del 2026-10-09) también pesa 0: el prospecto no está
+ * activo ni descartado, y no debe sumar al % de cierre.
  */
 export const LEAD_STAGE_WEIGHT: Record<LeadStage, number> = {
   Nuevo: 0.1,
@@ -26,8 +30,16 @@ export const LEAD_STAGE_WEIGHT: Record<LeadStage, number> = {
   Enviado: 0.7,
   "En espera": 0.8,
   Cerrado: 1,
+  "En pausa": 0,
   Descartado: 0,
 };
+
+/** Etapas que no cuentan en el pipeline: ni en totales ni en el % de cierre. */
+export const LEAD_STAGES_FUERA: readonly LeadStage[] = ["En pausa", "Descartado"];
+
+export function cuentaEnPipeline(stage: string): boolean {
+  return !(LEAD_STAGES_FUERA as readonly string[]).includes(stage);
+}
 
 export const LEAD_STAGE_TONE: Record<LeadStage, BadgeTone> = {
   Nuevo: "info",
@@ -36,6 +48,7 @@ export const LEAD_STAGE_TONE: Record<LeadStage, BadgeTone> = {
   Enviado: "info",
   "En espera": "neutral",
   Cerrado: "success",
+  "En pausa": "neutral",
   Descartado: "danger",
 };
 
