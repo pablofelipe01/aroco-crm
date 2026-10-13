@@ -111,9 +111,18 @@ export function ParametrosModal({
           t.cotizador.porcentajes,
           filas.filter((f) => f.unidad === "ratio"),
         )}
+        {/* Cada incoterm tiene sus costos, como cada pestaña de la hoja. */}
+        {(["fob", "cif", "nacional"] as const).map((sufijo) => (
+          <React.Fragment key={sufijo}>
+            {grupo(
+              t.cotizador.porDefectoDe.replace("{incoterm}", sufijo.toUpperCase()),
+              filas.filter((f) => f.unidad === "cop_kg" && f.clave.endsWith(`_${sufijo}`)),
+            )}
+          </React.Fragment>
+        ))}
         {grupo(
-          t.cotizador.porDefecto,
-          filas.filter((f) => f.unidad === "cop_kg"),
+          t.cotizador.bonificacionesNacional,
+          filas.filter((f) => f.unidad === "cop_kg" && f.clave.startsWith("bonif_")),
         )}
       </div>
     </Modal>

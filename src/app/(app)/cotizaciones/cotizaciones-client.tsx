@@ -21,6 +21,12 @@ import { deleteQuote, setQuoteStatus } from "./actions";
 
 const STATUSES: QuoteStatus[] = ["borrador", "enviada", "aceptada", "rechazada"];
 
+/** Utilidad en USD/TM: precio final menos costo total, ambos guardados en la cotización. */
+function valorUtilidad(q: QuoteWithLead): number | null {
+  if (q.precio_final_usd_tm == null || q.costo_total_usd_tm == null) return null;
+  return Number(q.precio_final_usd_tm) - Number(q.costo_total_usd_tm);
+}
+
 export function CotizacionesClient({
   initialQuotes,
   leads,
@@ -176,6 +182,7 @@ export function CotizacionesClient({
                   <p className="text-xs text-fg-subtle">
                     {t.cotizaciones.utilidad}{" "}
                     {q.utilidad_pct != null ? `${(q.utilidad_pct * 100).toFixed(2)}%` : "—"}
+                    {valorUtilidad(q) != null && ` (${formatUSD(valorUtilidad(q)!)}/TM)`}
                     {" · "}
                     {f.fecha(q.created_at)}
                   </p>
@@ -276,6 +283,11 @@ export function CotizacionesClient({
                   </td>
                   <td className="px-4 py-3 text-right font-mono tnum text-fg-muted">
                     {q.utilidad_pct != null ? `${(q.utilidad_pct * 100).toFixed(2)}%` : "—"}
+                    {valorUtilidad(q) != null && (
+                      <span className="block text-xs text-fg-subtle">
+                        {formatUSD(valorUtilidad(q)!)} /TM
+                      </span>
+                    )}
                   </td>
                   <td className="px-4 py-3">
                     {canWrite ? (

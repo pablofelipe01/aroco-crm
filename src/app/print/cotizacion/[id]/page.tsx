@@ -170,6 +170,10 @@ export default async function QuotePrintPage({
             <p className="font-mono text-xl font-bold text-[#1B4332]">
               {(calc.utilidadPct * 100).toFixed(2)}%
             </p>
+            <p className="font-mono text-sm text-[#2D6A4F]">
+              {formatUSD(calc.valorUtilidadUsdTm)} /TM ·{" "}
+              {formatCOP(calc.valorUtilidadUsdTm * quote.trm)} /TM
+            </p>
           </div>
         </div>
         <div className="mt-3 border-t border-[#95D5B2] pt-3 text-sm">
@@ -178,6 +182,12 @@ export default async function QuotePrintPage({
           </span>{" "}
           <span className="font-mono font-semibold text-[#1B4332]">
             {formatUSD(calc.totalOperacionUsd)} · {formatCOP(calc.totalOperacionCop)}
+          </span>
+          <br />
+          <span className="text-[#2D6A4F]">Utilidad de la operación:</span>{" "}
+          <span className="font-mono font-semibold text-[#1B4332]">
+            {formatUSD(calc.valorUtilidadUsdTm * quote.volume_tm)} ·{" "}
+            {formatCOP(calc.valorUtilidadUsdTm * quote.volume_tm * quote.trm)}
           </span>
         </div>
       </div>

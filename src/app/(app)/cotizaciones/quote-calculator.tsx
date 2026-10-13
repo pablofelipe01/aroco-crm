@@ -7,7 +7,13 @@ import { Field, Input, Select } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/components/ui/toast";
 import { cotizar, esViable, type CotizadorInput, type Incoterm } from "@/lib/calc/cotizador";
-import { comisionPorDefecto, type Parametros } from "@/lib/cotizador-parametros";
+import {
+  aplicaCosto,
+  comisionPorDefecto,
+  costosPorDefecto,
+  type Costo,
+  type Parametros,
+} from "@/lib/cotizador-parametros";
 import { fijosDe, type Fijos } from "@/lib/schemas/quote";
 import { formatUSD, cn } from "@/lib/utils";
 import { useT, useFormatos } from "@/lib/i18n/provider";
@@ -21,13 +27,26 @@ type State = Record<string, string>;
 
 const pct = (r: number) => String(Math.round(r * 1e6) / 1e4);
 
+/** El mercado sale del incoterm: NACIONAL es nacional, FOB y CIF exportación. */
+const mercadoDe = (incoterm: Incoterm) => (incoterm === "NACIONAL" ? "Nacional" : "Internacional");
+
+/** Al elegir incoterm se cargan su comisión y sus costos (cada pestaña de la hoja tiene los suyos). */
+function porIncoterm(p: Parametros, incoterm: Incoterm): State {
+  const costos = costosPorDefecto(p, incoterm);
+  return {
+    incoterm,
+    market: mercadoDe(incoterm),
+    commission_pct: pct(comisionPorDefecto(p, incoterm)),
+    ...Object.fromEntries(Object.entries(costos).map(([k, v]) => [k, String(v)])),
+  };
+}
+
 /** A new quote starts from the admin parameters and today's market. */
 function nuevoEstado(p: Parametros, ref: ReferenciasMercado): State {
   return {
-    incoterm: "FOB",
+    ...porIncoterm(p, "FOB"),
     lead_id: "",
     client_name: "",
-    market: "Internacional",
     port_origin: "Buenaventura",
     port_destination: "",
     volume_tm: "25",
@@ -36,14 +55,6 @@ function nuevoEstado(p: Parametros, ref: ReferenciasMercado): State {
     cocoa_usd_t: ref.cocoaUsdT != null ? String(ref.cocoaUsdT) : "",
     differential_pct: "0",
     purchase_price_cop_kg: "",
-    commission_pct: pct(comisionPorDefecto(p, "FOB")),
-    transporte_bodega: String(p.transporte_bodega),
-    seleccion: String(p.seleccion),
-    fumigacion: String(p.fumigacion),
-    estibas: String(p.estibas),
-    costales: String(p.costales),
-    coberturas: String(p.coberturas),
-    costos_exportacion: String(p.costos_exportacion),
     bonif_calidad_proveedor_pct: pct(p.bonif_calidad_proveedor_pct),
     bonif_cadmio: String(p.bonif_cadmio),
     bonif_trazabilidad: String(p.bonif_trazabilidad),
@@ -179,11 +190,7 @@ export function QuoteCalculator({
   const set = (k: string, v: string) => setS((p) => ({ ...p, [k]: v }));
 
   function onIncoterm(incoterm: Incoterm) {
-    setS((p) => ({
-      ...p,
-      incoterm,
-      commission_pct: pct(comisionPorDefecto(parametros, incoterm)),
-    }));
+    setS((p) => ({ ...p, ...porIncoterm(parametros, incoterm) }));
   }
 
   const isNacional = s.incoterm === "NACIONAL";
@@ -217,13 +224,16 @@ export function QuoteCalculator({
       ...p,
       lead_id: id,
       client_name: lead?.company ?? p.client_name,
-      market: lead?.market ?? p.market,
     }));
   }
 
   async function onSave() {
     setSaving(true);
-    const payload = { ...s, lead_id: s.lead_id || null };
+    const payload = {
+      ...s,
+      lead_id: s.lead_id || null,
+      market: mercadoDe(s.incoterm as Incoterm),
+    };
     const res = initial
       ? await updateQuote(initial.id, payload)
       : await createQuote(payload);
@@ -285,15 +295,8 @@ export function QuoteCalculator({
                 ))}
               </Select>
             </Field>
-            <Field label={t.cotizador.nombreCliente} className="col-span-2">
+            <Field label={t.cotizador.nombreCliente} className="col-span-3">
               <Input value={s.client_name} onChange={(e) => set("client_name", e.target.value)} />
-            </Field>
-            <Field label={t.cotizador.mercado}>
-              <Select value={s.market} onChange={(e) => set("market", e.target.value)}>
-                <option value="">—</option>
-                <option value="Nacional">{t.mercados.Nacional}</option>
-                <option value="Internacional">{t.mercados.Internacional}</option>
-              </Select>
             </Field>
           </section>
 
@@ -321,15 +324,22 @@ export function QuoteCalculator({
               <span className="font-normal normal-case">(COP/kg)</span>
             </h4>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-              <NumField label={t.cotizador.transpBodega} value={s.transporte_bodega} onChange={(v) => set("transporte_bodega", v)} />
-              <NumField label={t.cotizador.seleccion} value={s.seleccion} onChange={(v) => set("seleccion", v)} />
-              <NumField label={t.cotizador.fumigacion} value={s.fumigacion} onChange={(v) => set("fumigacion", v)} />
-              <NumField label={t.cotizador.estibas} value={s.estibas} onChange={(v) => set("estibas", v)} />
-              <NumField label={t.cotizador.costales} value={s.costales} onChange={(v) => set("costales", v)} />
-              <NumField label={t.cotizador.coberturas} value={s.coberturas} onChange={(v) => set("coberturas", v)} />
-              {!isNacional && (
-                <NumField label={t.cotizador.costosExport} value={s.costos_exportacion} onChange={(v) => set("costos_exportacion", v)} />
-              )}
+              {/* Solo los que cuentan en este incoterm; el cálculo deja los otros en 0. */}
+              {(
+                [
+                  ["transporte_bodega", t.cotizador.transpBodega],
+                  ["seleccion", t.cotizador.seleccion],
+                  ["fumigacion", t.cotizador.fumigacion],
+                  ["estibas", t.cotizador.estibas],
+                  ["costales", t.cotizador.costales],
+                  ["coberturas", t.cotizador.coberturas],
+                  ["costos_exportacion", t.cotizador.costosExport],
+                ] as [Costo, string][]
+              )
+                .filter(([c]) => aplicaCosto(c, s.incoterm as Incoterm))
+                .map(([c, label]) => (
+                  <NumField key={c} label={label} value={s[c]} onChange={(v) => set(c, v)} />
+                ))}
             </div>
             <p className="mt-2 text-xs text-fg-subtle">
               {t.cotizador.fijosNota}{" "}
@@ -403,6 +413,14 @@ export function QuoteCalculator({
                     value={`${(result.utilidadPct * 100).toFixed(2)}%`}
                     tone={esViable(result.utilidadPct, umbral) ? "good" : "bad"}
                   />
+                  <Row
+                    label={t.cotizador.valorUtilidad}
+                    value={`${formatUSD(result.valorUtilidadUsdTm)} /TM`}
+                    tone={esViable(result.utilidadPct, umbral) ? "good" : "bad"}
+                  />
+                  <p className="text-right font-mono text-xs text-fg-muted tnum">
+                    {f.cop(result.valorUtilidadUsdTm * n(s, "trm"))} /TM
+                  </p>
                 </div>
                 <div className="mt-3">
                   {esViable(result.utilidadPct, umbral) ? (
@@ -424,6 +442,14 @@ export function QuoteCalculator({
                   </p>
                   <p className="font-mono text-xs text-fg-muted tnum">
                     {f.cop(result.totalOperacionCop)}
+                  </p>
+                  <p className="mt-2 text-xs text-fg-subtle">{t.cotizador.utilidadOperacion}</p>
+                  <p className="font-mono text-sm font-semibold text-fg tnum">
+                    {formatUSD(result.valorUtilidadUsdTm * n(s, "volume_tm"))}
+                    <span className="font-normal text-fg-muted">
+                      {" · "}
+                      {f.cop(result.valorUtilidadUsdTm * n(s, "volume_tm") * n(s, "trm"))}
+                    </span>
                   </p>
                 </div>
               </>

@@ -4,7 +4,11 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/types/database";
 import { cotizar } from "@/lib/calc/cotizador";
 import { quoteSchema, toCotizadorInput, fijosDe } from "@/lib/schemas/quote";
-import { cargarParametros, comisionPorDefecto } from "@/lib/cotizador-parametros";
+import {
+  cargarParametros,
+  comisionPorDefecto,
+  costosPorDefecto,
+} from "@/lib/cotizador-parametros";
 import { getMarketData } from "@/lib/market";
 import { scopeLabel, type AgentContext } from "@/lib/ai/context";
 import { DEPARTMENTS as DEPARTMENT_LIST } from "@/lib/departments";
@@ -1463,17 +1467,15 @@ export async function executeTool(
       const company = String(input.company ?? "").trim();
       let lead_id: string | null = null;
       let client_name: string | null = null;
-      let market: string | null = null;
       if (company) {
         const { data } = await db
           .from("leads")
-          .select("id, company, market")
+          .select("id, company")
           .ilike("company", `%${company}%`)
           .limit(1);
         if (data?.[0]) {
           lead_id = data[0].id;
           client_name = data[0].company;
-          market = data[0].market;
         }
       }
       const par = await cargarParametros(db);
@@ -1485,20 +1487,15 @@ export async function executeTool(
         incoterm,
         lead_id,
         client_name,
-        market,
+        // Como en el cotizador: el mercado sale del incoterm, no del lead.
+        market: incoterm === "NACIONAL" ? "Nacional" : "Internacional",
         trm: Number(input.trm) || 0,
         cocoa_usd_t: Number(input.cocoa_usd_t) || 0,
         differential_pct: Number(input.differential_pct) || 0,
         purchase_price_cop_kg: Number(input.purchase_price_cop_kg) || 0,
         volume_tm: Number(input.volume_tm) || 1,
         commission_pct: comision,
-        transporte_bodega: par.transporte_bodega,
-        seleccion: par.seleccion,
-        fumigacion: par.fumigacion,
-        estibas: par.estibas,
-        costales: par.costales,
-        coberturas: par.coberturas,
-        costos_exportacion: par.costos_exportacion,
+        ...costosPorDefecto(par, incoterm as "NACIONAL" | "FOB" | "CIF"),
         bonif_calidad_proveedor_pct: par.bonif_calidad_proveedor_pct * 100,
         bonif_cadmio: par.bonif_cadmio,
         bonif_trazabilidad: par.bonif_trazabilidad,
