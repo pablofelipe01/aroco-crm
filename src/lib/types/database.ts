@@ -3024,6 +3024,39 @@ export type Database = {
         };
         Relationships: [];
       };
+      correos_compras: {
+        Row: {
+          created_at: string;
+          enviado_at: string | null;
+          estado: "pendiente" | "enviando" | "enviado" | "omitido" | "error";
+          id: string;
+          motivo: string | null;
+          notification_id: string;
+          profile_id: string;
+          solicitud_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          enviado_at?: string | null;
+          estado?: "pendiente" | "enviando" | "enviado" | "omitido" | "error";
+          id?: string;
+          motivo?: string | null;
+          notification_id: string;
+          profile_id: string;
+          solicitud_id: string;
+        };
+        Update: {
+          created_at?: string;
+          enviado_at?: string | null;
+          estado?: "pendiente" | "enviando" | "enviado" | "omitido" | "error";
+          id?: string;
+          motivo?: string | null;
+          notification_id?: string;
+          profile_id?: string;
+          solicitud_id?: string;
+        };
+        Relationships: [];
+      };
       correos_tareas: {
         Row: {
           asignado_por: string | null;

@@ -1,8 +1,10 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getSessionContext } from "@/lib/auth";
+import { enviarCorreosCompras } from "@/lib/correo/compras-aprobacion";
 import {
   solicitudSchema,
   cotizacionSchema,
@@ -331,6 +333,9 @@ export async function enviarAAprobacion(id: string): Promise<CompraResult> {
     .update({ estado: "Pendiente" })
     .eq("id", id);
   if (error) return { ok: false, error: legible(error.message) };
+  // El aviso a cada aprobador encoló su correo (0107); sale después de
+  // responder, para no hacer esperar a quien pide por Resend.
+  after(enviarCorreosCompras);
   revalidatePath("/compras");
   return { ok: true };
 }
