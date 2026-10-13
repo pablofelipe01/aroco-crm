@@ -26,6 +26,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { cn, formatDate } from "@/lib/utils";
 import type { TeamMember } from "@/lib/types/database";
 import type { MeetingWithCount, TaskLoad, ProfileLite } from "./page";
+import { esReservada } from "./reservada";
 import { MeetingDetail } from "./meeting-detail";
 import {
   createActaTasks,
@@ -242,7 +243,7 @@ export function ActasClient({
   async function onToggleRestricted(m: MeetingWithCount) {
     if (!m.restricted && m.meeting_attendees.length === 0) {
       const ok = confirm(
-        `"${m.title}" no tiene invitados registrados. Si la restringes, solo la verán Dirección, quien la subió y quien tenga tareas en ella. ¿Continuar?`,
+        `"${m.title}" no tiene invitados registrados. Si la restringes, solo la verán Dirección y quien la subió. ¿Continuar?`,
       );
       if (!ok) return;
     }
@@ -256,7 +257,7 @@ export function ActasClient({
       title: m.restricted ? "Acta abierta al equipo" : "Acta restringida",
       description: m.restricted
         ? undefined
-        : `La verán ${m.meeting_attendees.length} invitados, Dirección, quien la subió y quien tenga tareas en ella.`,
+        : `La verán ${m.meeting_attendees.length} invitados, Dirección y quien la subió.`,
     });
     router.refresh();
   }
@@ -329,20 +330,19 @@ export function ActasClient({
                   </p>
                 </div>
               </button>
-              {m.restricted && (
+              {esReservada(m) && (
                 <Badge
                   tone="warn"
-                  title={
-                    m.meeting_attendees.length > 0
-                      ? `La ven Dirección, quien tiene tareas en ella y: ${m.meeting_attendees
-                          .map((a) => a.name ?? a.email)
-                          .filter(Boolean)
-                          .join(", ")}`
-                      : "Solo la ven Dirección, quien la subió y quien tiene tareas en ella — no hay invitados registrados"
-                  }
+                  title={`Reservada: la ven Dirección y solo ${
+                    m.meeting_attendees
+                      .filter((a) => a.can_view)
+                      .map((a) => a.name ?? a.email)
+                      .filter(Boolean)
+                      .join(", ") || "quien la subió"
+                  }`}
                 >
                   <Lock className="h-3 w-3" />
-                  Restringida
+                  Reservada
                 </Badge>
               )}
               <TaskLoadBadge total={m.tasks?.[0]?.count ?? 0} load={m.taskLoad} />

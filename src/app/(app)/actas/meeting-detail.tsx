@@ -20,6 +20,7 @@ import { createClient } from "@/lib/supabase/client";
 import { formatDate } from "@/lib/utils";
 import { TASK_STATUS_META, type TaskStatus } from "@/lib/status";
 import type { MeetingWithCount, MeetingTemaLite, ProfileLite } from "./page";
+import { esReservada } from "./reservada";
 import {
   setAttendeeAccess,
   setAttendeeManage,
@@ -96,13 +97,13 @@ function AccessPanel({
       </h3>
       <p className="mb-3 text-xs text-fg-subtle">
         {meeting.restricted
-          ? "Solo la ven los marcados, Dirección, quien la subió, quien la administra y quien tiene tareas en ella."
+          ? "Solo la ven los marcados, Dirección, quien la subió y quien la administra. Tener una tarea del acta no da acceso a ella."
           : "El acta está abierta a todo el equipo. Estas marcas empiezan a aplicar cuando la restrinjas."}
       </p>
 
       {invitados.length === 0 ? (
         <p className="text-sm text-fg-subtle">
-          No hay nadie en la lista. Restringida, solo la ven Dirección, quien la subió y quien tiene tareas en ella.
+          No hay nadie en la lista. Restringida, solo la ven Dirección y quien la subió.
         </p>
       ) : (
         <ul className="space-y-1">
@@ -481,10 +482,10 @@ export function MeetingDetail({
           <span className="text-xs text-fg-muted">
             {formatDate(meeting.meeting_date ?? meeting.created_at)}
           </span>
-          {meeting.restricted && (
+          {esReservada(meeting) && (
             <Badge tone="warn">
               <Lock className="h-3 w-3" />
-              Restringida
+              Reservada
             </Badge>
           )}
           <Badge tone="neutral">{meeting.tasks?.[0]?.count ?? 0} tareas</Badge>
