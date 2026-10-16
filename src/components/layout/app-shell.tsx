@@ -18,6 +18,8 @@ export interface ShellUser {
   department: Department | null;
   role?: UserRole;
   permisos?: Permisos;
+  /** Cuenta de prueba (0110): puede cambiarse el rol y el área desde el menú. */
+  esPrueba?: boolean;
 }
 
 /** Resolve the page title/subtitle from the current route. */
@@ -124,6 +126,7 @@ function ShellInterno({
               name: user.name,
               department: user.department ?? undefined,
               role: user.role,
+              esPrueba: user.esPrueba,
             }}
           />
           <main className="flex-1 overflow-y-auto">

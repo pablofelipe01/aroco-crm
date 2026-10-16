@@ -40,6 +40,7 @@ export default async function AppLayout({
     department: profile.department,
     role: profile.role,
     permisos: { ve_mercado: profile.ve_mercado, ve_uso: profile.ve_uso },
+    esPrueba: profile.es_prueba,
   };
 
   // El perfil manda sobre la cookie: es lo que sigue a la persona de un

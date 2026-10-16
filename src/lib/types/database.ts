@@ -2714,6 +2714,7 @@ export type Database = {
           created_at: string;
           department: Database["public"]["Enums"]["department"] | null;
           email: string;
+          es_prueba: boolean;
           full_name: string;
           id: string;
           idioma: string;
@@ -2731,6 +2732,7 @@ export type Database = {
           created_at?: string;
           department?: Database["public"]["Enums"]["department"] | null;
           email: string;
+          es_prueba?: boolean;
           full_name: string;
           id: string;
           idioma?: string;
@@ -2748,6 +2750,7 @@ export type Database = {
           created_at?: string;
           department?: Database["public"]["Enums"]["department"] | null;
           email?: string;
+          es_prueba?: boolean;
           full_name?: string;
           id?: string;
           idioma?: string;

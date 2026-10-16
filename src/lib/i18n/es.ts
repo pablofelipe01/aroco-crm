@@ -99,6 +99,12 @@ export const es = {
     abrirMenu: "Abrir menú",
     administrador: "Administrador",
     miembro: "Miembro",
+    adminVista: "Admin (solo ver)",
+    cuentaPrueba: "Cuenta de prueba",
+    verComo: "Ver como",
+    rol: "Rol",
+    area: "Área",
+    cambiandoPerfil: "Cambiando…",
   },
 
   dashboard: {

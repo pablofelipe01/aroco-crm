@@ -99,6 +99,12 @@ export const en: Diccionario = {
     abrirMenu: "Open menu",
     administrador: "Administrator",
     miembro: "Member",
+    adminVista: "Admin (view only)",
+    cuentaPrueba: "Test account",
+    verComo: "View as",
+    rol: "Role",
+    area: "Area",
+    cambiandoPerfil: "Switching…",
   },
 
   dashboard: {

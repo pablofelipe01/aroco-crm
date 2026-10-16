@@ -25,6 +25,7 @@ export function Topbar({
     name: string;
     department?: string;
     role?: UserRole;
+    esPrueba?: boolean;
   } | null;
 }) {
   const t = useT();
@@ -84,6 +85,7 @@ export function Topbar({
             name={user.name}
             department={user.department}
             role={user.role}
+            esPrueba={user.esPrueba}
           />
         )}
       </div>
