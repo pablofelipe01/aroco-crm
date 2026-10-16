@@ -130,12 +130,14 @@ function NumField({
   onChange,
   suffix,
   hint,
+  readOnly = false,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
   suffix?: string;
   hint?: string;
+  readOnly?: boolean;
 }) {
   return (
     <Field label={label} hint={hint}>
@@ -144,8 +146,10 @@ function NumField({
           type="number"
           step="any"
           value={value}
+          readOnly={readOnly}
+          aria-readonly={readOnly || undefined}
           onChange={(e) => onChange(e.target.value)}
-          className="pr-12 font-mono tnum"
+          className={cn("pr-12 font-mono tnum", readOnly && "cursor-not-allowed bg-bg-subtle text-fg-muted")}
         />
         {suffix && (
           <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-fg-subtle">
@@ -165,6 +169,7 @@ export function QuoteCalculator({
   onSaved,
   parametros,
   referencias,
+  isAdmin,
 }: {
   open: boolean;
   onClose: () => void;
@@ -173,6 +178,8 @@ export function QuoteCalculator({
   onSaved: () => void;
   parametros: Parametros;
   referencias: ReferenciasMercado;
+  /** Solo un admin edita TRM, cacao referencial y diferencial (reunión 2026-10-16). */
+  isAdmin: boolean;
 }) {
   const { toast } = useToast();
   const t = useT();
@@ -194,6 +201,11 @@ export function QuoteCalculator({
   }
 
   const isNacional = s.incoterm === "NACIONAL";
+  // Sin referencia de mercado el campo queda abierto: si no, no habría cómo cotizar.
+  // Al editar, la cotización ya trae los suyos y se conservan.
+  const trmBloqueada = !isAdmin && (initial != null || referencias.trm != null);
+  const cacaoBloqueado = !isAdmin && (initial != null || referencias.cocoaUsdT != null);
+  const diferencialBloqueado = !isAdmin;
   // An existing quote keeps the parameters it was created with.
   const fijos: Fijos = React.useMemo(() => fijosDe(initial ?? parametros), [initial, parametros]);
   const umbral = parametros.umbral_viable;
@@ -305,13 +317,13 @@ export function QuoteCalculator({
               {t.cotizador.precioVolumen}
             </h4>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-              <NumField label="TRM" value={s.trm} onChange={(v) => set("trm", v)} suffix="COP/USD" hint={hintTrm} />
+              <NumField label="TRM" value={s.trm} onChange={(v) => set("trm", v)} suffix="COP/USD" hint={hintTrm} readOnly={trmBloqueada} />
               <NumField label={t.cotizador.compra} value={s.purchase_price_cop_kg} onChange={(v) => set("purchase_price_cop_kg", v)} suffix="COP/kg" />
               <NumField label={t.cotizador.volumen} value={s.volume_tm} onChange={(v) => set("volume_tm", v)} suffix="TM" />
               {!isNacional && (
                 <>
-                  <NumField label={t.cotizador.cocoaRef} value={s.cocoa_usd_t} onChange={(v) => set("cocoa_usd_t", v)} suffix="USD/T" hint={hintCocoa} />
-                  <NumField label={t.cotizador.diferencial} value={s.differential_pct} onChange={(v) => set("differential_pct", v)} suffix="%" />
+                  <NumField label={t.cotizador.cocoaRef} value={s.cocoa_usd_t} onChange={(v) => set("cocoa_usd_t", v)} suffix="USD/T" hint={hintCocoa} readOnly={cacaoBloqueado} />
+                  <NumField label={t.cotizador.diferencial} value={s.differential_pct} onChange={(v) => set("differential_pct", v)} suffix="%" readOnly={diferencialBloqueado} hint={diferencialBloqueado ? t.cotizador.soloAdmin : undefined} />
                 </>
               )}
               <NumField label={t.cotizador.comision} value={s.commission_pct} onChange={(v) => set("commission_pct", v)} suffix="%" />

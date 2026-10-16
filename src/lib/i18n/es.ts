@@ -357,6 +357,7 @@ export const es = {
   },
 
   cotizador: {
+    soloAdmin: "Lo fija un admin",
     editar: "Editar",
     cotizacion: "cotización",
     crear: "Crear cotización",

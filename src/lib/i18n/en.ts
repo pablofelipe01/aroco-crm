@@ -357,6 +357,7 @@ export const en: Diccionario = {
   },
 
   cotizador: {
+    soloAdmin: "Set by an admin",
     editar: "Edit",
     cotizacion: "quote",
     crear: "Create quote",

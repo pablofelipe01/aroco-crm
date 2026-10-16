@@ -378,6 +378,7 @@ export function CotizacionesClient({
         initial={editing}
         parametros={parametros}
         referencias={referencias}
+        isAdmin={isAdmin}
         onSaved={() => {
           setOpen(false);
           router.refresh();

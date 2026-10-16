@@ -9,6 +9,7 @@ import {
   PARAMETROS_HOJA,
   type ClaveParametro,
 } from "@/lib/cotizador-parametros";
+import { precioEnVivo } from "@/lib/mercado/precio";
 import type { QuoteStatus } from "@/lib/types/database";
 
 export type ActionResult = { ok: boolean; error?: string; id?: string };
@@ -32,6 +33,62 @@ function buildRow(input: unknown, fijos: Fijos) {
   }
 }
 
+/** Desvío que se tolera entre el cacao que vio el formulario y el de referencia. */
+const TOLERANCIA_CACAO = 0.05;
+
+/**
+ * Indicadores base (TRM, cacao referencial, diferencial): solo un admin los
+ * edita (reunión 2026-10-16). Los demás cotizan sobre el mercado del día.
+ *
+ * El formulario ya los bloquea; esto es lo que de verdad lo impide. Al editar
+ * se conservan los que ya tenía la cotización. Al crear, la TRM y el
+ * diferencial se imponen desde aquí; el cacao se acepta si está cerca de la
+ * referencia porque el precio en vivo se mueve entre que se abre el
+ * formulario y se guarda. Sin referencia (sync caído) se deja pasar lo que
+ * venga: bloquear ahí dejaría al comercial sin poder cotizar.
+ */
+async function fijarIndicadores(
+  input: unknown,
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  actual: { trm: number; cocoa_usd_t: number | null; differential: number } | null,
+): Promise<{ input: unknown } | { error: string }> {
+  if (typeof input !== "object" || input === null) return { input };
+  const datos = input as Record<string, unknown>;
+
+  if (actual) {
+    return {
+      input: {
+        ...datos,
+        trm: actual.trm,
+        cocoa_usd_t: actual.cocoa_usd_t,
+        differential_pct: Number(actual.differential) * 100,
+      },
+    };
+  }
+
+  const [{ data: refs }, vivo] = await Promise.all([
+    supabase.rpc("cotizador_referencias"),
+    precioEnVivo(2500).catch(() => null),
+  ]);
+  const ref = refs?.[0];
+  const fijo: Record<string, unknown> = { ...datos, differential_pct: 0 };
+  if (ref?.trm != null) fijo.trm = Number(ref.trm);
+
+  const candidatos = [vivo?.usdT, ref?.cocoa_usd_t]
+    .filter((v): v is number => v != null)
+    .map(Number);
+  const cacao = Number(datos.cocoa_usd_t);
+  if (
+    candidatos.length > 0 &&
+    datos.cocoa_usd_t !== "" &&
+    datos.cocoa_usd_t != null &&
+    !candidatos.some((c) => Math.abs(cacao - c) <= c * TOLERANCIA_CACAO)
+  ) {
+    return { error: "El cacao referencial no coincide con el de mercado. Recarga la página." };
+  }
+  return { input: fijo };
+}
+
 async function nextQuoteNumber(
   supabase: Awaited<ReturnType<typeof createClient>>,
 ): Promise<string> {
@@ -45,6 +102,11 @@ async function nextQuoteNumber(
 export async function createQuote(input: unknown): Promise<ActionResult> {
   const session = await requireSession();
   const supabase = await createClient();
+  if (session.profile?.role !== "admin") {
+    const fijado = await fijarIndicadores(input, supabase, null);
+    if ("error" in fijado) return { ok: false, error: fijado.error };
+    input = fijado.input;
+  }
   // A new quote takes today's admin parameters.
   const built = buildRow(input, fijosDe(await cargarParametros(supabase)));
   if ("error" in built) return { ok: false, error: built.error };
@@ -61,15 +123,20 @@ export async function createQuote(input: unknown): Promise<ActionResult> {
 }
 
 export async function updateQuote(id: string, input: unknown): Promise<ActionResult> {
-  await requireSession();
+  const session = await requireSession();
   const supabase = await createClient();
   // An edit keeps the parameters the quote was created with.
   const { data: actual, error: errActual } = await supabase
     .from("quotes")
-    .select("fnc_pct, merma_pct, factor_nacional, bonif_calidad_pct")
+    .select("fnc_pct, merma_pct, factor_nacional, bonif_calidad_pct, trm, cocoa_usd_t, differential")
     .eq("id", id)
     .single();
   if (errActual) return { ok: false, error: errActual.message };
+  if (session.profile?.role !== "admin") {
+    const fijado = await fijarIndicadores(input, supabase, actual);
+    if ("error" in fijado) return { ok: false, error: fijado.error };
+    input = fijado.input;
+  }
   const built = buildRow(input, actual);
   if ("error" in built) return { ok: false, error: built.error };
   const { error } = await supabase.from("quotes").update(built.row).eq("id", id);
