@@ -93,6 +93,18 @@ function Column({
           {leads.length}
         </span>
       </div>
+      {/* Totales de la etapa: toneladas y valor potencial. Fuera de la zona fija
+          (revisión del 2026-10-16): fijos abajo tapaban las tarjetas al bajar. */}
+      <div className="mb-2 flex items-center justify-between gap-2 rounded-[var(--radius-md)] border border-border bg-surface px-3 py-2">
+        <span className="text-[11px] font-medium uppercase tracking-wide text-fg-subtle">
+          {t.comun.total}
+        </span>
+        <span className="flex items-center gap-2 font-mono text-xs tnum text-fg">
+          <span>{tons > 0 ? `${f.numero(tons, 1)} ${t.unidades.tm}` : "—"}</span>
+          <span className="text-fg-subtle">·</span>
+          <span className="font-semibold">{value > 0 ? f.cop(value) : "—"}</span>
+        </span>
+      </div>
       <motion.div
         ref={setNodeRef}
         variants={staggerContainer}
@@ -119,17 +131,6 @@ function Column({
           </p>
         )}
       </motion.div>
-      {/* Totales de la etapa: toneladas y valor potencial. */}
-      <div className="sticky bottom-0 z-10 mt-2 flex items-center justify-between gap-2 rounded-[var(--radius-md)] border border-border bg-surface px-3 py-2">
-        <span className="text-[11px] font-medium uppercase tracking-wide text-fg-subtle">
-          {t.comun.total}
-        </span>
-        <span className="flex items-center gap-2 font-mono text-xs tnum text-fg">
-          <span>{tons > 0 ? `${f.numero(tons, 1)} ${t.unidades.tm}` : "—"}</span>
-          <span className="text-fg-subtle">·</span>
-          <span className="font-semibold">{value > 0 ? f.cop(value) : "—"}</span>
-        </span>
-      </div>
     </div>
   );
 }
