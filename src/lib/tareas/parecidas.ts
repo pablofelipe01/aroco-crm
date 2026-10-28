@@ -15,7 +15,11 @@
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/types/database";
-import { buscarTareasParecidas, type TareaParaComparar } from "@/lib/ai/actas";
+import {
+  buscarRepetidasEnActa,
+  buscarTareasParecidas,
+  type TareaParaComparar,
+} from "@/lib/ai/actas";
 
 const SELECT =
   "id, name, description, person_name, created_at, meeting:meetings(meeting_date), task_assignees(team_members(name))";
@@ -48,8 +52,8 @@ function clavePar(a: string, b: string): string {
 }
 
 /**
- * Compara `idsNuevas` con las tareas abiertas creadas ANTES que ellas y guarda
- * los pares que la IA considera el mismo compromiso.
+ * Compara `idsNuevas` con las tareas abiertas creadas antes que ellas, y entre
+ * sí, y guarda los pares que la IA considera el mismo compromiso.
  *
  * Solo entran tareas abiertas y sin unir, de los dos lados: una tarea cerrada
  * ya no puede repetirse con nada que valga la pena señalar. Un par que ya se
@@ -82,16 +86,27 @@ export async function detectarParecidas(
     .neq("status", "done")
     .is("unida_a", null)
     .lt("created_at", desde)
-    .order("created_at", { ascending: true })
+    // Las más recientes primero: si hay más de 800 abiertas, las que se quedan
+    // fuera tienen que ser las viejas, no las de la semana pasada, que son las
+    // que más se repiten.
+    .order("created_at", { ascending: false })
     .limit(800);
   if (eErr) throw new Error(eErr.message);
   const existentes = (existRaw ?? []) as unknown as Fila[];
-  if (existentes.length === 0) return { sugeridas: 0 };
 
-  const pares = await buscarTareasParecidas(
-    nuevas.map(paraComparar),
-    existentes.map(paraComparar),
-  );
+  const pares = [
+    ...(await buscarTareasParecidas(nuevas.map(paraComparar), existentes.map(paraComparar))).map(
+      (p) => ({ task: nuevas[p.nueva]!, parecida: existentes[p.existente]!, motivo: p.motivo }),
+    ),
+    // Las del mismo acta entre sí: con solo mirar hacia atrás, «Definir agenda
+    // del viaje al Cauca con Anderson» y «Llamar a Anderson (Cauca) para
+    // definir agenda del viaje» (acta del 20-oct) nunca se iban a cruzar.
+    ...(await buscarRepetidasEnActa(nuevas.map(paraComparar))).map((p) => ({
+      task: nuevas[p.nueva]!,
+      parecida: nuevas[p.existente]!,
+      motivo: p.motivo,
+    })),
+  ];
   if (pares.length === 0) return { sugeridas: 0 };
 
   // Lo ya sugerido antes no se repite, ni siquiera si se dijo «son distintas»:
@@ -108,11 +123,7 @@ export async function detectarParecidas(
   const vistas = new Set((previas ?? []).map((p) => clavePar(p.task_id, p.parecida_a)));
 
   const filas = pares
-    .map((p) => ({
-      task_id: nuevas[p.nueva]!.id,
-      parecida_a: existentes[p.existente]!.id,
-      motivo: p.motivo || null,
-    }))
+    .map((p) => ({ task_id: p.task.id, parecida_a: p.parecida.id, motivo: p.motivo || null }))
     .filter((f) => {
       const k = clavePar(f.task_id, f.parecida_a);
       if (vistas.has(k)) return false;

@@ -456,9 +456,59 @@ export async function buscarTareasParecidas(
   if (nuevas.length === 0 || existentes.length === 0) return [];
   const anthropic = new Anthropic({ apiKey: serverEnv.ANTHROPIC_API_KEY });
 
+  // Por lotes: el modelo enumera también los pares que va descartando, y con
+  // 66 tareas nuevas la respuesta se cortaba en max_tokens y llegaba vacía —
+  // «ninguna repetida» sin ningún error (revisión del 2026-10-27).
+  const LOTE = 15;
+  const pares: ParecidaEncontrada[] = [];
+  for (let i = 0; i < nuevas.length; i += LOTE) {
+    const lote = await buscarLote(anthropic, nuevas.slice(i, i + LOTE), existentes);
+    pares.push(...lote.map((p) => ({ ...p, nueva: p.nueva + i })));
+  }
+  return pares;
+}
+
+/**
+ * Pares repetidos DENTRO de una misma acta. `nueva` y `existente` son índices
+ * de la misma lista; `nueva` es la que aparece después.
+ *
+ * Va en una pasada aparte: metidas las nuevas entre las registradas, el modelo
+ * emparejaba cada una consigo misma —su gemela es siempre la más parecida— y
+ * no quedaba ningún par. Así se perdió en el acta del 20-oct «Definir agenda
+ * del viaje al Cauca con Anderson» / «Llamar a Anderson (Cauca) para definir
+ * agenda del viaje».
+ */
+export async function buscarRepetidasEnActa(
+  tareas: TareaParaComparar[],
+): Promise<ParecidaEncontrada[]> {
+  if (tareas.length < 2) return [];
+  const anthropic = new Anthropic({ apiKey: serverEnv.ANTHROPIC_API_KEY });
+  return buscarLote(anthropic, tareas, null);
+}
+
+/** Con `existentes` en null compara `nuevas` entre sí (misma acta). */
+async function buscarLote(
+  anthropic: Anthropic,
+  nuevas: TareaParaComparar[],
+  existentes: TareaParaComparar[] | null,
+): Promise<ParecidaEncontrada[]> {
+  const mismaActa = existentes === null;
+  const contra = existentes ?? nuevas;
+  const encargo = mismaActa
+    ? "Estas tareas salieron de UNA misma reunión. Las notas a veces repiten un compromiso con otra redacción —en el resumen y otra vez en los próximos pasos— y el acta lo crea dos veces. Señala los pares de esta lista que son el MISMO compromiso."
+    : "Compara las TAREAS NUEVAS con las TAREAS YA REGISTRADAS y señala las nuevas que son el MISMO compromiso que una registrada.";
+  const emparejar = mismaActa
+    ? "Cada tarea va a lo sumo en UN par y nunca consigo misma. En «nueva» va la que aparece más abajo en la lista y en «existente» la de más arriba; las dos son índices N."
+    : "Cada tarea nueva se empareja con UNA sola registrada, la más parecida. No emparejes tareas nuevas entre sí.";
+  const listas = mismaActa
+    ? `TAREAS DE LA REUNIÓN:\n${nuevas.map((t, i) => lineaTarea("N", i, t)).join("\n")}`
+    : `TAREAS NUEVAS:\n${nuevas.map((t, i) => lineaTarea("N", i, t)).join("\n")}\n\nTAREAS YA REGISTRADAS:\n${contra
+        .map((t, i) => lineaTarea("E", i, t))
+        .join("\n")}`;
+
   const instruction = `Eres Renata, la asistente que toma las actas de AROCO (exportadora de cacao). Cada reunión crea sus tareas sin mirar las anteriores, así que un compromiso que no se cerró reaparece con otras palabras.
 
-Compara las TAREAS NUEVAS con las TAREAS YA REGISTRADAS y señala las nuevas que son el MISMO compromiso que una registrada.
+${encargo}
 
 Son la misma cuando piden la misma acción concreta sobre el mismo objeto:
 - «Enviar precios de compra semanal del Cauca» y «Enviar precio de compra semanal al Cauca» → la misma.
@@ -476,17 +526,13 @@ Sé estricto: ante la duda, no la marques. El equipo revisa cada sugerencia a ma
 
 Si al pensarlo concluyes que un par NO es el mismo, no lo incluyas: la lista es solo de los que sí. Copia los dos nombres exactamente como aparecen, y marca la confianza con honestidad: solo «alta» llega al equipo.
 
-Cada tarea nueva se empareja con UNA sola registrada, la más parecida. No emparejes tareas nuevas entre sí.
+${emparejar}
 
-TAREAS NUEVAS:
-${nuevas.map((t, i) => lineaTarea("N", i, t)).join("\n")}
-
-TAREAS YA REGISTRADAS:
-${existentes.map((t, i) => lineaTarea("E", i, t)).join("\n")}`;
+${listas}`;
 
   const response = await anthropic.messages.create({
     model: MODEL,
-    max_tokens: 4000,
+    max_tokens: 8000,
     // Opus 5 razona por defecto y eso gasta max_tokens; aquí no hace falta.
     thinking: { type: "disabled" },
     tools: [PARECIDAS_TOOL],
@@ -494,6 +540,10 @@ ${existentes.map((t, i) => lineaTarea("E", i, t)).join("\n")}`;
     messages: [{ role: "user", content: instruction }],
   });
 
+  // Cortada, la herramienta llega como {} y se leería como «ninguna repetida».
+  if (response.stop_reason === "max_tokens") {
+    throw new Error(`la búsqueda de repetidas se cortó (${nuevas.length} tareas nuevas)`);
+  }
   const block = response.content.find((b) => b.type === "tool_use");
   if (!block || block.type !== "tool_use") return [];
   const out = block.input as { repetidas?: unknown };
@@ -519,10 +569,11 @@ ${existentes.map((t, i) => lineaTarea("E", i, t)).join("\n")}`;
     })
     .filter((p) => {
       const n = nuevas[p.nueva];
-      const e = existentes[p.existente];
+      const e = contra[p.existente];
       const valido =
         Number.isInteger(p.nueva) && !!n &&
         Number.isInteger(p.existente) && !!e &&
+        (!mismaActa || p.nueva !== p.existente) &&
         p.confianza === "alta" &&
         normNombre(p.nombreNueva) === normNombre(n.nombre) &&
         normNombre(p.nombreExistente) === normNombre(e.nombre) &&
