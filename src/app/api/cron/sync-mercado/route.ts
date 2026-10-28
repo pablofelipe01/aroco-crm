@@ -33,6 +33,7 @@ export async function GET(request: NextRequest) {
   // trabajo cinco veces por un dato que no cambió.
   const diferenciales = request.nextUrl.searchParams.get("diferenciales") === "1";
   const r = await sincronizarMercado(db, { dias, diferenciales });
+  if (diferenciales) await avisarDiferencialesViejos(db, r.fallos);
 
   // Solo se avisa si no entró NADA. Que falle un vencimiento o un día suelto
   // es ruido; avisar por eso enseña a ignorar la campana.
@@ -48,4 +49,40 @@ export async function GET(request: NextRequest) {
   }
 
   return NextResponse.json({ ok: true, ...r });
+}
+
+/**
+ * Del 10-sep al 22-oct `get_cocoa_tables` no respondió ni un jueves y nadie lo
+ * supo: la TRM y los estados sí entraban, la corrida quedaba «ok» y el CRM
+ * siguió mostrando los ratios del 28 de agosto. Por eso aquí no se mira si la
+ * corrida falló, sino la edad del último reporte guardado.
+ *
+ * StoneX lo publica los viernes y este cron corre el jueves: con el reporte al
+ * día tiene 6 días. 9 deja margen para un festivo sin dejar pasar una semana.
+ */
+const DIAS_MAX_DIFERENCIALES = 9;
+
+async function avisarDiferencialesViejos(
+  db: ReturnType<typeof createAdminClient>,
+  fallos: { fuente: string; error: string }[],
+): Promise<void> {
+  const { data } = await db
+    .from("cocoa_differentials")
+    .select("report_date")
+    .order("report_date", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const ultimo = data?.report_date ?? null;
+  const dias = ultimo ? Math.floor((Date.now() - Date.parse(ultimo)) / 86_400_000) : null;
+  if (dias !== null && dias <= DIAS_MAX_DIFERENCIALES) return;
+
+  const motivo = fallos.find((f) => f.fuente === "Diferenciales")?.error;
+  await avisarFalloSync(
+    db,
+    "diferenciales",
+    "los diferenciales y ratios de StoneX",
+    `${ultimo ? `El último reporte guardado es del ${ultimo} (hace ${dias} días).` : "No hay ningún reporte guardado."}${
+      motivo ? ` Esta semana: ${motivo}` : ""
+    }`,
+  );
 }

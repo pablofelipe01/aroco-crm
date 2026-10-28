@@ -402,7 +402,8 @@ function Column({
   const meta = TASK_STATUS_META[status];
   return (
     <div className="flex w-72 shrink-0 flex-col">
-      <div className="mb-2 flex items-center justify-between px-1">
+      {/* Encabezado fijo al bajar por una columna larga (revisión del 2026-10-20). */}
+      <div className="sticky top-0 z-10 mb-2 flex items-center justify-between bg-bg-base/95 px-1 py-1.5 backdrop-blur-sm">
         <Badge tone={meta.tone} dot>
           {meta.label}
         </Badge>
@@ -856,7 +857,9 @@ export function TareasClient({
           onDragEnd={onDragEnd}
           onDragCancel={() => setActiveId(null)}
         >
-          <div className="flex gap-4 overflow-x-auto pb-4">
+          {/* El tablero lleva su propio scroll vertical: con overflow-x, un sticky
+              no se pega al scroll de la página. */}
+          <div className="flex max-h-[calc(100dvh-9rem)] gap-4 overflow-auto pb-4">
             {TASK_STATUSES.map((status) => (
               <Column
                 key={status}
