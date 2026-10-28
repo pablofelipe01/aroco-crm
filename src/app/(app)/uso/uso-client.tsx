@@ -60,6 +60,13 @@ export function UsoClient({ datos }: { datos: UsoCrm }) {
   const modulos = React.useMemo(() => modulosDelEquipo(datos.personas), [datos.personas]);
 
   const [vista, setVista] = React.useState<Vista>("dias");
+  // Una sola escala para todas las filas: con la de cada persona, quien entra
+  // un día por semana salía con las barras tan llenas como quien entra cinco
+  // (revisión del 2026-10-27). En días el tope es la semana misma.
+  const escala =
+    vista === "dias"
+      ? 7
+      : Math.max(0, ...filas.flatMap((x) => x.serie.slice(-8).map((s) => valorDe(vista, s))));
 
   const activos = filas.filter((x) => x.estado === "activo").length;
   const conDias = filas.filter((x) => x.actual.dias > 0);
@@ -249,15 +256,21 @@ export function UsoClient({ datos }: { datos: UsoCrm }) {
                 <th scope="col" className="px-3 py-3 text-right">{t.uso.cerradas30}</th>
                 <th scope="col" className="px-3 py-3 text-right">{t.uso.pendientes}</th>
                 <th scope="col" className="px-3 py-3 text-right">{t.uso.vencidas}</th>
-                <th scope="col" className="px-3 py-3 text-right" title={t.uso.comercialNota}>
+                <th scope="col" className="px-3 py-3 text-right">
                   {t.uso.comercial4}
+                  <span className="block font-normal text-fg-subtle">{t.uso.comercialNota}</span>
                 </th>
-                <th scope="col" className="px-5 py-3">{t.uso.ultimas8}</th>
+                <th scope="col" className="px-5 py-3">
+                  {t.uso.ultimas8}
+                  <span className="block font-normal text-fg-subtle">
+                    {vista === "dias" ? t.uso.ultimas8Dias : t.uso.ultimas8Acciones}
+                  </span>
+                </th>
               </tr>
             </thead>
             <tbody>
               {filas.map((x) => (
-                <FilaPersona key={x.persona.id} fila={x} vista={vista} />
+                <FilaPersona key={x.persona.id} fila={x} vista={vista} escala={escala} />
               ))}
             </tbody>
           </table>
@@ -293,7 +306,7 @@ function SelectorVista({ vista, onChange }: { vista: Vista; onChange: (v: Vista)
   );
 }
 
-function FilaPersona({ fila, vista }: { fila: FilaUso; vista: Vista }) {
+function FilaPersona({ fila, vista, escala }: { fila: FilaUso; vista: Vista; escala: number }) {
   const t = useT();
   const f = useFormatos();
   const p = fila.persona;
@@ -304,7 +317,6 @@ function FilaPersona({ fila, vista }: { fila: FilaUso; vista: Vista }) {
   }[fila.estado];
 
   const ultimas = fila.serie.slice(-8);
-  const max = Math.max(...ultimas.map((s) => valorDe(vista, s)), 0);
   const num = (v: number, d = 0) => (v === 0 ? "—" : f.numero(v, d));
 
   return (
@@ -366,7 +378,7 @@ function FilaPersona({ fila, vista }: { fila: FilaUso; vista: Vista }) {
                 key={s.semana}
                 title={`${f.fecha(s.semana)} · ${f.numero(v, 0)}`}
                 className={cn("w-2 rounded-sm", v > 0 ? "bg-accent" : "bg-bg-muted")}
-                style={{ height: max > 0 && v > 0 ? `${Math.max(15, (v / max) * 100)}%` : "15%" }}
+                style={{ height: escala > 0 && v > 0 ? `${Math.max(15, (v / escala) * 100)}%` : "15%" }}
               />
             );
           })}

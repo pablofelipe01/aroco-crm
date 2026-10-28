@@ -28,6 +28,7 @@ import {
   Copy,
 } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
+import { ScrollFijo } from "@/components/ui/scroll-fijo";
 import { Button } from "@/components/ui/button";
 import { Input, Select } from "@/components/ui/input";
 import { MultiSelect } from "@/components/ui/multi-select";
@@ -859,7 +860,7 @@ export function TareasClient({
         >
           {/* El tablero lleva su propio scroll vertical: con overflow-x, un sticky
               no se pega al scroll de la página. */}
-          <div className="flex max-h-[calc(100dvh-9rem)] gap-4 overflow-auto pb-4">
+          <ScrollFijo className="flex gap-4 pb-4">
             {TASK_STATUSES.map((status) => (
               <Column
                 key={status}
@@ -873,7 +874,7 @@ export function TareasClient({
                 onCalendar={setCalTask}
               />
             ))}
-          </div>
+          </ScrollFijo>
           <DragOverlay>
             {activeTask ? (
               <div className="w-72">

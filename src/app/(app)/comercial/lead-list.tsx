@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { ScrollFijo } from "@/components/ui/scroll-fijo";
 import {
   useReactTable,
   getCoreRowModel,
@@ -166,7 +167,7 @@ export function LeadList({
       {/* Desktop: sortable table */}
       {/* Scroll propio para que la fila de encabezados quede fija al bajar
           (con overflow-x, un sticky no se pega al scroll de la página). */}
-      <div className="hidden max-h-[calc(100dvh-9rem)] overflow-auto rounded-[var(--radius-lg)] border border-border bg-surface sm:block">
+      <ScrollFijo className="hidden rounded-[var(--radius-lg)] border border-border bg-surface sm:block">
       <table className="w-full min-w-[760px] text-sm">
         <thead>
           {table.getHeaderGroups().map((hg) => (
@@ -212,7 +213,7 @@ export function LeadList({
           ))}
         </tbody>
       </table>
-      </div>
+      </ScrollFijo>
     </>
   );
 }

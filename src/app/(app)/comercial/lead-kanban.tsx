@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { ScrollFijo } from "@/components/ui/scroll-fijo";
 import {
   DndContext,
   DragOverlay,
@@ -187,7 +188,7 @@ export function LeadKanban({
     >
       {/* El tablero lleva su propio scroll vertical: con overflow-x, un sticky
           no se pega al scroll de la página, y así los encabezados quedan fijos. */}
-      <div className="flex max-h-[calc(100dvh-9rem)] gap-4 overflow-auto pb-4">
+      <ScrollFijo className="flex gap-4 pb-4">
         {LEAD_STAGES.map((stage) => (
           <Column
             key={stage}
@@ -198,7 +199,7 @@ export function LeadKanban({
             prices={prices}
           />
         ))}
-      </div>
+      </ScrollFijo>
       <DragOverlay>
         {activeLead ? (
           <div className="w-72">
