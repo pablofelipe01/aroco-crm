@@ -3,6 +3,7 @@
 import * as React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Plus, Search, Boxes, Package, Layers } from "lucide-react";
+import { ScrollFijo } from "@/components/ui/scroll-fijo";
 import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -100,7 +101,14 @@ export function InventarioClient({
         <StatCard label="Lotes totales" value={totals.count} icon={Layers} />
       </motion.div>
 
-      <div className="flex flex-wrap items-center gap-3">
+      {/* Filtros fijos arriba al bajar (revisión del 2026-10-30): el título y
+          los totales se van, los filtros y los encabezados de la tabla quedan.
+          Fondo opaco. ScrollFijo la encuentra por data-fijo-encima y se para
+          bajo ella. En celular no se fija. */}
+      <div
+        data-fijo-encima
+        className="z-20 flex flex-wrap items-center gap-3 bg-bg-base py-2 sm:sticky sm:top-0"
+      >
         <div className="relative max-w-xs flex-1">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-fg-subtle" />
           <Input
@@ -181,11 +189,15 @@ export function InventarioClient({
           ))}
         </ul>
 
-        {/* Desktop: table */}
-        <div className="hidden overflow-x-auto rounded-[var(--radius-lg)] border border-border bg-surface sm:block">
+        {/* Desktop: table. Scroll propio para que la fila de encabezados quede
+            fija al bajar (con overflow-x, un sticky no se pega al scroll de la
+            página). */}
+        <ScrollFijo className="hidden rounded-[var(--radius-lg)] border border-border bg-surface sm:block">
           <table className="w-full min-w-[680px] text-sm">
             <thead>
-              <tr className="border-b border-border text-xs uppercase tracking-wide text-fg-subtle">
+              {/* Cada th fijo con fondo; el borde va como sombra porque el de la
+                  fila no viaja con un th fijo. */}
+              <tr className="text-xs uppercase tracking-wide text-fg-subtle [&>th]:sticky [&>th]:top-0 [&>th]:z-10 [&>th]:bg-surface [&>th]:shadow-[inset_0_-1px_0_var(--color-border)]">
                 <th className="px-4 py-3 text-left font-medium">Código</th>
                 <th className="px-4 py-3 text-left font-medium">Ingreso</th>
                 <th className="px-4 py-3 text-left font-medium">Remisión</th>
@@ -239,7 +251,7 @@ export function InventarioClient({
               ))}
             </tbody>
           </table>
-        </div>
+        </ScrollFijo>
         </>
       )}
 
