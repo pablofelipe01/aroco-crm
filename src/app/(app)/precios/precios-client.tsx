@@ -11,6 +11,7 @@ import {
   Sparkles,
   Loader2,
 } from "lucide-react";
+import { ScrollFijo } from "@/components/ui/scroll-fijo";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardHeader, CardTitle, CardBody } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -300,7 +301,9 @@ export function PreciosClient({
       </Card>
 
       <Card>
-        <CardHeader>
+        {/* Encabezado fijo mientras pasa la tabla (revisión del 2026-10-30).
+            data-fijo-encima: el scroll de la tabla se para bajo él. */}
+        <CardHeader fijo data-fijo-encima>
           <CardTitle>
             {t.precios.registros} ({byDate.length} {t.precios.fechas})
           </CardTitle>
@@ -357,11 +360,15 @@ export function PreciosClient({
               ))}
             </ul>
 
-            {/* Desktop: table */}
-            <div className="hidden overflow-x-auto sm:block">
+            {/* Desktop: table. Scroll propio para que la fila de encabezados
+                quede fija bajo el de la tarjeta (con overflow-x, un sticky no se
+                pega al scroll de la página). */}
+            <ScrollFijo className="hidden sm:block">
               <table className="w-full min-w-[560px] text-sm">
                 <thead>
-                  <tr className="border-b border-border text-xs uppercase tracking-wide text-fg-subtle">
+                  {/* Cada th fijo con fondo; el borde va como sombra porque el
+                      de la fila no viaja con un th fijo. */}
+                  <tr className="text-xs uppercase tracking-wide text-fg-subtle [&>th]:sticky [&>th]:top-0 [&>th]:z-10 [&>th]:bg-surface [&>th]:shadow-[inset_0_-1px_0_var(--color-border)]">
                     <th className="px-4 py-3 text-left font-medium">
                       {t.comun.fecha}
                     </th>
@@ -409,7 +416,7 @@ export function PreciosClient({
                   ))}
                 </tbody>
               </table>
-            </div>
+            </ScrollFijo>
             </>
           )}
         </CardBody>
