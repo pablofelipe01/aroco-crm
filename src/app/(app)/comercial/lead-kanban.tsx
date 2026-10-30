@@ -190,18 +190,23 @@ export function LeadKanban({
       onDragCancel={() => setActiveId(null)}
     >
       {/* El tablero lleva su propio scroll vertical: con overflow-x, un sticky
-          no se pega al scroll de la página, y así los encabezados quedan fijos. */}
-      <ScrollFijo className="flex gap-4 pb-4">
-        {LEAD_STAGES.map((stage) => (
-          <Column
-            key={stage}
-            stage={stage}
-            leads={byStage.get(stage) ?? []}
-            canWrite={canWrite}
-            onSelect={onSelect}
-            prices={prices}
-          />
-        ))}
+          no se pega al scroll de la página, y así los encabezados quedan fijos.
+          La fila va en un div aparte (revisión del 2026-10-30): si el scroll
+          fuera la fila misma, las columnas se estirarían solo al alto visible y
+          en las cortas el encabezado se iría con la última tarjeta. */}
+      <ScrollFijo>
+        <div className="flex w-max gap-4 pb-4">
+          {LEAD_STAGES.map((stage) => (
+            <Column
+              key={stage}
+              stage={stage}
+              leads={byStage.get(stage) ?? []}
+              canWrite={canWrite}
+              onSelect={onSelect}
+              prices={prices}
+            />
+          ))}
+        </div>
       </ScrollFijo>
       <DragOverlay>
         {activeLead ? (
