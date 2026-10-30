@@ -52,7 +52,7 @@ export function PosicionesAbiertas({
 
   return (
     <Card>
-      <CardHeader>
+      <CardHeader fijo>
         <CardTitle>
           <span className="inline-flex items-center gap-2">
             <Briefcase className="h-4 w-4 text-fg-subtle" /> Contratos abiertos

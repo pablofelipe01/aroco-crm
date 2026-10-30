@@ -19,13 +19,20 @@ export function Card({
 
 export function CardHeader({
   className,
+  fijo = false,
   ...props
-}: React.HTMLAttributes<HTMLDivElement>) {
+}: React.ComponentProps<"div"> & {
+  /** Queda arriba mientras pasa la tarjeta (tarjetas largas; revisión del
+   *  2026-10-30). Fondo sólido bajo el degradado para que no se transparente.
+   *  Solo en páginas sin barra fija de filtros: quedaría tapado por ella. */
+  fijo?: boolean;
+}) {
   return (
     <div
       className={cn(
-        // Degradado verde suave (rediseño del 2026-10-30).
+        // Degradado suave (rediseño del 2026-10-30).
         "flex items-center justify-between gap-3 border-b border-border bg-linear-to-r from-accent-soft/50 to-transparent px-5 py-4",
+        fijo && "sticky top-0 z-10 rounded-t-[var(--radius-lg)] bg-surface",
         className,
       )}
       {...props}

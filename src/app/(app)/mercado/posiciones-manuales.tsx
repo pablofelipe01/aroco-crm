@@ -52,7 +52,7 @@ export function PosicionesManuales({ manual }: { manual: DatosMercado["manual"] 
 
   return (
     <Card>
-      <CardHeader>
+      <CardHeader fijo>
         <CardTitle>
           <span className="inline-flex items-center gap-2">
             <Wallet className="h-4 w-4 text-fg-subtle" /> Movimientos del día

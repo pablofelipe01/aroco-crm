@@ -40,6 +40,24 @@ export function MercadoClient({
   const router = useRouter();
   const { toast } = useToast();
   const t = useT();
+
+  // Alto del encabezado fijo de «Ratios de producto», para pegar los
+  // subtítulos justo debajo. Se guarda en la raíz del documento: el h4 lo lee.
+  const encabezadoRatiosRef = React.useRef<HTMLDivElement>(null);
+  React.useEffect(() => {
+    const el = encabezadoRatiosRef.current;
+    if (!el) return;
+    const raiz = document.documentElement;
+    const medir = () =>
+      raiz.style.setProperty("--alto-encabezado-ratios", `${el.offsetHeight}px`);
+    medir();
+    const ro = new ResizeObserver(medir);
+    ro.observe(el);
+    return () => {
+      ro.disconnect();
+      raiz.style.removeProperty("--alto-encabezado-ratios");
+    };
+  }, [d.ratios.filas.length]);
   const f = useFormatos();
   const idioma = useIdioma();
   const locale = useLocale();
@@ -200,7 +218,7 @@ export function MercadoClient({
 
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           <Card>
-            <CardHeader>
+            <CardHeader fijo>
               <CardTitle>{t.mercado.cobertura}</CardTitle>
             </CardHeader>
             <CardBody className="space-y-3">
@@ -256,7 +274,7 @@ export function MercadoClient({
           </Card>
 
           <Card>
-            <CardHeader>
+            <CardHeader fijo>
               <CardTitle>
                 <span className="inline-flex items-center gap-2">
                   <Landmark className="h-4 w-4 text-fg-subtle" /> {t.mercado.cuentaBroker}
@@ -293,7 +311,7 @@ export function MercadoClient({
 
         {d.escenarios.length > 0 && (
           <Card>
-            <CardHeader>
+            <CardHeader fijo>
               <CardTitle>{t.mercado.siElPrecio}</CardTitle>
             </CardHeader>
             <CardBody>
@@ -353,7 +371,7 @@ export function MercadoClient({
             ratio de 1,74 no dice nada. */}
         {d.ratios.futuros.length > 0 && (
           <Card>
-            <CardHeader>
+            <CardHeader fijo>
               <CardTitle>
                 <span className="inline-flex items-center gap-2">
                   <ArrowLeftRight className="h-4 w-4 text-fg-subtle" />{" "}
@@ -407,10 +425,9 @@ export function MercadoClient({
         {/* ── Ratios de producto ─────────────────────────────────────────── */}
         {d.ratios.filas.length > 0 && (
           <Card>
-            {/* Encabezado fijo mientras pasa la tarjeta, que es larga (revisión
-                del 2026-10-30). bg-surface bajo el degradado para que las filas
-                no se vean a través. */}
-            <CardHeader className="sticky top-0 z-10 rounded-t-[var(--radius-lg)] bg-surface">
+            {/* Los subtítulos (Licor, Manteca…) se pegan bajo este encabezado:
+                su alto va en --alto-encabezado-ratios. */}
+            <CardHeader fijo ref={encabezadoRatiosRef}>
               <CardTitle>
                 <span className="inline-flex items-center gap-2">
                   <Factory className="h-4 w-4 text-fg-subtle" /> {t.mercado.ratiosProducto}
@@ -431,7 +448,9 @@ export function MercadoClient({
                   const europa = referenciaEuropa(filas);
                   return (
                     <div key={cat}>
-                      <h4 className="mb-1.5 text-[11px] uppercase tracking-wide text-fg-subtle">
+                      {/* Fijo bajo el encabezado de la tarjeta mientras pasa
+                          su grupo (revisión del 2026-10-30). */}
+                      <h4 className="sticky top-[var(--alto-encabezado-ratios,0px)] z-[5] mb-1.5 bg-surface py-1 text-[11px] uppercase tracking-wide text-fg-subtle">
                         {cat === "Liquor"
                           ? t.mercado.licor
                           : cat === "Butter"
@@ -518,7 +537,7 @@ export function MercadoClient({
 
         {d.diferenciales.filas.length > 0 && (
           <Card>
-            <CardHeader>
+            <CardHeader fijo>
               <CardTitle>
                 <span className="inline-flex items-center gap-2">
                   <Balanza className="h-4 w-4 text-fg-subtle" />{" "}
@@ -590,7 +609,7 @@ export function MercadoClient({
 
         {d.intel.length > 0 && (
           <Card>
-            <CardHeader>
+            <CardHeader fijo>
               <CardTitle>
                 <span className="inline-flex items-center gap-2">
                   <Newspaper className="h-4 w-4 text-fg-subtle" />{" "}
@@ -635,7 +654,7 @@ export function MercadoClient({
         )}
 
         <Card>
-          <CardHeader>
+          <CardHeader fijo>
             <CardTitle>{t.mercado.lotesEnBodega}</CardTitle>
           </CardHeader>
           <CardBody>
@@ -778,7 +797,7 @@ function CadenaOpciones({
 
   return (
     <Card>
-      <CardHeader>
+      <CardHeader fijo>
         <CardTitle>
           <span className="inline-flex items-center gap-2">
             <Layers3 className="h-4 w-4 text-fg-subtle" /> {t.mercado.cadenaTitulo}
