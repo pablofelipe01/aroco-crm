@@ -184,8 +184,14 @@ export function ComercialClient({
         titulo={negocio === "Venta" ? t.comercial.pipelineVentas : t.comercial.pipelineCompras}
       />
 
-      {/* Toolbar */}
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+      {/* Toolbar. Fija arriba al bajar (revisión del 2026-10-30): el título y el
+          resumen se van, los filtros y el tablero quedan. Fondo opaco para que
+          lo de arriba pase por debajo sin verse. ScrollFijo la encuentra por
+          data-fijo-encima y se para bajo ella. En celular no se fija. */}
+      <div
+        data-fijo-encima
+        className="z-20 flex flex-col gap-3 bg-bg-base py-2 sm:sticky sm:top-0 lg:flex-row lg:items-center lg:justify-between"
+      >
         <div className="flex flex-1 flex-wrap items-center gap-2">
           <div className="relative min-w-48 flex-1 sm:max-w-xs">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-fg-subtle" />
