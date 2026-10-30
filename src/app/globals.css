@@ -221,3 +221,44 @@ body {
     scroll-behavior: auto !important;
   }
 }
+
+/* Rediseño del 2026-10-30: efectos ligados al scroll, sin JavaScript.
+   - .revelar (en Card): aparece con un fundido al entrar en pantalla. Lo que ya
+     está a la vista al cargar no se mueve: su tramo de entrada ya pasó, y con
+     fill «backwards» la animación no deja nada aplicado al terminar (un
+     transform fijo rompería el apilado de menús dentro de la tarjeta).
+   - .progreso-scroll (en los shells): barra fina que se llena al bajar. Si la
+     página no tiene scroll, la línea de tiempo queda inactiva y no se ve.
+   Sin soporte (Firefox) no hay efecto ni barra. */
+.progreso-scroll {
+  transform: scaleX(0);
+  visibility: hidden;
+}
+@supports (animation-timeline: view()) {
+  .progreso-scroll {
+    visibility: visible;
+    animation: progreso-scroll linear both;
+    animation-timeline: scroll(nearest block);
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .revelar {
+      animation: revelar linear backwards;
+      animation-timeline: view();
+      animation-range: entry 0% entry 60%;
+    }
+  }
+}
+@keyframes progreso-scroll {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+@keyframes revelar {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+}

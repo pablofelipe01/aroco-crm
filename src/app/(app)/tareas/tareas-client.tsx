@@ -297,7 +297,8 @@ function TaskCard({
   return (
     <div
       className={cn(
-        "group rounded-[var(--radius-md)] border border-border bg-surface p-3 shadow-[var(--shadow-soft-sm)] transition-all hover:border-border-strong hover:shadow-[var(--shadow-soft-md)]",
+        // Se eleva un poco al pasar el mouse (rediseño del 2026-10-30).
+        "group rounded-[var(--radius-md)] border border-border bg-surface p-3 shadow-[var(--shadow-soft-sm)] transition-all duration-150 hover:-translate-y-0.5 hover:border-border-strong hover:shadow-[var(--shadow-soft-md)]",
         dragging && "rotate-2 shadow-[var(--shadow-soft-lg)]",
       )}
     >

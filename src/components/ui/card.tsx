@@ -8,7 +8,8 @@ export function Card({
   return (
     <div
       className={cn(
-        "rounded-[var(--radius-lg)] border border-border bg-surface shadow-[var(--shadow-soft-sm)]",
+        // revelar: aparece al entrar en pantalla al bajar (globals.css).
+        "revelar rounded-[var(--radius-lg)] border border-border bg-surface shadow-[var(--shadow-soft-sm)]",
         className,
       )}
       {...props}
@@ -23,7 +24,8 @@ export function CardHeader({
   return (
     <div
       className={cn(
-        "flex items-center justify-between gap-3 border-b border-border px-5 py-4",
+        // Degradado verde suave (rediseño del 2026-10-30).
+        "flex items-center justify-between gap-3 border-b border-border bg-linear-to-r from-accent-soft/50 to-transparent px-5 py-4",
         className,
       )}
       {...props}

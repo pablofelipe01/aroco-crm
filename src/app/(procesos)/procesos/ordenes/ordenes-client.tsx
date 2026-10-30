@@ -3,6 +3,7 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { Plus, ShoppingCart, X } from "lucide-react";
+import { BarraFija } from "@/components/ui/scroll-efectos";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatCard } from "@/components/ui/stat-card";
 import { Button } from "@/components/ui/button";
@@ -60,8 +61,9 @@ export function OrdenesClient({
       </div>
 
       {/* Filtros fijos arriba al bajar (revisión del 2026-10-30): el título y
-          los totales se van, los filtros quedan. Fondo opaco; en celular no se fija. */}
-      <div className="z-20 flex flex-wrap items-end gap-3 bg-bg-base py-2 sm:sticky sm:top-0">
+          los totales se van, los filtros quedan. Pegados se ven con desenfoque y
+          sombra; en celular no se fijan. */}
+      <BarraFija className="flex flex-wrap items-end gap-3">
         <Select value={estado} onChange={(e) => setEstado(e.target.value)} className="w-auto">
           <option value="">Todo estado</option>
           {ESTADOS.map((e) => (
@@ -78,7 +80,7 @@ export function OrdenesClient({
         <span className="ml-auto self-center text-xs text-fg-subtle">
           {filtradas.length} de {ordenes.length}
         </span>
-      </div>
+      </BarraFija>
 
       {filtradas.length === 0 ? (
         <EmptyState

@@ -130,6 +130,9 @@ function ShellInterno({
             }}
           />
           <main className="flex-1 overflow-y-auto">
+            {/* Progreso de lectura en páginas largas (rediseño del 2026-10-30;
+                globals.css). Sin scroll no se ve. */}
+            <div aria-hidden className="progreso-scroll pointer-events-none sticky top-0 z-40 -mb-0.5 h-0.5 origin-left bg-accent" />
             <AnimatePresence mode="wait">
               <motion.div
                 key={pathname}

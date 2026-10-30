@@ -3,6 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { Workflow, Boxes, AlertTriangle, CheckCircle2, Users } from "lucide-react";
+import { BarraFija } from "@/components/ui/scroll-efectos";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatCard } from "@/components/ui/stat-card";
 import { Badge } from "@/components/ui/badge";
@@ -71,8 +72,9 @@ export function ProcesosDashboard({
       </div>
 
       {/* Filtros fijos arriba al bajar (revisión del 2026-10-30): el título y
-          los totales se van, los filtros quedan. Fondo opaco; en celular no se fija. */}
-      <div className="z-20 flex flex-wrap items-center gap-2 bg-bg-base py-2 sm:sticky sm:top-0">
+          los totales se van, los filtros quedan. Pegados se ven con desenfoque y
+          sombra; en celular no se fijan. */}
+      <BarraFija className="flex flex-wrap items-center gap-2">
         <Select value={tipo} onChange={(e) => setTipo(e.target.value)} className="w-auto">
           <option value="">Todo tipo</option>
           <option value="proveedor">Proveedor</option>
@@ -87,7 +89,7 @@ export function ProcesosDashboard({
         <span className="ml-auto text-xs text-fg-subtle">
           {filtrados.length} de {casos.length}
         </span>
-      </div>
+      </BarraFija>
 
       {filtrados.length === 0 ? (
         <EmptyState
@@ -101,7 +103,7 @@ export function ProcesosDashboard({
             <li key={c.id}>
               <Link
                 href={`/procesos/${c.id}`}
-                className="block rounded-[var(--radius-lg)] border border-border bg-surface p-4 shadow-[var(--shadow-soft-sm)] transition-all hover:border-accent/40 hover:shadow-[var(--shadow-soft-md)]"
+                className="block rounded-[var(--radius-lg)] border border-border bg-surface p-4 shadow-[var(--shadow-soft-sm)] transition-all duration-150 hover:-translate-y-0.5 hover:border-accent/40 hover:shadow-[var(--shadow-soft-md)]"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">

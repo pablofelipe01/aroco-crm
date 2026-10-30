@@ -68,8 +68,7 @@ export function PipelineSummary({
 
   return (
     <Card>
-      {/* Degradado verde suave en el encabezado (rediseño del 2026-10-30). */}
-      <CardHeader className="bg-linear-to-r from-accent-soft/50 to-transparent">
+      <CardHeader>
         <CardTitle>{titulo}</CardTitle>
         <span className="text-xs text-fg-subtle">
           {t.comercial.valorEsperado}{" "}

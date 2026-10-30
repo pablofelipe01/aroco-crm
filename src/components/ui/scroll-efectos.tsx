@@ -11,7 +11,8 @@ import {
 import { cn } from "@/lib/utils";
 
 /*
- * Efectos ligados al scroll (revisión del 2026-10-30, muestra en Comercial).
+ * Efectos ligados al scroll (rediseño del 2026-10-30). La aparición de las
+ * tarjetas al bajar y la barra de progreso van en CSS (globals.css).
  *
  * La página no se desplaza en `window` sino en el <main> del shell, así que
  * todo mide contra ese <main>. Con «reducir movimiento» activo no hay
@@ -64,11 +65,22 @@ export function EncabezadoScroll({ children }: { children: React.ReactNode }) {
 export function BarraFija({
   className,
   children,
+  ref: refExterno,
 }: {
   className?: string;
   children: React.ReactNode;
+  /** Para quien necesite medir la barra (Compras pega sus encabezados debajo). */
+  ref?: React.Ref<HTMLDivElement>;
 }) {
   const ref = React.useRef<HTMLDivElement>(null);
+  const unirRefs = React.useCallback(
+    (el: HTMLDivElement | null) => {
+      ref.current = el;
+      if (typeof refExterno === "function") refExterno(el);
+      else if (refExterno) refExterno.current = el;
+    },
+    [refExterno],
+  );
   const [fijada, setFijada] = React.useState(false);
 
   React.useEffect(() => {
@@ -95,7 +107,7 @@ export function BarraFija({
 
   return (
     <div
-      ref={ref}
+      ref={unirRefs}
       data-fijo-encima
       data-fijada={fijada || undefined}
       className={cn(

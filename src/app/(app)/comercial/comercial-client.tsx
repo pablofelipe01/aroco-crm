@@ -4,7 +4,7 @@ import * as React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { LayoutGrid, List, Plus, Search, X } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
-import { BarraFija, EncabezadoScroll, Revelar } from "@/components/ui/scroll-efectos";
+import { BarraFija } from "@/components/ui/scroll-efectos";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { MultiSelect } from "@/components/ui/multi-select";
@@ -139,22 +139,20 @@ export function ComercialClient({
 
   return (
     <div className="space-y-6">
-      <EncabezadoScroll>
-        <PageHeader
-          title={t.comercial.titulo}
-          description={`${delLado.length} ${t.comercial.leadsPipeline}${
-            hasFilters ? ` · ${filtered.length} ${t.comercial.filtrados}` : ""
-          }`}
-          actions={
-            canWrite && (
-              <Button size="sm" onClick={openNew}>
-                <Plus className="h-4 w-4" />
-                {t.comercial.nuevoLead}
-              </Button>
-            )
-          }
-        />
-      </EncabezadoScroll>
+      <PageHeader
+        title={t.comercial.titulo}
+        description={`${delLado.length} ${t.comercial.leadsPipeline}${
+          hasFilters ? ` · ${filtered.length} ${t.comercial.filtrados}` : ""
+        }`}
+        actions={
+          canWrite && (
+            <Button size="sm" onClick={openNew}>
+              <Plus className="h-4 w-4" />
+              {t.comercial.nuevoLead}
+            </Button>
+          )
+        }
+      />
 
       <div
         role="tablist"
@@ -181,13 +179,11 @@ export function ComercialClient({
         })}
       </div>
 
-      <Revelar>
-        <PipelineSummary
-          leads={filtered}
-          prices={prices}
-          titulo={negocio === "Venta" ? t.comercial.pipelineVentas : t.comercial.pipelineCompras}
-        />
-      </Revelar>
+      <PipelineSummary
+        leads={filtered}
+        prices={prices}
+        titulo={negocio === "Venta" ? t.comercial.pipelineVentas : t.comercial.pipelineCompras}
+      />
 
       {/* Toolbar. Fija arriba al bajar (revisión del 2026-10-30): el título y el
           resumen se van, los filtros y el tablero quedan. Pegada se ve con

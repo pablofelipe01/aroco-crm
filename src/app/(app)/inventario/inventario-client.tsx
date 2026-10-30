@@ -4,6 +4,7 @@ import * as React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Plus, Search, Boxes, Package, Layers } from "lucide-react";
 import { ScrollFijo } from "@/components/ui/scroll-fijo";
+import { BarraFija } from "@/components/ui/scroll-efectos";
 import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -105,10 +106,7 @@ export function InventarioClient({
           los totales se van, los filtros y los encabezados de la tabla quedan.
           Fondo opaco. ScrollFijo la encuentra por data-fijo-encima y se para
           bajo ella. En celular no se fija. */}
-      <div
-        data-fijo-encima
-        className="z-20 flex flex-wrap items-center gap-3 bg-bg-base py-2 sm:sticky sm:top-0"
-      >
+      <BarraFija className="flex flex-wrap items-center gap-3">
         <div className="relative max-w-xs flex-1">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-fg-subtle" />
           <Input
@@ -132,7 +130,7 @@ export function InventarioClient({
             </span>
           )}
         </label>
-      </div>
+      </BarraFija>
 
       {filtered.length === 0 ? (
         <EmptyState

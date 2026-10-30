@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { Plus, Truck, Trash2, Search, X } from "lucide-react";
 import { ScrollFijo } from "@/components/ui/scroll-fijo";
+import { BarraFija } from "@/components/ui/scroll-efectos";
 import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
 import { Input, Select, Field } from "@/components/ui/input";
@@ -152,13 +153,10 @@ export function DespachosClient({
       />
 
       {/* Filtros fijos arriba al bajar (revisión del 2026-10-30): el título se
-          va, los filtros y los encabezados de la tabla quedan. Fondo opaco.
+          va, los filtros y los encabezados de la tabla quedan.
           ScrollFijo la encuentra por data-fijo-encima y se para bajo ella. En
           celular no se fija. */}
-      <div
-        data-fijo-encima
-        className="z-20 flex flex-wrap items-end gap-3 bg-bg-base py-2 sm:sticky sm:top-0"
-      >
+      <BarraFija className="flex flex-wrap items-end gap-3">
         <Field label="Buscar" className="w-full sm:w-56">
           <div className="relative">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-fg-subtle" />
@@ -195,7 +193,7 @@ export function DespachosClient({
         <span className="ml-auto self-center text-xs text-fg-subtle">
           {filtered.length} de {initialDispatches.length}
         </span>
-      </div>
+      </BarraFija>
 
       {filtered.length === 0 ? (
         <EmptyState

@@ -7,6 +7,7 @@ import {
   Columns3, List, FileWarning, Trash2,
 } from "lucide-react";
 import { motion } from "framer-motion";
+import { BarraFija } from "@/components/ui/scroll-efectos";
 import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -77,7 +78,7 @@ function TarjetaSolicitud({
   return (
     <button
       onClick={onAbrir}
-      className="w-full rounded-[var(--radius-md)] border border-border bg-surface p-3 text-left shadow-[var(--shadow-soft-sm)] transition-colors hover:border-border-strong"
+      className="w-full rounded-[var(--radius-md)] border border-border bg-surface p-3 text-left shadow-[var(--shadow-soft-sm)] transition-all duration-150 hover:-translate-y-0.5 hover:border-border-strong hover:shadow-[var(--shadow-soft-md)]"
     >
       <div className="flex items-start justify-between gap-2">
         <span className="font-mono text-[11px] text-fg-subtle">{s.consecutivo}</span>
@@ -390,11 +391,8 @@ export function ComprasClient({
 
       {/* Filtros fijos arriba al bajar (revisión del 2026-10-30): el título y
           los totales se van, los filtros y los encabezados de columna quedan.
-          Fondo opaco para que lo de abajo pase sin verse. En celular no se fija. */}
-      <div
-        ref={filtrosRef}
-        className="z-20 flex flex-wrap items-center gap-2 bg-bg-base py-2 sm:sticky sm:top-0"
-      >
+          En celular no se fija. */}
+      <BarraFija ref={filtrosRef} className="flex flex-wrap items-center gap-2">
         <div className="relative min-w-48 flex-1 sm:max-w-xs">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-fg-subtle" />
           <Input
@@ -461,7 +459,7 @@ export function ComprasClient({
             </button>
           ))}
         </div>
-      </div>
+      </BarraFija>
 
       {filtradas.length === 0 ? (
         <EmptyState

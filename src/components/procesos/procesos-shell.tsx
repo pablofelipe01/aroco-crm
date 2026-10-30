@@ -105,7 +105,12 @@ export function ProcesosShell({
           ))}
         </nav>
 
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">{children}</main>
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
+          {/* Progreso de lectura (rediseño del 2026-10-30; globals.css). Los
+              márgenes negativos lo sacan del padding para que vaya pegado arriba. */}
+          <div aria-hidden className="progreso-scroll pointer-events-none sticky top-0 z-40 -mx-4 -mt-4 mb-3.5 h-0.5 origin-left bg-accent sm:-mx-6 sm:-mt-6 sm:mb-5.5 lg:-mx-8 lg:-mt-8 lg:mb-7.5" />
+          {children}
+        </main>
       </div>
     </div>
   );
