@@ -403,8 +403,9 @@ function Column({
   const meta = TASK_STATUS_META[status];
   return (
     <div className="flex w-72 shrink-0 flex-col">
-      {/* Encabezado fijo al bajar por una columna larga (revisión del 2026-10-20). */}
-      <div className="sticky top-0 z-10 mb-2 flex items-center justify-between bg-bg-base/95 px-1 py-1.5 backdrop-blur-sm">
+      {/* Encabezado fijo al bajar por una columna larga (revisión del 2026-10-20).
+          Fondo opaco para que las tarjetas pasen por debajo sin verse. */}
+      <div className="sticky top-0 z-10 mb-2 flex items-center justify-between bg-bg-base px-1 py-1.5">
         <Badge tone={meta.tone} dot>
           {meta.label}
         </Badge>
@@ -859,21 +860,26 @@ export function TareasClient({
           onDragCancel={() => setActiveId(null)}
         >
           {/* El tablero lleva su propio scroll vertical: con overflow-x, un sticky
-              no se pega al scroll de la página. */}
-          <ScrollFijo className="flex gap-4 pb-4">
-            {TASK_STATUSES.map((status) => (
-              <Column
-                key={status}
-                status={status}
-                tasks={byStatus.get(status) ?? []}
-                onEdit={(t) => {
-                  setEditing(t);
-                  setFormOpen(true);
-                }}
-                onDelete={onDelete}
-                onCalendar={setCalTask}
-              />
-            ))}
+              no se pega al scroll de la página. La fila va en un div aparte
+              (revisión del 2026-10-30): si el scroll fuera la fila misma, las
+              columnas se estirarían solo al alto visible y en las cortas el
+              encabezado se iría con la última tarjeta. */}
+          <ScrollFijo>
+            <div className="flex w-max gap-4 pb-4">
+              {TASK_STATUSES.map((status) => (
+                <Column
+                  key={status}
+                  status={status}
+                  tasks={byStatus.get(status) ?? []}
+                  onEdit={(t) => {
+                    setEditing(t);
+                    setFormOpen(true);
+                  }}
+                  onDelete={onDelete}
+                  onCalendar={setCalTask}
+                />
+              ))}
+            </div>
           </ScrollFijo>
           <DragOverlay>
             {activeTask ? (
