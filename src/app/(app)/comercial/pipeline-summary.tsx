@@ -2,6 +2,7 @@
 
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { AnimatedCounter } from "@/components/ui/animated-counter";
 import {
   LEAD_STAGES,
   LEAD_STAGE_TONE,
@@ -67,12 +68,13 @@ export function PipelineSummary({
 
   return (
     <Card>
-      <CardHeader>
+      {/* Degradado verde suave en el encabezado (rediseño del 2026-10-30). */}
+      <CardHeader className="bg-linear-to-r from-accent-soft/50 to-transparent">
         <CardTitle>{titulo}</CardTitle>
         <span className="text-xs text-fg-subtle">
           {t.comercial.valorEsperado}{" "}
           <span className="font-mono tnum font-semibold text-fg">
-            {f.cop(total.weighted)}
+            <AnimatedCounter value={total.weighted} format={f.cop} />
           </span>
         </span>
       </CardHeader>
@@ -138,10 +140,14 @@ export function PipelineSummary({
                   {total.tons > 0 ? ton(total.tons) : "—"}
                 </td>
                 <td className="px-4 py-2.5 text-right font-mono tnum text-fg">
-                  {total.value > 0 ? f.cop(total.value) : "—"}
+                  {total.value > 0 ? <AnimatedCounter value={total.value} format={f.cop} /> : "—"}
                 </td>
                 <td className="px-4 py-2.5 text-right font-mono tnum text-fg">
-                  {total.weighted > 0 ? f.cop(total.weighted) : "—"}
+                  {total.weighted > 0 ? (
+                    <AnimatedCounter value={total.weighted} format={f.cop} />
+                  ) : (
+                    "—"
+                  )}
                 </td>
               </tr>
             </tfoot>

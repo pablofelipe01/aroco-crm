@@ -14,20 +14,25 @@ export function AnimatedCounter({
   decimals = 0,
   prefix = "",
   suffix = "",
+  format,
 }: {
   value: number;
   decimals?: number;
   prefix?: string;
   suffix?: string;
+  /** Formateador propio (p. ej. f.cop, que lleva el idioma de la vista). */
+  format?: (v: number) => string;
 }) {
   const ref = React.useRef<HTMLSpanElement>(null);
   const inView = useInView(ref, { once: true, margin: "-40px" });
   const count = useMotionValue(0);
   const rounded = useTransform(count, (v) =>
-    new Intl.NumberFormat("es-CO", {
-      minimumFractionDigits: decimals,
-      maximumFractionDigits: decimals,
-    }).format(v),
+    format
+      ? format(v)
+      : new Intl.NumberFormat("es-CO", {
+          minimumFractionDigits: decimals,
+          maximumFractionDigits: decimals,
+        }).format(v),
   );
 
   React.useEffect(() => {

@@ -4,6 +4,7 @@ import * as React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { LayoutGrid, List, Plus, Search, X } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
+import { BarraFija, EncabezadoScroll, Revelar } from "@/components/ui/scroll-efectos";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { MultiSelect } from "@/components/ui/multi-select";
@@ -138,20 +139,22 @@ export function ComercialClient({
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        title={t.comercial.titulo}
-        description={`${delLado.length} ${t.comercial.leadsPipeline}${
-          hasFilters ? ` · ${filtered.length} ${t.comercial.filtrados}` : ""
-        }`}
-        actions={
-          canWrite && (
-            <Button size="sm" onClick={openNew}>
-              <Plus className="h-4 w-4" />
-              {t.comercial.nuevoLead}
-            </Button>
-          )
-        }
-      />
+      <EncabezadoScroll>
+        <PageHeader
+          title={t.comercial.titulo}
+          description={`${delLado.length} ${t.comercial.leadsPipeline}${
+            hasFilters ? ` · ${filtered.length} ${t.comercial.filtrados}` : ""
+          }`}
+          actions={
+            canWrite && (
+              <Button size="sm" onClick={openNew}>
+                <Plus className="h-4 w-4" />
+                {t.comercial.nuevoLead}
+              </Button>
+            )
+          }
+        />
+      </EncabezadoScroll>
 
       <div
         role="tablist"
@@ -178,20 +181,18 @@ export function ComercialClient({
         })}
       </div>
 
-      <PipelineSummary
-        leads={filtered}
-        prices={prices}
-        titulo={negocio === "Venta" ? t.comercial.pipelineVentas : t.comercial.pipelineCompras}
-      />
+      <Revelar>
+        <PipelineSummary
+          leads={filtered}
+          prices={prices}
+          titulo={negocio === "Venta" ? t.comercial.pipelineVentas : t.comercial.pipelineCompras}
+        />
+      </Revelar>
 
       {/* Toolbar. Fija arriba al bajar (revisión del 2026-10-30): el título y el
-          resumen se van, los filtros y el tablero quedan. Fondo opaco para que
-          lo de arriba pase por debajo sin verse. ScrollFijo la encuentra por
-          data-fijo-encima y se para bajo ella. En celular no se fija. */}
-      <div
-        data-fijo-encima
-        className="z-20 flex flex-col gap-3 bg-bg-base py-2 sm:sticky sm:top-0 lg:flex-row lg:items-center lg:justify-between"
-      >
+          resumen se van, los filtros y el tablero quedan. Pegada se ve con
+          desenfoque y sombra. En celular no se fija. */}
+      <BarraFija className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex flex-1 flex-wrap items-center gap-2">
           <div className="relative min-w-48 flex-1 sm:max-w-xs">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-fg-subtle" />
@@ -251,7 +252,7 @@ export function ComercialClient({
             </button>
           ))}
         </div>
-      </div>
+      </BarraFija>
 
       {view === "kanban" ? (
         <LeadKanban
