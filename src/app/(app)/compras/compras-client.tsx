@@ -140,7 +140,9 @@ function TableroFlujo({
         if (etapa === "Rechazada" && dentro.length === 0) return null;
         return (
           <section key={etapa} className="flex flex-col">
-            <div className="mb-2 flex items-center justify-between gap-2 px-1">
+            {/* Fijo bajo la barra de filtros al bajar por una columna larga
+                (revisión del 2026-10-30). */}
+            <div className="sticky top-[var(--alto-filtros,0px)] z-10 mb-2 flex items-center justify-between gap-2 bg-bg-base px-1 py-1.5">
               <div className="flex items-center gap-1.5">
                 <Badge tone={ETAPA_TONE[etapa]} dot>
                   {etapa}
@@ -200,6 +202,30 @@ export function ComprasClient({
   const [fCategoria, setFCategoria] = React.useState<string[]>([]);
   const [fArea, setFArea] = React.useState<string[]>([]);
   const [vista, setVista] = React.useState<"flujo" | "lista">("flujo");
+
+  // Alto de la barra de filtros fija, para que los encabezados de columna se
+  // peguen justo debajo. 0 en celular, donde la barra no se fija.
+  const paginaRef = React.useRef<HTMLDivElement>(null);
+  const filtrosRef = React.useRef<HTMLDivElement>(null);
+  React.useEffect(() => {
+    const pagina = paginaRef.current;
+    const filtros = filtrosRef.current;
+    if (!pagina || !filtros) return;
+    const p = pagina;
+    const f = filtros;
+    function medir() {
+      const fija = getComputedStyle(f).position === "sticky";
+      p.style.setProperty("--alto-filtros", `${fija ? Math.ceil(f.offsetHeight) : 0}px`);
+    }
+    medir();
+    const ro = new ResizeObserver(medir);
+    ro.observe(f);
+    window.addEventListener("resize", medir);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", medir);
+    };
+  }, []);
   const [abierta, setAbierta] = React.useState<SolicitudConCotizaciones | null>(null);
   const [formOpen, setFormOpen] = React.useState(false);
   const [cotizaciones, setCotizaciones] = React.useState(1);
@@ -312,7 +338,7 @@ export function ComprasClient({
   }
 
   return (
-    <div className="space-y-6">
+    <div ref={paginaRef} className="space-y-6">
       <PageHeader
         title="Compras"
         description={`Solicitudes de insumos, de la petición a la entrega · ${solicitudes.length}${
@@ -362,7 +388,13 @@ export function ComprasClient({
         />
       </motion.div>
 
-      <div className="flex flex-wrap items-center gap-2">
+      {/* Filtros fijos arriba al bajar (revisión del 2026-10-30): el título y
+          los totales se van, los filtros y los encabezados de columna quedan.
+          Fondo opaco para que lo de abajo pase sin verse. En celular no se fija. */}
+      <div
+        ref={filtrosRef}
+        className="z-20 flex flex-wrap items-center gap-2 bg-bg-base py-2 sm:sticky sm:top-0"
+      >
         <div className="relative min-w-48 flex-1 sm:max-w-xs">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-fg-subtle" />
           <Input
