@@ -70,7 +70,9 @@ export function ProcesosDashboard({
         <StatCard label="Órdenes de Compra" value={kpis.ocs} icon={Boxes} />
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
+      {/* Filtros fijos arriba al bajar (revisión del 2026-10-30): el título y
+          los totales se van, los filtros quedan. Fondo opaco; en celular no se fija. */}
+      <div className="z-20 flex flex-wrap items-center gap-2 bg-bg-base py-2 sm:sticky sm:top-0">
         <Select value={tipo} onChange={(e) => setTipo(e.target.value)} className="w-auto">
           <option value="">Todo tipo</option>
           <option value="proveedor">Proveedor</option>

@@ -59,7 +59,9 @@ export function OrdenesClient({
         <StatCard label="Emitidas" value={cuenta("Emitida")} />
       </div>
 
-      <div className="flex flex-wrap items-end gap-3">
+      {/* Filtros fijos arriba al bajar (revisión del 2026-10-30): el título y
+          los totales se van, los filtros quedan. Fondo opaco; en celular no se fija. */}
+      <div className="z-20 flex flex-wrap items-end gap-3 bg-bg-base py-2 sm:sticky sm:top-0">
         <Select value={estado} onChange={(e) => setEstado(e.target.value)} className="w-auto">
           <option value="">Todo estado</option>
           {ESTADOS.map((e) => (

@@ -94,7 +94,9 @@ export function ProveedoresClient({
         <StatCard label="Departamentos" value={departamentos.length} />
       </div>
 
-      <div className="flex flex-wrap items-end gap-3">
+      {/* Filtros fijos arriba al bajar (revisión del 2026-10-30): el título y
+          los totales se van, los filtros quedan. Fondo opaco; en celular no se fija. */}
+      <div className="z-20 flex flex-wrap items-end gap-3 bg-bg-base py-2 sm:sticky sm:top-0">
         <div className="relative w-full max-w-xs">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-fg-subtle" />
           <Input
