@@ -407,7 +407,10 @@ export function MercadoClient({
         {/* ── Ratios de producto ─────────────────────────────────────────── */}
         {d.ratios.filas.length > 0 && (
           <Card>
-            <CardHeader>
+            {/* Encabezado fijo mientras pasa la tarjeta, que es larga (revisión
+                del 2026-10-30). bg-surface bajo el degradado para que las filas
+                no se vean a través. */}
+            <CardHeader className="sticky top-0 z-10 rounded-t-[var(--radius-lg)] bg-surface">
               <CardTitle>
                 <span className="inline-flex items-center gap-2">
                   <Factory className="h-4 w-4 text-fg-subtle" /> {t.mercado.ratiosProducto}
