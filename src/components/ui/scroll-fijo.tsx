@@ -17,15 +17,49 @@ import { cn } from "@/lib/utils";
  * arriba —y entonces ocupa justo el alto visible— y solo después lo mueve a
  * él. Subiendo no hace falta nada: el navegador ya pasa a la página cuando el
  * contenedor llega a su tope.
+ *
+ * Con `llenar` el contenedor toma justo el alto que queda bajo lo que tiene
+ * encima, así la página no se mueve y el título y los filtros siguen a la
+ * vista (revisión del 2026-10-30, Tareas). Si lo de encima deja menos de
+ * MINIMO —un celular con los filtros apilados— vuelve al modo de arriba: un
+ * tablero de dos tarjetas de alto no sirve.
  */
+const MINIMO = 320;
+
 export function ScrollFijo({
   className,
+  llenar = false,
   children,
 }: {
   className?: string;
+  llenar?: boolean;
   children: React.ReactNode;
 }) {
   const ref = React.useRef<HTMLDivElement>(null);
+  const [alto, setAlto] = React.useState<number | null>(null);
+
+  React.useEffect(() => {
+    const el = ref.current;
+    const main = el?.closest("main");
+    if (!llenar || !el || !main) return;
+    const pagina = main.firstElementChild;
+
+    function medir() {
+      if (!el || !main) return;
+      const arriba = el.getBoundingClientRect().top - main.getBoundingClientRect().top + main.scrollTop;
+      const abajo = pagina ? parseFloat(getComputedStyle(pagina).paddingBottom) || 0 : 0;
+      const libre = Math.floor(main.clientHeight - arriba - abajo);
+      setAlto(libre >= MINIMO ? libre : null);
+    }
+
+    medir();
+    // El alto de encima cambia si los filtros pasan a otra línea o aparece un
+    // botón; el de abajo, al girar o redimensionar la ventana.
+    const ro = new ResizeObserver(medir);
+    ro.observe(main);
+    if (pagina) ro.observe(pagina);
+    return () => ro.disconnect();
+  }, [llenar]);
 
   React.useEffect(() => {
     const el = ref.current;
@@ -52,7 +86,11 @@ export function ScrollFijo({
   return (
     // 6rem = barra superior (4rem) + el padding inferior de la página (2rem):
     // con la página al fondo, el contenedor arranca justo bajo la barra.
-    <div ref={ref} className={cn("max-h-[calc(100dvh-6rem)] overflow-auto", className)}>
+    <div
+      ref={ref}
+      className={cn("max-h-[calc(100dvh-6rem)] overflow-auto", className)}
+      style={alto != null ? { maxHeight: alto } : undefined}
+    >
       {children}
     </div>
   );

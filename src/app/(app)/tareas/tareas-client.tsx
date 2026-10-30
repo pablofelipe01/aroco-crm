@@ -863,8 +863,9 @@ export function TareasClient({
               no se pega al scroll de la página. La fila va en un div aparte
               (revisión del 2026-10-30): si el scroll fuera la fila misma, las
               columnas se estirarían solo al alto visible y en las cortas el
-              encabezado se iría con la última tarjeta. */}
-          <ScrollFijo>
+              encabezado se iría con la última tarjeta. `llenar`: el título y los
+              filtros quedan a la vista (revisión del 2026-10-30). */}
+          <ScrollFijo llenar>
             <div className="flex w-max gap-4 pb-4">
               {TASK_STATUSES.map((status) => (
                 <Column
