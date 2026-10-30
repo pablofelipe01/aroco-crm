@@ -79,32 +79,35 @@ function Column({
   );
   return (
     <div className="flex w-72 shrink-0 flex-col">
-      {/* Encabezado fijo al bajar por una columna larga (revisión del 2026-10-09). */}
-      <div className="sticky top-0 z-10 mb-2 flex items-center justify-between gap-2 bg-bg-base/95 px-1 py-1.5 backdrop-blur-sm">
-        <div className="flex items-center gap-1.5">
-          <Badge tone={LEAD_STAGE_TONE[stage]} dot>
-            {t.etapas[stage]}
-          </Badge>
-          <span className="font-mono text-[11px] font-semibold tnum text-accent-soft-fg">
-            {prob}%
+      {/* Encabezado y total fijos arriba al bajar por una columna larga (revisiones
+          del 2026-10-09 y 2026-10-30). Fondo opaco para que las tarjetas pasen por
+          debajo sin verse; fijo abajo, el total las tapaba (2026-10-16). */}
+      <div className="sticky top-0 z-10 bg-bg-base pb-2">
+        <div className="flex items-center justify-between gap-2 px-1 py-1.5">
+          <div className="flex items-center gap-1.5">
+            <Badge tone={LEAD_STAGE_TONE[stage]} dot>
+              {t.etapas[stage]}
+            </Badge>
+            <span className="font-mono text-[11px] font-semibold tnum text-accent-soft-fg">
+              {prob}%
+            </span>
+          </div>
+          <span className="font-mono text-xs text-fg-subtle tnum">
+            {tons > 0 ? `${f.numero(tons, 1)} ${t.unidades.tm} · ` : ""}
+            {leads.length}
           </span>
         </div>
-        <span className="font-mono text-xs text-fg-subtle tnum">
-          {tons > 0 ? `${f.numero(tons, 1)} ${t.unidades.tm} · ` : ""}
-          {leads.length}
-        </span>
-      </div>
-      {/* Totales de la etapa: toneladas y valor potencial. Fuera de la zona fija
-          (revisión del 2026-10-16): fijos abajo tapaban las tarjetas al bajar. */}
-      <div className="mb-2 flex items-center justify-between gap-2 rounded-[var(--radius-md)] border border-border bg-surface px-3 py-2">
-        <span className="text-[11px] font-medium uppercase tracking-wide text-fg-subtle">
-          {t.comun.total}
-        </span>
-        <span className="flex items-center gap-2 font-mono text-xs tnum text-fg">
-          <span>{tons > 0 ? `${f.numero(tons, 1)} ${t.unidades.tm}` : "—"}</span>
-          <span className="text-fg-subtle">·</span>
-          <span className="font-semibold">{value > 0 ? f.cop(value) : "—"}</span>
-        </span>
+        {/* Totales de la etapa: toneladas y valor potencial. */}
+        <div className="mt-1 flex items-center justify-between gap-2 rounded-[var(--radius-md)] border border-border bg-surface px-3 py-2">
+          <span className="text-[11px] font-medium uppercase tracking-wide text-fg-subtle">
+            {t.comun.total}
+          </span>
+          <span className="flex items-center gap-2 font-mono text-xs tnum text-fg">
+            <span>{tons > 0 ? `${f.numero(tons, 1)} ${t.unidades.tm}` : "—"}</span>
+            <span className="text-fg-subtle">·</span>
+            <span className="font-semibold">{value > 0 ? f.cop(value) : "—"}</span>
+          </span>
+        </div>
       </div>
       <motion.div
         ref={setNodeRef}
