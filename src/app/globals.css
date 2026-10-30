@@ -4,38 +4,39 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 /* ------------------------------------------------------------------ *
- *  AROCO design tokens — cacao / verde identity (light + dark)
+ *  AROCO design tokens — paleta del logo: cacao y arena (light + dark).
+ *  Cambiada del verde el 2026-10-30. El verde queda solo para «success».
  *  Semantic CSS variables; the @theme block below maps them to
  *  Tailwind utilities (bg-surface, text-fg-muted, border-border, ...).
  * ------------------------------------------------------------------ */
 :root {
   /* Backgrounds — paper / sand */
-  --bg-base: #f5f3ee;
-  --bg-subtle: #edeae3;
-  --bg-muted: #e4e0d7;
+  --bg-base: #f7f2e9;
+  --bg-subtle: #efe7d9;
+  --bg-muted: #e6dccb;
 
   /* Surfaces */
   --surface: #ffffff;
   --surface-raised: #ffffff;
-  --surface-sunken: #f2efe9;
+  --surface-sunken: #f4eee3;
 
   /* Borders / dividers */
-  --border: #e0dccf;
-  --border-strong: #cfc9b9;
+  --border: #e6dccb;
+  --border-strong: #d4c6ae;
 
   /* Text */
-  --fg: #1a1814;
-  --fg-muted: #6b6760;
-  --fg-subtle: #9b9790;
+  --fg: #1f1409;
+  --fg-muted: #6e5d4b;
+  --fg-subtle: #958370;
 
-  /* Accent — verde cacao */
-  --accent: #1b4332;
-  --accent-hover: #163728;
-  --accent-active: #102a1f;
-  --accent-mid: #2d6a4f;
-  --accent-soft: #d8f3dc;
-  --accent-soft-fg: #1b4332;
-  --accent-fg: #f5f3ee; /* text on accent surfaces */
+  /* Accent — cacao del logo («co»); el arena («aro») va en accent-soft */
+  --accent: #4a2511;
+  --accent-hover: #3a1c0c;
+  --accent-active: #241002;
+  --accent-mid: #b07a2a;
+  --accent-soft: #fbecc8;
+  --accent-soft-fg: #5a2e0e;
+  --accent-fg: #fbf3e2; /* text on accent surfaces */
 
   /* Brand — official AROCO logo palette (arena / cacao), theme-independent */
   --brand-tan: #f4c575;
@@ -43,8 +44,8 @@
   --brand-cream: #f3ead9;
 
   /* Status — each with a soft companion */
-  --warn: #b45309;
-  --warn-soft: #fdecd3;
+  --warn: #a8360a;
+  --warn-soft: #fde4d6;
   --danger: #991b1b;
   --danger-soft: #fbe0e0;
   --info: #1e40af;
@@ -53,7 +54,7 @@
   --success-soft: #d8f3dc;
 
   /* Ring / focus */
-  --ring: #2d6a4f;
+  --ring: #a8741f;
 
   /* Radii */
   --radius-sm: 6px;
@@ -67,32 +68,32 @@
 }
 
 .dark {
-  /* Cacao nocturno — warm dark */
-  --bg-base: #15120e;
-  --bg-subtle: #1a1611;
-  --bg-muted: #221d16;
+  /* Cacao nocturno — en oscuro el acento es el arena del logo */
+  --bg-base: #16100a;
+  --bg-subtle: #1c150e;
+  --bg-muted: #251c13;
 
-  --surface: #1e1a15;
-  --surface-raised: #262019;
-  --surface-sunken: #17130f;
+  --surface: #20180f;
+  --surface-raised: #2a2016;
+  --surface-sunken: #18110b;
 
-  --border: #322b22;
-  --border-strong: #463d30;
+  --border: #3a2c1e;
+  --border-strong: #4f3d29;
 
-  --fg: #f0ebe2;
-  --fg-muted: #b0a99c;
-  --fg-subtle: #7e776b;
+  --fg: #f5ecdc;
+  --fg-muted: #bfae96;
+  --fg-subtle: #8a7a66;
 
-  --accent: #40916c;
-  --accent-hover: #52b788;
-  --accent-active: #2d6a4f;
-  --accent-mid: #52b788;
-  --accent-soft: #1c3329;
-  --accent-soft-fg: #95d5b2;
-  --accent-fg: #0f1a14;
+  --accent: #f4c575;
+  --accent-hover: #f8d595;
+  --accent-active: #e0ac55;
+  --accent-mid: #f4c575;
+  --accent-soft: #3a2a14;
+  --accent-soft-fg: #f4c575;
+  --accent-fg: #241002;
 
-  --warn: #e08a2b;
-  --warn-soft: #3a2a12;
+  --warn: #f08a4b;
+  --warn-soft: #3d2214;
   --danger: #e06a6a;
   --danger-soft: #3a1c1c;
   --info: #7aa2f7;
@@ -100,7 +101,7 @@
   --success: #52b788;
   --success-soft: #1c3329;
 
-  --ring: #52b788;
+  --ring: #f4c575;
 
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
   --shadow-md: 0 2px 6px rgba(0, 0, 0, 0.35), 0 6px 16px rgba(0, 0, 0, 0.3);
