@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
 import { initials } from "@/lib/utils";
+import { colorDeArea } from "@/lib/areas";
 
 export const dynamic = "force-dynamic";
 
@@ -9,7 +10,7 @@ export const dynamic = "force-dynamic";
 export default async function EquipoProcesosPage() {
   const supabase = await createClient();
   const [{ data: team }, { data: pasos }] = await Promise.all([
-    supabase.from("team_members").select("id, name, color").eq("active", true).order("name"),
+    supabase.from("team_members").select("id, name, department").eq("active", true).order("name"),
     supabase
       .from("proceso_pasos")
       .select("asignado_a, estado")
@@ -48,7 +49,7 @@ export default async function EquipoProcesosPage() {
               >
                 <span
                   className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full font-mono text-[11px] text-white"
-                  style={{ backgroundColor: p.color ?? "var(--accent)" }}
+                  style={{ backgroundColor: colorDeArea(p.department) }}
                 >
                   {initials(p.name)}
                 </span>

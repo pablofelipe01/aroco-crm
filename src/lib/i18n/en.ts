@@ -15,11 +15,11 @@ export const en: Diccionario = {
   nav: {
     dashboard: "Dashboard",
     comercial: "Sales pipeline",
-    cotizaciones: "Quotes",
+    cotizaciones: "Cocoa Purchasing",
     inventario: "Inventory",
     trazabilidad: "Traceability",
     proveedoresInsumos: "Supply vendors",
-    compras: "Purchasing",
+    compras: "Admin Purchasing",
     despachos: "Shipments",
     preguntas: "Open questions",
     mercado: "Market",
@@ -34,7 +34,7 @@ export const en: Diccionario = {
 
   uso: {
     titulo: "CRM usage",
-    descripcion: "Who uses it, on how many days, and whether they keep their tasks up to date",
+    descripcion: "Who closes their tasks, who is falling behind, and who uses it",
     accesoRestringido: "Restricted access",
     accesoRestringidoNota: "CRM usage is only visible to people with that permission.",
     errorCarga: "Could not load CRM usage",
@@ -83,6 +83,18 @@ export const en: Diccionario = {
     modulosVacio: "Shows up once time has been measured.",
     semanaDel: "Week of {fecha}",
     minutos: "min",
+    abiertasEquipo: "Team's open tasks",
+    cerradasVista: "Closed",
+    tareasCerradas: "Tasks closed",
+    ultimas8Cerradas: "tasks closed per week, same scale for everyone",
+    topCerradas: "Most tasks completed",
+    topCerradasNota: "Top 5 · closed in the last 30 days",
+    topVencidas: "Most overdue tasks",
+    topVencidasNota: "Top 5 · overdue and still open today",
+    topMenosCerradas: "Fewest tasks closed",
+    topMenosCerradasNota: "Top 5 · closed in 30 days, among people with tasks",
+    abiertasN: "{n} open",
+    rankingVacio: "Nobody for now.",
     ordenar: "Sort by",
   },
 
@@ -337,7 +349,7 @@ export const en: Diccionario = {
   },
 
   cotizaciones: {
-    titulo: "Quotes",
+    titulo: "Cocoa Purchasing",
     enHistorial: "quotes on record",
     nueva: "New quote",
     sinCotizaciones: "No quotes",
@@ -505,8 +517,11 @@ export const en: Diccionario = {
     enLaSemana: "over the week",
     reporteDel: "Report dated",
     arbitrajeNota:
-      "The arbitrage is the difference between the New York and London contracts.",
+      "The arbitrage is the difference between the New York contract and the London one converted to dollars. Positive: New York pays more than London; negative, less.",
     ratiosProducto: "Product ratios",
+    colProducto: "Product",
+    colRatio: "Ratio",
+    colPrecioUsdT: "US$/t",
     ratiosNota:
       "How many times the futures price each derivative is worth. A ratio of 1.74 means that product trades at 1.74 times the bean — it is what tells you whether to sell cocoa or process it.",
     deltaBroker: "Broker delta",

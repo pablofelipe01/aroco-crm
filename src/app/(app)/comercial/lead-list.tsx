@@ -18,6 +18,7 @@ import { LEAD_STAGE_TONE, LEAD_STAGE_WEIGHT, type LeadStage } from "@/lib/status
 import { initials } from "@/lib/utils";
 import { useT, useFormatos } from "@/lib/i18n/provider";
 import type { LeadWithOwner } from "./page";
+import { colorDeArea } from "@/lib/areas";
 
 const col = createColumnHelper<LeadWithOwner>();
 
@@ -151,7 +152,7 @@ export function LeadList({
                       <span
                         title={l.owner.name}
                         className="flex h-5 w-5 items-center justify-center rounded-full font-mono text-[9px] text-white"
-                        style={{ backgroundColor: l.owner.color ?? "var(--accent)" }}
+                        style={{ backgroundColor: colorDeArea(l.owner.department) }}
                       >
                         {initials(l.owner.name)}
                       </span>

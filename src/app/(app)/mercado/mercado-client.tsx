@@ -436,7 +436,8 @@ export function MercadoClient({
             </CardHeader>
             <CardBody>
               <p className="mb-3 text-xs text-fg-subtle">
-                {t.mercado.ratiosNota} {t.mercado.ratiosEuropaNota}
+                {t.mercado.ratiosNota} {t.mercado.ratiosEuropaNota}{" "}
+                {t.mercado.reporteDel} {d.ratios.fecha ? f.fecha(d.ratios.fecha) : "—"}.
               </p>
               <div className="space-y-4">
                 {["Liquor", "Butter", "Powder", "Combined"].map((cat) => {
@@ -459,74 +460,106 @@ export function MercadoClient({
                               ? t.mercado.polvo
                               : t.mercado.combinado}
                       </h4>
-                      <ul className="space-y-1">
-                        {filas.map((fila) => {
-                          const cambio =
-                            fila.ratio_anterior === null
-                              ? null
-                              : Math.round((fila.ratio - fila.ratio_anterior) * 100) / 100;
-                          const esReferencia = europa === fila;
-                          // La referencia no se compara consigo misma: un
-                          // «0,0 %» al lado del patrón solo ocupa sitio.
-                          const brecha = esReferencia
-                            ? null
-                            : brechaVsEuropa(fila.ratio, europa?.ratio ?? null);
-                          return (
-                            <li
-                              key={`${fila.producto}-${fila.incoterm ?? ""}`}
-                              className="flex flex-wrap items-baseline justify-between gap-2 border-b border-border/50 pb-1 text-sm last:border-0"
-                            >
-                              <span className="min-w-0 text-fg">
-                                {fila.producto}
-                                {fila.mercado && (
-                                  <span className="ml-1.5 text-xs text-fg-subtle">
-                                    {fila.mercado}
-                                  </span>
-                                )}
-                                {esReferencia && (
-                                  <Badge tone="info" className="ml-2">
-                                    {t.mercado.refEuropa}
-                                  </Badge>
-                                )}
-                              </span>
-                              <span className="shrink-0 font-mono tnum text-fg-muted">
-                                {fila.ratio.toFixed(2)}
-                                {cambio !== null && cambio !== 0 && (
-                                  <span className={cambio > 0 ? "text-success" : "text-danger"}>
-                                    {" "}
-                                    {cambio > 0 ? "+" : ""}
-                                    {cambio.toFixed(2)}
-                                  </span>
-                                )}
-                                {brecha && (
-                                  /* Contra Europa. En por ciento y no en
-                                     puntos: «10 % menos que la europea» es lo
-                                     que se puede llevar a una negociación. */
-                                  <span
-                                    className="ml-2 text-xs text-fg-subtle"
-                                    title={`${t.mercado.vsEuropa} ${europa?.producto ?? ""}`}
+                      {/* Tabla y no una línea corrida: con todo en un renglón
+                          se leía «1.52vs Europa +7,8 %US$ 9.266» sin saber qué
+                          número era cuál (revisión del 2026-11-04). */}
+                      <div className="overflow-x-auto">
+                        <table className="w-full min-w-[30rem] text-sm">
+                          <thead>
+                            <tr className="text-[11px] text-fg-subtle">
+                              <th scope="col" className="py-1 pr-2 text-left font-normal">
+                                {t.mercado.colProducto}
+                              </th>
+                              <th scope="col" className="px-2 py-1 text-right font-normal">
+                                {t.mercado.colRatio}
+                              </th>
+                              <th scope="col" className="px-2 py-1 text-right font-normal">
+                                {t.mercado.enLaSemana}
+                              </th>
+                              <th scope="col" className="px-2 py-1 text-right font-normal">
+                                {t.mercado.vsEuropa}
+                              </th>
+                              <th scope="col" className="py-1 pl-2 text-right font-normal">
+                                {t.mercado.colPrecioUsdT}
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {filas.map((fila) => {
+                              const cambio =
+                                fila.ratio_anterior === null
+                                  ? null
+                                  : Math.round((fila.ratio - fila.ratio_anterior) * 100) / 100;
+                              const esReferencia = europa === fila;
+                              // La referencia no se compara consigo misma: un
+                              // «0,0 %» al lado del patrón solo ocupa sitio.
+                              const brecha = esReferencia
+                                ? null
+                                : brechaVsEuropa(fila.ratio, europa?.ratio ?? null);
+                              return (
+                                <tr
+                                  key={`${fila.producto}-${fila.incoterm ?? ""}`}
+                                  className="border-t border-border/50"
+                                >
+                                  <td className="py-1.5 pr-2 text-fg">
+                                    {fila.producto}
+                                    {fila.mercado && (
+                                      <span className="ml-1.5 text-xs text-fg-subtle">
+                                        {fila.mercado}
+                                      </span>
+                                    )}
+                                    {esReferencia && (
+                                      <Badge tone="info" className="ml-2">
+                                        {t.mercado.refEuropa}
+                                      </Badge>
+                                    )}
+                                  </td>
+                                  <td className="px-2 py-1.5 text-right font-mono tnum font-medium text-fg">
+                                    {f.numero(fila.ratio, 2)}
+                                  </td>
+                                  <td
+                                    className={
+                                      "px-2 py-1.5 text-right font-mono tnum text-xs " +
+                                      (cambio === null || cambio === 0
+                                        ? "text-fg-subtle"
+                                        : cambio > 0
+                                          ? "text-success"
+                                          : "text-danger")
+                                    }
                                   >
-                                    {t.mercado.vsEuropa}{" "}
-                                    <span
-                                      className={
-                                        brecha.porcentaje >= 0 ? "text-success" : "text-danger"
-                                      }
-                                    >
-                                      {brecha.porcentaje > 0 ? "+" : ""}
-                                      {f.numero(brecha.porcentaje, 1)} %
-                                    </span>
-                                  </span>
-                                )}
-                                {fila.precio_usd && (
-                                  <span className="ml-2 text-fg-subtle">
-                                    US$ {f.numero(fila.precio_usd)}
-                                  </span>
-                                )}
-                              </span>
-                            </li>
-                          );
-                        })}
-                      </ul>
+                                    {cambio === null || cambio === 0
+                                      ? "—"
+                                      : `${cambio > 0 ? "+" : "−"}${f.numero(Math.abs(cambio), 2)}`}
+                                  </td>
+                                  {/* Contra Europa en por ciento y no en puntos:
+                                      «10 % menos que la europea» es lo que se
+                                      puede llevar a una negociación. */}
+                                  <td
+                                    className={
+                                      "px-2 py-1.5 text-right font-mono tnum text-xs " +
+                                      (!brecha
+                                        ? "text-fg-subtle"
+                                        : brecha.porcentaje >= 0
+                                          ? "text-success"
+                                          : "text-danger")
+                                    }
+                                    title={
+                                      brecha ? `${t.mercado.vsEuropa} ${europa?.producto ?? ""}` : undefined
+                                    }
+                                  >
+                                    {brecha
+                                      ? `${brecha.porcentaje > 0 ? "+" : brecha.porcentaje < 0 ? "−" : ""}${f.numero(Math.abs(brecha.porcentaje), 1)} %`
+                                      : "—"}
+                                  </td>
+                                  <td className="py-1.5 pl-2 text-right font-mono tnum text-fg-muted">
+                                    {fila.precio_usd ? f.numero(fila.precio_usd) : "—"}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
                     </div>
                   );
                 })}

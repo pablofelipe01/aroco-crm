@@ -50,6 +50,7 @@ import { CalendarExport } from "./calendar-export";
 import { updateTaskStatus, deleteTask } from "./actions";
 import { etiquetaMes } from "@/lib/tareas/archivo";
 import { diasAbierta, fechasDeTarea } from "@/lib/tareas/fechas";
+import { colorDeArea } from "@/lib/areas";
 
 /** Etiqueta para las tareas que no traen origen, para poder filtrarlas. */
 const SIN_ORIGEN = "Sin origen";
@@ -141,7 +142,7 @@ function AssigneeAvatars({ task }: { task: TaskWithPerson }) {
         <span
           key={p.id}
           className="flex h-6 w-6 items-center justify-center rounded-full border border-surface font-mono text-[10px] text-white"
-          style={{ backgroundColor: p.color ?? "var(--accent)" }}
+          style={{ backgroundColor: colorDeArea(p.department) }}
         >
           {initials(p.name)}
         </span>

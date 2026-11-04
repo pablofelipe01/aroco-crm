@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { motion } from "framer-motion";
-import { Activity, AlarmClock, CalendarDays, CheckCheck, Info, Users } from "lucide-react";
+import { Activity, AlarmClock, CheckCheck, Info, ListChecks, Trophy, TrendingDown, Users } from "lucide-react";
 import {
   Bar,
   BarChart,
@@ -25,16 +25,18 @@ import {
   filaDeUso,
   modulosDelEquipo,
   ordenarFilas,
+  rankingsTareas,
   semanasDelPeriodo,
   type EstadoUso,
   type FilaUso,
+  type PersonaUso,
   type SemanaUso,
   type UsoCrm,
 } from "@/lib/uso";
 
-// Días y no horas (reunión del 2026-10-08): quien trabaja por la integración
-// con Claude no deja minutos, pero sus acciones sí marcan el día.
-type Vista = "dias" | "actividad";
+// Tareas cerradas y no días de acceso (reunión del 2026-11-04): entrar al CRM
+// no dice si el trabajo avanza; cerrar tareas sí.
+type Vista = "cerradas" | "actividad";
 
 const TONO: Record<EstadoUso, BadgeTone> = {
   activo: "success",
@@ -42,7 +44,7 @@ const TONO: Record<EstadoUso, BadgeTone> = {
   inactivo: "neutral",
 };
 
-const valorDe = (vista: Vista, s: SemanaUso) => (vista === "dias" ? s.dias : acciones(s));
+const valorDe = (vista: Vista, s: SemanaUso) => (vista === "cerradas" ? s.cerradas : acciones(s));
 
 export function UsoClient({ datos }: { datos: UsoCrm }) {
   const t = useT();
@@ -59,19 +61,18 @@ export function UsoClient({ datos }: { datos: UsoCrm }) {
   );
   const modulos = React.useMemo(() => modulosDelEquipo(datos.personas), [datos.personas]);
 
-  const [vista, setVista] = React.useState<Vista>("dias");
-  // Una sola escala para todas las filas: con la de cada persona, quien entra
-  // un día por semana salía con las barras tan llenas como quien entra cinco
-  // (revisión del 2026-10-27). En días el tope es la semana misma.
-  const escala =
-    vista === "dias"
-      ? 7
-      : Math.max(0, ...filas.flatMap((x) => x.serie.slice(-8).map((s) => valorDe(vista, s))));
+  const rankings = React.useMemo(() => rankingsTareas(datos.personas), [datos.personas]);
+
+  const [vista, setVista] = React.useState<Vista>("cerradas");
+  // Una sola escala para todas las filas: con la de cada persona, quien cierra
+  // una tarea por semana salía con las barras tan llenas como quien cierra
+  // diez (revisión del 2026-10-27).
+  const escala = Math.max(
+    0,
+    ...filas.flatMap((x) => x.serie.slice(-8).map((s) => valorDe(vista, s))),
+  );
 
   const activos = filas.filter((x) => x.estado === "activo").length;
-  const conDias = filas.filter((x) => x.actual.dias > 0);
-  const diasPromedio =
-    conDias.length === 0 ? 0 : conDias.reduce((a, x) => a + x.actual.dias, 0) / conDias.length;
   // Por responsable: una tarea compartida entre dos suma para los dos.
   const cerradas30 = filas.reduce((a, x) => a + x.persona.cerradas_30d, 0);
   const cerradasSemana = filas.reduce((a, x) => a + x.actual.cerradas, 0);
@@ -130,19 +131,6 @@ export function UsoClient({ datos }: { datos: UsoCrm }) {
         className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"
       >
         <StatCard
-          label={t.uso.activosSemana}
-          value={activos}
-          icon={Users}
-          hint={t.uso.deActivos.replace("{n}", String(filas.length))}
-        />
-        <StatCard
-          label={t.uso.diasSemana}
-          value={diasPromedio}
-          decimals={1}
-          icon={CalendarDays}
-          hint={t.uso.conUso.replace("{n}", f.numero(conDias.length))}
-        />
-        <StatCard
           label={t.uso.cerradas30Equipo}
           value={cerradas30}
           icon={CheckCheck}
@@ -154,7 +142,47 @@ export function UsoClient({ datos }: { datos: UsoCrm }) {
           icon={AlarmClock}
           hint={t.uso.sinFechaHint.replace("{n}", f.numero(sinFecha))}
         />
+        <StatCard
+          label={t.uso.abiertasEquipo}
+          value={filas.reduce((a, x) => a + x.persona.abiertas, 0)}
+          icon={ListChecks}
+        />
+        <StatCard
+          label={t.uso.activosSemana}
+          value={activos}
+          icon={Users}
+          hint={t.uso.deActivos.replace("{n}", String(filas.length))}
+        />
       </motion.div>
+
+      {/* Los tres top 5 de la reunión del 2026-11-04. */}
+      <div className="grid gap-6 lg:grid-cols-3">
+        <Ranking
+          titulo={t.uso.topCerradas}
+          nota={t.uso.topCerradasNota}
+          icono={<Trophy className="h-4 w-4 text-success" />}
+          personas={rankings.masCerradas}
+          valor={(p) => p.cerradas_30d}
+          tono="text-success"
+        />
+        <Ranking
+          titulo={t.uso.topVencidas}
+          nota={t.uso.topVencidasNota}
+          icono={<AlarmClock className="h-4 w-4 text-danger" />}
+          personas={rankings.masVencidas}
+          valor={(p) => p.vencidas}
+          tono="text-danger"
+        />
+        <Ranking
+          titulo={t.uso.topMenosCerradas}
+          nota={t.uso.topMenosCerradasNota}
+          icono={<TrendingDown className="h-4 w-4 text-warn" />}
+          personas={rankings.menosCerradas}
+          valor={(p) => p.cerradas_30d}
+          detalle={(p) => t.uso.abiertasN.replace("{n}", f.numero(p.abiertas))}
+          tono="text-fg"
+        />
+      </div>
 
       <div className="grid gap-6 xl:grid-cols-3">
         <Card className="xl:col-span-2">
@@ -193,7 +221,7 @@ export function UsoClient({ datos }: { datos: UsoCrm }) {
                   }}
                   formatter={(v: unknown) => [
                     f.numero(Number(v)),
-                    vista === "dias" ? t.uso.diasPersona : t.uso.acciones,
+                    vista === "cerradas" ? t.uso.tareasCerradas : t.uso.acciones,
                   ]}
                 />
                 <Bar dataKey="valor" fill="var(--color-accent)" radius={[6, 6, 0, 0]} maxBarSize={36} />
@@ -248,9 +276,6 @@ export function UsoClient({ datos }: { datos: UsoCrm }) {
                 <th scope="col" className="px-5 py-3">{t.uso.persona}</th>
                 <th scope="col" className="px-3 py-3">{t.uso.ultimoUso}</th>
                 <th scope="col" className="px-3 py-3 text-right" title={t.uso.diasNota}>
-                  {t.uso.dias}
-                </th>
-                <th scope="col" className="px-3 py-3 text-right" title={t.uso.diasNota}>
                   {t.uso.dias30}
                 </th>
                 <th scope="col" className="px-3 py-3 text-right">{t.uso.cerradas30}</th>
@@ -263,7 +288,7 @@ export function UsoClient({ datos }: { datos: UsoCrm }) {
                 <th scope="col" className="px-5 py-3">
                   {t.uso.ultimas8}
                   <span className="block font-normal text-fg-subtle">
-                    {vista === "dias" ? t.uso.ultimas8Dias : t.uso.ultimas8Acciones}
+                    {vista === "cerradas" ? t.uso.ultimas8Cerradas : t.uso.ultimas8Acciones}
                   </span>
                 </th>
               </tr>
@@ -287,7 +312,7 @@ function SelectorVista({ vista, onChange }: { vista: Vista; onChange: (v: Vista)
       role="radiogroup"
       className="inline-flex rounded-[var(--radius-md)] border border-border bg-bg-muted p-0.5 text-xs"
     >
-      {(["dias", "actividad"] as const).map((v) => (
+      {(["cerradas", "actividad"] as const).map((v) => (
         <button
           key={v}
           type="button"
@@ -299,7 +324,7 @@ function SelectorVista({ vista, onChange }: { vista: Vista; onChange: (v: Vista)
             vista === v ? "bg-surface text-fg shadow-[var(--shadow-soft-sm)]" : "text-fg-muted hover:text-fg",
           )}
         >
-          {v === "dias" ? t.uso.diasVista : t.uso.actividad}
+          {v === "cerradas" ? t.uso.cerradasVista : t.uso.actividad}
         </button>
       ))}
     </div>
@@ -342,7 +367,6 @@ function FilaPersona({ fila, vista, escala }: { fila: FilaUso; vista: Vista; esc
           <span className="text-xs text-fg-subtle">{t.uso.nunca}</span>
         )}
       </td>
-      <td className="tnum px-3 py-3 text-right font-mono">{num(fila.actual.dias)}</td>
       <td className="tnum px-3 py-3 text-right font-mono">{num(p.dias_30d)}</td>
       {p.tiene_tareas ? (
         <>
@@ -385,5 +409,65 @@ function FilaPersona({ fila, vista, escala }: { fila: FilaUso; vista: Vista; esc
         </div>
       </td>
     </tr>
+  );
+}
+
+function Ranking({
+  titulo,
+  nota,
+  icono,
+  personas,
+  valor,
+  detalle,
+  tono,
+}: {
+  titulo: string;
+  nota: string;
+  icono: React.ReactNode;
+  personas: PersonaUso[];
+  valor: (p: PersonaUso) => number;
+  detalle?: (p: PersonaUso) => string;
+  tono: string;
+}) {
+  const t = useT();
+  const f = useFormatos();
+  return (
+    <Card>
+      <CardHeader>
+        <div>
+          <CardTitle>
+            <span className="inline-flex items-center gap-2">
+              {icono} {titulo}
+            </span>
+          </CardTitle>
+          <p className="mt-0.5 text-xs text-fg-subtle">{nota}</p>
+        </div>
+      </CardHeader>
+      <CardBody>
+        {personas.length === 0 ? (
+          <p className="text-sm text-fg-muted">{t.uso.rankingVacio}</p>
+        ) : (
+          <ol className="space-y-2">
+            {personas.map((p, i) => (
+              <li key={p.id} className="flex items-center gap-3 text-sm">
+                <span className="w-4 shrink-0 text-right font-mono text-xs tnum text-fg-subtle">
+                  {i + 1}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-fg">{p.nombre}</span>
+                  <span className="block truncate text-xs text-fg-subtle">
+                    {p.area ?? "—"}
+                    {detalle ? ` · ${detalle(p)}` : ""}
+                  </span>
+                </span>
+                <span className={cn("shrink-0 font-mono text-base font-semibold tnum", tono)}>
+                  {f.numero(valor(p))}
+                </span>
+              </li>
+            ))}
+          </ol>
+        )}
+      </CardBody>
+    </Card>
   );
 }

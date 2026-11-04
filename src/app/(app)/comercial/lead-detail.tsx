@@ -27,6 +27,7 @@ import { useT, useFormatos } from "@/lib/i18n/provider";
 import type { TeamMember, LeadActivity, ActivityType } from "@/lib/types/database";
 import type { LeadWithOwner } from "./page";
 import { addActivity, deleteLead } from "./actions";
+import { colorDeArea } from "@/lib/areas";
 
 const ACTIVITY_ICON: Record<ActivityType, React.ElementType> = {
   Nota: StickyNote,
@@ -214,7 +215,7 @@ export function LeadDetail({
             <span className="flex items-center gap-1.5 text-xs text-fg-muted">
               <span
                 className="flex h-5 w-5 items-center justify-center rounded-full font-mono text-[9px] text-white"
-                style={{ backgroundColor: lead.owner.color ?? "var(--accent)" }}
+                style={{ backgroundColor: colorDeArea(lead.owner.department) }}
               >
                 {initials(lead.owner.name)}
               </span>

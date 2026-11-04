@@ -69,7 +69,9 @@ export const NAV_ITEMS: NavItem[] = [
   {
     href: "/cotizaciones",
     llave: "cotizaciones",
-    label: "Cotizaciones",
+    // Renombrado el 2026-11-04 a pedido de Milena: «Cotizaciones» confundía,
+    // porque lo que hay aquí son compras de cacao. La ruta sigue igual.
+    label: "Compras Cacao",
     icon: Calculator,
     departments: ["Dirección", "Comercial", "Financiero"],
   },
@@ -108,7 +110,8 @@ export const NAV_ITEMS: NavItem[] = [
   {
     href: "/compras",
     llave: "compras",
-    label: "Compras",
+    // Antes «Compras»: son las compras internas de insumos de la empresa.
+    label: "Compras Adm",
     icon: ShoppingCart,
     // Cualquiera puede pedir insumos; aprobar es otra cosa y lo decide
     // `profiles.aprueba_compras`, no el área.

@@ -15,11 +15,11 @@ export const es = {
   nav: {
     dashboard: "Dashboard",
     comercial: "Comercial",
-    cotizaciones: "Cotizaciones",
+    cotizaciones: "Compras Cacao",
     inventario: "Inventario",
     trazabilidad: "Trazabilidad",
     proveedoresInsumos: "Proveedores Insumos",
-    compras: "Compras",
+    compras: "Compras Adm",
     despachos: "Despachos",
     preguntas: "Preguntas",
     mercado: "Mercado",
@@ -34,7 +34,7 @@ export const es = {
 
   uso: {
     titulo: "Uso del CRM",
-    descripcion: "Quién lo usa, cuántos días y si mantiene sus tareas al día",
+    descripcion: "Quién cierra sus tareas, quién se atrasa y quién lo usa",
     accesoRestringido: "Acceso restringido",
     accesoRestringidoNota: "El uso del CRM solo lo ven quienes tienen ese permiso.",
     errorCarga: "No se pudo cargar el uso del CRM",
@@ -83,6 +83,18 @@ export const es = {
     modulosVacio: "Aparece cuando haya tiempo medido.",
     semanaDel: "Semana del {fecha}",
     minutos: "min",
+    abiertasEquipo: "Tareas abiertas del equipo",
+    cerradasVista: "Cerradas",
+    tareasCerradas: "Tareas cerradas",
+    ultimas8Cerradas: "tareas cerradas por semana, misma escala para todos",
+    topCerradas: "Más tareas completadas",
+    topCerradasNota: "Top 5 · cerradas en los últimos 30 días",
+    topVencidas: "Más tareas vencidas",
+    topVencidasNota: "Top 5 · vencidas sin cerrar hoy",
+    topMenosCerradas: "Menos tareas cerradas",
+    topMenosCerradasNota: "Top 5 · cerradas en 30 días, entre quienes tienen tareas",
+    abiertasN: "{n} abiertas",
+    rankingVacio: "Nadie por ahora.",
     ordenar: "Ordenar por",
   },
 
@@ -337,7 +349,7 @@ export const es = {
   },
 
   cotizaciones: {
-    titulo: "Cotizaciones",
+    titulo: "Compras Cacao",
     enHistorial: "cotizaciones en el historial",
     nueva: "Nueva cotización",
     sinCotizaciones: "Sin cotizaciones",
@@ -505,8 +517,11 @@ export const es = {
     enLaSemana: "en la semana",
     reporteDel: "Reporte del",
     arbitrajeNota:
-      "El arbitraje es la diferencia entre el contrato de Nueva York y el de Londres.",
+      "El arbitraje es la diferencia entre el contrato de Nueva York y el de Londres llevado a dólares. Positivo: Nueva York paga más que Londres; negativo, menos.",
     ratiosProducto: "Ratios de producto",
+    colProducto: "Producto",
+    colRatio: "Ratio",
+    colPrecioUsdT: "US$/t",
     ratiosNota:
       "Cuántas veces el precio del futuro vale cada derivado. Un ratio de 1,74 significa que ese producto se cotiza a 1,74 veces el grano — es lo que dice si conviene vender cacao o transformarlo.",
     deltaBroker: "Delta del bróker",

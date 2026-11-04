@@ -341,7 +341,7 @@ export function ComprasClient({
   return (
     <div ref={paginaRef} className="space-y-6">
       <PageHeader
-        title="Compras"
+        title="Compras Adm"
         description={`Solicitudes de insumos, de la petición a la entrega · ${solicitudes.length}${
           hayFiltros ? ` · ${filtradas.length} filtradas` : ""
         }`}

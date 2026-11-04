@@ -58,7 +58,7 @@ export function armarCorreoCompra(
       .join(" · ");
 
   const html = marcoCorreo({
-    seccion: "Compras",
+    seccion: "Compras Adm",
     cuerpo: `<p style="margin:0 0 6px;font-size:15px">Hola, ${escapar(primerNombre(aprobador))}. ${escapar(intro)}</p>
 <p style="margin:0 0 16px;font-size:16px;font-weight:600">${escapar(s.consecutivo)} — ${escapar(s.titulo)}</p>
 ${s.justificacion ? `<p style="margin:0 0 16px;font-size:13px;color:#57534e">${escapar(s.justificacion.slice(0, 400))}</p>` : ""}

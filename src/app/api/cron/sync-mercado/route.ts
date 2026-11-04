@@ -57,8 +57,10 @@ export async function GET(request: NextRequest) {
  * siguió mostrando los ratios del 28 de agosto. Por eso aquí no se mira si la
  * corrida falló, sino la edad del último reporte guardado.
  *
- * StoneX lo publica los viernes y este cron corre el jueves: con el reporte al
- * día tiene 6 días. 9 deja margen para un festivo sin dejar pasar una semana.
+ * StoneX lo publica a fin de semana (jueves o viernes) y este cron corre el
+ * lunes 9:00 (Bogotá), 20 min después de que el servidor calienta su caché:
+ * con el reporte al día tiene 3-4 días. 9 deja margen para un festivo sin
+ * dejar pasar una semana.
  */
 const DIAS_MAX_DIFERENCIALES = 9;
 

@@ -53,6 +53,17 @@
   --success: #2d6a4f;
   --success-soft: #d8f3dc;
 
+
+  /* Áreas — un color por área para avatares y chips de persona (2026-11-04).
+     Tonos medios: llevan texto blanco encima con contraste AA en ambos temas. */
+  --area-direccion: #4a2511;
+  --area-comercial: #b45309;
+  --area-financiero: #1e40af;
+  --area-administrativo: #6d28d9;
+  --area-bodega: #0f766e;
+  --area-finca: #2d6a4f;
+  --area-operaciones: #be123c;
+
   /* Ring / focus */
   --ring: #a8741f;
 
@@ -103,12 +114,22 @@
 
   --ring: #f4c575;
 
+  /* En oscuro el cacao se pierde contra el fondo: se aclara. */
+  --area-direccion: #8a5a3b;
+
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
   --shadow-md: 0 2px 6px rgba(0, 0, 0, 0.35), 0 6px 16px rgba(0, 0, 0, 0.3);
   --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.45), 0 2px 8px rgba(0, 0, 0, 0.35);
 }
 
 @theme inline {
+  --color-area-direccion: var(--area-direccion);
+  --color-area-comercial: var(--area-comercial);
+  --color-area-financiero: var(--area-financiero);
+  --color-area-administrativo: var(--area-administrativo);
+  --color-area-bodega: var(--area-bodega);
+  --color-area-finca: var(--area-finca);
+  --color-area-operaciones: var(--area-operaciones);
   --color-bg-base: var(--bg-base);
   --color-bg-subtle: var(--bg-subtle);
   --color-bg-muted: var(--bg-muted);

@@ -146,24 +146,61 @@ export function filaDeUso(p: PersonaUso, lunes: string[]): FilaUso {
   };
 }
 
-const PESO: Record<EstadoUso, number> = { activo: 0, poco: 1, inactivo: 2 };
-
 /**
- * Primero quien está activo, y dentro de cada grupo quien entra más días y
- * cierra más tareas. Las horas ya no ordenan: quien trabaja por la
- * integración con Claude no deja minutos (reunión del 2026-10-08).
+ * Primero quien más tareas cierra; luego quien menos vencidas arrastra.
+ *
+ * Desde el 2026-11-04 el indicador de uso son las tareas completadas, no los
+ * días de acceso: entrar al CRM no dice si el trabajo avanza. Los días siguen
+ * en la tabla como dato, pero ya no ordenan.
  */
 export function ordenarFilas(filas: FilaUso[]): FilaUso[] {
   return [...filas].sort(
     (a, b) =>
-      PESO[a.estado] - PESO[b.estado] ||
-      b.actual.dias - a.actual.dias ||
-      b.persona.dias_30d - a.persona.dias_30d ||
       b.persona.cerradas_30d - a.persona.cerradas_30d ||
+      a.persona.vencidas - b.persona.vencidas ||
+      b.actual.cerradas - a.actual.cerradas ||
       b.accionesSemana - a.accionesSemana ||
-      (b.ultimo.cuando ?? "").localeCompare(a.ultimo.cuando ?? "") ||
       a.persona.nombre.localeCompare(b.persona.nombre, "es"),
   );
+}
+
+export type Rankings = {
+  /** Quienes más tareas cerraron en 30 días. */
+  masCerradas: PersonaUso[];
+  /** Quienes más tareas vencidas tienen hoy. */
+  masVencidas: PersonaUso[];
+  /** Quienes menos tareas cerraron en 30 días, entre quienes tienen tareas. */
+  menosCerradas: PersonaUso[];
+};
+
+const porNombre = (a: PersonaUso, b: PersonaUso) => a.nombre.localeCompare(b.nombre, "es");
+
+/**
+ * Los tres top 5 de la reunión del 2026-11-04. Solo cuenta quien tiene tareas:
+ * alguien sin ninguna asignada saldría siempre de último en cerradas sin que
+ * eso diga nada de su trabajo. Un top de vencidas con ceros sería ruido, así
+ * que solo entra quien tiene al menos una.
+ */
+export function rankingsTareas(personas: PersonaUso[], n = 5): Rankings {
+  const conTareas = personas.filter((p) => p.tiene_tareas);
+  return {
+    masCerradas: conTareas
+      .filter((p) => p.cerradas_30d > 0)
+      .sort((a, b) => b.cerradas_30d - a.cerradas_30d || porNombre(a, b))
+      .slice(0, n),
+    masVencidas: conTareas
+      .filter((p) => p.vencidas > 0)
+      .sort((a, b) => b.vencidas - a.vencidas || porNombre(a, b))
+      .slice(0, n),
+    menosCerradas: [...conTareas]
+      .sort(
+        (a, b) =>
+          a.cerradas_30d - b.cerradas_30d ||
+          b.abiertas - a.abiertas ||
+          porNombre(a, b),
+      )
+      .slice(0, n),
+  };
 }
 
 /** Minutos por módulo sumando a todo el equipo, de mayor a menor. */

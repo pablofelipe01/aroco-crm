@@ -6,6 +6,7 @@ import { cn, initials } from "@/lib/utils";
 import { useT, useFormatos } from "@/lib/i18n/provider";
 import { LEAD_STAGE_WEIGHT, type LeadStage } from "@/lib/status";
 import type { LeadWithOwner } from "./page";
+import { colorDeArea } from "@/lib/areas";
 
 export function LeadCard({
   lead,
@@ -36,7 +37,7 @@ export function LeadCard({
           <span
             title={lead.owner.name}
             className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full font-mono text-[10px] font-medium text-white"
-            style={{ backgroundColor: lead.owner.color ?? "var(--accent)" }}
+            style={{ backgroundColor: colorDeArea(lead.owner.department) }}
           >
             {initials(lead.owner.name)}
           </span>

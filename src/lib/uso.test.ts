@@ -6,6 +6,7 @@ import {
   lunesDe,
   modulosDelEquipo,
   ordenarFilas,
+  rankingsTareas,
   semanasDelPeriodo,
   semanaVacia,
   usoCrmSchema,
@@ -87,33 +88,39 @@ test("estado: poco si solo usó la semana pasada, inactivo si nada", () => {
   assert.equal(filaDeUso(persona(), lunes).estado, "inactivo");
 });
 
-test("ordenarFilas pone primero a los activos y luego por días, no por horas", () => {
+test("ordenarFilas ordena por tareas cerradas, no por días", () => {
   const lunes = semanasDelPeriodo("2026-09-21", "2026-09-29");
-  const f = (id: string, dias: number, minutos: number) =>
+  const f = (id: string, dias: number, cerradas_30d: number, vencidas = 0) =>
     filaDeUso(
       persona({
         id,
         nombre: id,
-        semanas: dias ? [{ ...semanaVacia("2026-09-28"), dias, minutos }] : [],
+        cerradas_30d,
+        vencidas,
+        semanas: dias ? [{ ...semanaVacia("2026-09-28"), dias }] : [],
       }),
       lunes,
     );
-  // «integracion» trabaja por Claude: muchos días, casi sin minutos.
-  const orden = ordenarFilas([f("nada", 0, 0), f("horas", 1, 300), f("integracion", 4, 5)]).map(
+  // «entra» abre el CRM todos los días pero cierra poco.
+  const orden = ordenarFilas([f("entra", 7, 1), f("cierra", 1, 9), f("empata", 2, 1, 4)]).map(
     (x) => x.persona.id,
   );
-  assert.deepEqual(orden, ["integracion", "horas", "nada"]);
+  assert.deepEqual(orden, ["cierra", "entra", "empata"]);
 });
 
-test("a igual de días desempatan los días de 30 y las tareas cerradas", () => {
-  const lunes = semanasDelPeriodo("2026-09-21", "2026-09-29");
-  const f = (id: string, dias_30d: number, cerradas_30d: number) =>
-    filaDeUso(
-      persona({ id, nombre: id, dias_30d, cerradas_30d, semanas: [{ ...semanaVacia("2026-09-28"), dias: 2 }] }),
-      lunes,
-    );
-  const orden = ordenarFilas([f("a", 3, 1), f("b", 3, 9), f("c", 5, 0)]).map((x) => x.persona.id);
-  assert.deepEqual(orden, ["c", "b", "a"]);
+test("rankingsTareas arma los tres top 5 solo con quien tiene tareas", () => {
+  const ps = [
+    persona({ id: "a", nombre: "Ana", cerradas_30d: 10, vencidas: 0, abiertas: 2 }),
+    persona({ id: "b", nombre: "Beto", cerradas_30d: 3, vencidas: 5, abiertas: 8 }),
+    persona({ id: "c", nombre: "Caro", cerradas_30d: 0, vencidas: 1, abiertas: 4 }),
+    persona({ id: "d", nombre: "Dani", cerradas_30d: 0, vencidas: 0, abiertas: 1 }),
+    persona({ id: "e", nombre: "Eva", tiene_tareas: false }),
+  ];
+  const r = rankingsTareas(ps, 3);
+  assert.deepEqual(r.masCerradas.map((p) => p.id), ["a", "b"]);
+  assert.deepEqual(r.masVencidas.map((p) => p.id), ["b", "c"]);
+  // A igual de cerradas, primero quien más abiertas acumula.
+  assert.deepEqual(r.menosCerradas.map((p) => p.id), ["c", "d", "b"]);
 });
 
 test("usoCrmSchema tolera la respuesta previa a 0102, sin dias_30d", () => {

@@ -170,7 +170,7 @@ export function CommandPaletteProvider({
           id: `quote:${qt.id}`,
           label: qt.quote_number ?? qt.client_name ?? "Cotización",
           hint: qt.client_name ?? undefined,
-          group: "Cotizaciones",
+          group: "Compras Cacao",
           icon: <FileText className="h-4 w-4" />,
           run: () => router.push(`/cotizaciones?quote=${qt.id}`),
         });

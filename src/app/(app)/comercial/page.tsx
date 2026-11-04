@@ -7,7 +7,7 @@ import type { Lead, TeamMember } from "@/lib/types/database";
 export const dynamic = "force-dynamic";
 
 export type LeadWithOwner = Lead & {
-  owner: Pick<TeamMember, "id" | "name" | "color"> | null;
+  owner: Pick<TeamMember, "id" | "name" | "color" | "department"> | null;
 };
 
 const WRITE_DEPTS = ["Comercial", "Administrativo"];
@@ -25,7 +25,7 @@ export default async function ComercialPage() {
     supabase
       .from("leads")
       .select(
-        "*, owner:team_members!leads_commercial_owner_fkey(id,name,color)",
+        "*, owner:team_members!leads_commercial_owner_fkey(id,name,color,department)",
       )
       .order("created_at", { ascending: false }),
     supabase

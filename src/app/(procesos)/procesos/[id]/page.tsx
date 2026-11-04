@@ -4,6 +4,7 @@ import { obtenerCaso } from "@/lib/procesos/repo";
 import { initials } from "@/lib/utils";
 import type { Persona } from "@/lib/procesos/types";
 import { CasoDetalle } from "./caso-detalle";
+import { colorDeArea } from "@/lib/areas";
 
 export const dynamic = "force-dynamic";
 
@@ -17,7 +18,7 @@ export default async function CasoPage({
 
   const [caso, { data: team }, { data: eventos }] = await Promise.all([
     obtenerCaso(id),
-    supabase.from("team_members").select("id, name, color").eq("active", true).order("name"),
+    supabase.from("team_members").select("id, name, department").eq("active", true).order("name"),
     supabase
       .from("proceso_eventos")
       .select("id, descripcion, paso_numero, created_at")
@@ -32,7 +33,7 @@ export default async function CasoPage({
     id: t.id,
     nombre: t.name,
     iniciales: initials(t.name),
-    color: t.color ?? "var(--accent)",
+    color: colorDeArea(t.department),
   }));
 
   return (

@@ -11,6 +11,8 @@ import { initials } from "@/lib/utils";
 import type { Profile } from "@/lib/types/database";
 import { InviteForm } from "./invite-form";
 import { ProfileList } from "./profile-list";
+import { colorDeArea } from "@/lib/areas";
+import { DEPARTMENTS } from "@/lib/departments";
 
 export default async function EquipoPage() {
   if (!hasSupabaseEnv()) {
@@ -57,7 +59,7 @@ export default async function EquipoPage() {
     <div className="space-y-6">
       <PageHeader
         title="Equipo / Ajustes"
-        description="Invita usuarios, gestiona perfiles y consulta el catálogo del equipo."
+        description="Invita usuarios, arma sus perfiles (área, rol y permisos) y consulta el catálogo del equipo."
         actions={<Badge tone="accent">Administrador</Badge>}
       />
 
@@ -73,6 +75,19 @@ export default async function EquipoPage() {
       <Card>
         <CardHeader>
           <CardTitle>Usuarios con acceso ({profiles?.length ?? 0})</CardTitle>
+          {/* Leyenda de colores por área: el mismo color sale en los avatares
+              de Tareas, Comercial y Procesos. */}
+          <ul className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-fg-muted">
+            {DEPARTMENTS.map((d) => (
+              <li key={d} className="inline-flex items-center gap-1.5">
+                <span
+                  className="h-2.5 w-2.5 rounded-full"
+                  style={{ backgroundColor: colorDeArea(d) }}
+                />
+                {d}
+              </li>
+            ))}
+          </ul>
         </CardHeader>
         <CardBody className="p-0">
           <ProfileList
@@ -95,7 +110,7 @@ export default async function EquipoPage() {
               >
                 <div
                   className="flex h-9 w-9 items-center justify-center rounded-full font-mono text-xs font-medium text-white"
-                  style={{ backgroundColor: m.color ?? "var(--accent)" }}
+                  style={{ backgroundColor: colorDeArea(m.department) }}
                 >
                   {initials(m.name)}
                 </div>

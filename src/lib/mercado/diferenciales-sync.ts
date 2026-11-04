@@ -45,7 +45,14 @@ export async function sincronizarDiferenciales(
   // 90 s y no más: Cloudflare corta cualquier tool del túnel a los 100 s. Un
   // timeout mayor no espera más —el túnel ya cortó— y convierte un corte del
   // borde en un error críptico en vez de uno que dice qué pasó.
-  const r = await llamarHerramienta(mcp, "get_cocoa_tables", {}, 90_000);
+  //
+  // `max_age_hours: 96` es lo que de verdad lo arregla. El servidor calienta su
+  // caché los lunes 8:40 (Bogotá) porque traer el reporte en fresco —scroll del
+  // feed más re-login— tarda ~95 s y roza ese corte. Con el default de 12 h,
+  // el cron del jueves encontraba la caché del lunes «vieja», mandaba a navegar
+  // en fresco y se cortaba: del 28-ago al 4-nov no entró ni un reporte. 96 h
+  // cubre el lunes completo y un botón manual hasta el jueves sin navegar.
+  const r = await llamarHerramienta(mcp, "get_cocoa_tables", { max_age_hours: 96 }, 90_000);
   if (typeof r === "string") throw new Error(r);
 
   const payload = r as { differentials?: Tabla; ratios?: Tabla; missing?: string[] };

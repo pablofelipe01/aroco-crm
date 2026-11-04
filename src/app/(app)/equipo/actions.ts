@@ -121,3 +121,72 @@ export async function setProfileRole(
   revalidatePath("/equipo");
   return { ok: true };
 }
+
+/**
+ * Lo que un admin puede cambiar de un perfil desde Equipo (2026-11-04: para que
+ * Nicolás arme los perfiles sin pasar por Pablo). El rol y el activo van por
+ * sus propias acciones, que traen la regla de no tocarse a sí mismo.
+ */
+export type CambiosPerfil = {
+  full_name?: string;
+  department?: Department | null;
+  aprueba_compras?: boolean;
+  ve_mercado?: boolean;
+  ve_uso?: boolean;
+  ve_comisiones_todas?: boolean;
+  verifica_proveedores?: boolean;
+};
+
+const PERMISOS = [
+  "aprueba_compras",
+  "ve_mercado",
+  "ve_uso",
+  "ve_comisiones_todas",
+  "verifica_proveedores",
+] as const;
+
+export async function actualizarPerfil(
+  profileId: string,
+  cambios: CambiosPerfil,
+): Promise<ProfileActionResult> {
+  const session = await requireAdmin().catch(() => null);
+  if (!session) return { ok: false, error: "No autorizado." };
+
+  const limpio: CambiosPerfil = {};
+  if (cambios.full_name !== undefined) {
+    const nombre = cambios.full_name.trim();
+    if (nombre.length < 2) return { ok: false, error: "El nombre es muy corto." };
+    limpio.full_name = nombre;
+  }
+  if (cambios.department !== undefined) {
+    if (cambios.department !== null && !DEPARTMENTS.includes(cambios.department)) {
+      return { ok: false, error: "Área inválida." };
+    }
+    limpio.department = cambios.department;
+  }
+  for (const k of PERMISOS) {
+    if (typeof cambios[k] === "boolean") limpio[k] = cambios[k];
+  }
+  if (Object.keys(limpio).length === 0) return { ok: true };
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("profiles").update(limpio).eq("id", profileId);
+  if (error) return { ok: false, error: error.message };
+
+  // El catálogo del equipo (avatares de tareas, leads, procesos) lee el área y
+  // el nombre de `team_members`, no del perfil. Sin esto, cambiar el área aquí
+  // no cambiaría el color en ningún otro lado.
+  const espejo: { name?: string; department?: Department | null } = {};
+  if (limpio.full_name !== undefined) espejo.name = limpio.full_name;
+  if (limpio.department !== undefined) espejo.department = limpio.department;
+  if (Object.keys(espejo).length > 0) {
+    const { error: eTm } = await supabase
+      .from("team_members")
+      .update(espejo)
+      .eq("profile_id", profileId);
+    if (eTm) return { ok: false, error: `Perfil guardado, catálogo no: ${eTm.message}` };
+  }
+
+  revalidatePath("/equipo");
+  return { ok: true };
+}
