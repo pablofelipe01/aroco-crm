@@ -6,6 +6,7 @@ import { TrendingUp, TrendingDown, type LucideIcon } from "lucide-react";
 import { AnimatedCounter } from "@/components/ui/animated-counter";
 import { fadeUp } from "@/lib/motion";
 import { cn } from "@/lib/utils";
+import { useFormatos } from "@/lib/i18n/provider";
 
 export function StatCard({
   label,
@@ -26,6 +27,7 @@ export function StatCard({
   delta?: number;
   hint?: string;
 }) {
+  const f = useFormatos();
   const positive = (delta ?? 0) >= 0;
   return (
     <motion.div
@@ -62,7 +64,9 @@ export function StatCard({
             ) : (
               <TrendingDown className="h-3.5 w-3.5" />
             )}
-            {Math.abs(delta)}%
+            {/* Un decimal y con el separador del idioma: sin esto salía
+                «1.4670823399963322%» en Mercado (2026-11-04). */}
+            {f.numero(Math.abs(delta), 1)} %
           </span>
         )}
         {hint && <span className="text-xs text-fg-subtle">{hint}</span>}

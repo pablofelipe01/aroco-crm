@@ -159,7 +159,7 @@ export function MercadoClient({
           <StatCard label={t.mercado.enBodega} value={r.toneladasFisicas} decimals={2} suffix=" t" icon={Boxes}
             hint={`${d.totales.lotes_con_saldo} ${t.mercado.lotes} · ${t.mercado.costo} ${f.cop(d.totales.costo_promedio_cop_kg ?? 0)}/kg`} />
           <StatCard label={t.mercado.descubierto} value={r.toneladasDescubiertas} decimals={2} suffix=" t" icon={ShieldAlert}
-            hint={r.coberturaPct === 0 ? t.mercado.sinCobertura : `${r.coberturaPct.toFixed(1)}% ${t.mercado.cubierto}`} />
+            hint={r.coberturaPct === 0 ? t.mercado.sinCobertura : `${f.numero(r.coberturaPct, 1)} % ${t.mercado.cubierto}`} />
           <StatCard
             label={t.mercado.cacaoHoy}
             value={r.precioMercadoCopKg ?? 0}
