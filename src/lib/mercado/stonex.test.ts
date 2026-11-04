@@ -1,6 +1,13 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { normalizarBalance, normalizarPnl, normalizarPosicion, diasHabiles } from "./stonex";
+import {
+  balanceDelTexto,
+  completarBalance,
+  normalizarBalance,
+  normalizarPnl,
+  normalizarPosicion,
+  diasHabiles,
+} from "./stonex";
 
 test("el balance sale del consolidado, no del primero que aparezca", () => {
   // Forma real del estado del 21-ago-2026: tres bloques, uno por tipo de cuenta.
@@ -65,4 +72,41 @@ test("los días hábiles saltan fines de semana", () => {
   assert.deepEqual(diasHabiles(new Date(Date.UTC(2026, 7, 24)), 4), [
     "2026-08-24", "2026-08-21", "2026-08-20", "2026-08-19",
   ]);
+});
+
+/** Bloque de balances del PDF real del 3-nov-2026, copiado del texto crudo. */
+const TEXTO_3NOV = `*USD SEGREGATED(U1)* *CONV SEG TOTAL* **TOTAL CONVERTED**
+BEGINNING BALANCE 12,633.08CR 12,633.08CR 12,633.08CR
+ENDING BALANCE 12,633.08CR 12,633.08CR 12,633.08CR
+TOTAL EQUITY 12,633.08CR 12,633.08CR 12,633.08CR
+LONG OPTION VALUE 450.00CR 450.00CR 450.00CR
+SHORT OPTION VALUE 40.00DR 40.00DR 40.00DR
+NET MARKET VALUE OF OPTIONS 410.00CR 410.00CR 410.00CR
+CURRENT LIQUIDATING VALUE 13,043.08CR 13,043.08CR 13,043.08CR
+PRIOR LIQUIDATING VALUE 13,063.08CR 13,063.08CR 13,063.08CR
+MARKET VARIANCE 20.00DR 20.00DR 20.00DR
+INITIAL MARGIN REQUIREMENT 3,680.00CR 3,680.00CR 3,680.00CR
+MAINTENANCE MARGIN REQUIREMENT 3,680.00CR 3,680.00CR 3,680.00CR
+EXCESS EQUITY 8,953.08CR 8,953.08CR 8,953.08CR`;
+
+test("el margen y el valor de las opciones salen del texto del PDF", () => {
+  assert.deepEqual(balanceDelTexto(TEXTO_3NOV), {
+    long_option_value: 450,
+    short_option_value: -40,
+    net_option_value: 410,
+    net_liquidating_value: 13043.08,
+    prior_net_liquidating_value: 13063.08,
+    initial_margin: 3680,
+    maintenance_margin: 3680,
+  });
+  assert.deepEqual(balanceDelTexto(null), {});
+});
+
+test("el texto completa los huecos del JSON pero no lo pisa", () => {
+  const json = normalizarBalance({
+    TOTAL_CONVERTED: { total_equity: 12633.08, excess_equity: 8953.08 },
+  });
+  const r = completarBalance(json, { initial_margin: 3680, total_equity: 1 });
+  assert.equal(r.initial_margin, 3680);
+  assert.equal(r.total_equity, 12633.08);
 });

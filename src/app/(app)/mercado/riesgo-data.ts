@@ -29,10 +29,9 @@ export type DatosMercado = {
     equity: number | null;
     margenInicial: number | null;
     /**
-     * Lo que el bróker declara disponible. Se muestra tal cual y NO se calcula
-     * como «equity − margen»: el extracto de StoneX no trae el margen (solo
-     * beginning/ending balance, total_equity, market_variance y excess_equity),
-     * así que restarlo daría una cifra inventada con pinta de exacta.
+     * Lo que el bróker declara disponible (excess equity), tal cual. Ya viene
+     * con el margen descontado: 12.633,08 − 3.680 = 8.953,08 el 3-nov. El
+     * margen se lee del texto del PDF desde el 2026-11-04; antes no se tenía.
      */
     disponible: number | null;
     variacionMercado: number | null;

@@ -128,6 +128,62 @@ export function normalizarBalance(balances: unknown): BalanceNormalizado {
   };
 }
 
+/**
+ * Lo que el JSON del MCP no trae y el PDF sí: margen, valor de las opciones y
+ * valor de liquidación.
+ *
+ * `balances` llega con cinco campos y por eso durante meses se dio por hecho
+ * que StoneX no reportaba el margen. El texto del PDF lo trae en cada estado:
+ *
+ *   INITIAL MARGIN REQUIREMENT 3,680.00CR 3,680.00CR 3,680.00CR
+ *
+ * Tres columnas —USD segregado, total segregado convertido, total convertido—;
+ * se toma la ÚLTIMA, la consolidada, por la misma razón que `normalizarBalance`
+ * prefiere TOTAL_CONVERTED. DR es débito y se vuelve negativo; los márgenes son
+ * un requisito y se guardan en positivo aunque el PDF los marque CR o DR.
+ */
+const LINEAS_TEXTO: [RegExp, keyof BalanceNormalizado][] = [
+  [/^INITIAL MARGIN REQUIREMENT\b/, "initial_margin"],
+  [/^MAINTENANCE MARGIN REQUIREMENT\b/, "maintenance_margin"],
+  [/^LONG OPTION VALUE\b/, "long_option_value"],
+  [/^SHORT OPTION VALUE\b/, "short_option_value"],
+  [/^NET MARKET VALUE OF OPTIONS\b/, "net_option_value"],
+  [/^CURRENT LIQUIDATING VALUE\b/, "net_liquidating_value"],
+  [/^PRIOR LIQUIDATING VALUE\b/, "prior_net_liquidating_value"],
+];
+
+export function balanceDelTexto(texto: string | null | undefined): Partial<BalanceNormalizado> {
+  const out: Partial<BalanceNormalizado> = {};
+  if (!texto) return out;
+  for (const cruda of texto.split("\n")) {
+    const linea = cruda.trim().replace(/\s+/g, " ");
+    const regla = LINEAS_TEXTO.find(([re]) => re.test(linea));
+    if (!regla || out[regla[1]] !== undefined) continue;
+    const montos = [...linea.matchAll(/(\d[\d,]*\.\d{2}|\.\d{2})(CR|DR|-)?/g)];
+    const ultimo = montos.at(-1);
+    if (!ultimo) continue;
+    const valor = Number(ultimo[1].replace(/,/g, ""));
+    if (!Number.isFinite(valor)) continue;
+    const esMargen = regla[1] === "initial_margin" || regla[1] === "maintenance_margin";
+    const negativo = ultimo[2] === "DR" || ultimo[2] === "-";
+    out[regla[1]] = esMargen ? valor : negativo ? -valor : valor;
+  }
+  return out;
+}
+
+/** El balance del JSON, completado con lo que solo trae el texto del PDF. */
+export function completarBalance(
+  json: BalanceNormalizado,
+  delTexto: Partial<BalanceNormalizado>,
+): BalanceNormalizado {
+  const r = { ...json };
+  for (const k of Object.keys(delTexto) as (keyof BalanceNormalizado)[]) {
+    // El JSON manda cuando trae el dato: es la lectura estructurada del MCP.
+    if (r[k] === null && delTexto[k] !== undefined) r[k] = delTexto[k] as number;
+  }
+  return r;
+}
+
 /** `summary.realized_profit_loss` viene por moneda: { USD: { mtd, ytd } }. */
 export function normalizarPnl(summary: unknown): { mtd: number; ytd: number; moneda: string } {
   const s = (summary ?? {}) as Record<string, unknown>;
@@ -225,7 +281,8 @@ export async function traerExtracto(
   if (!ruta) throw new Error(`download_daily_statement no devolvió ruta para ${fecha}.`);
 
   const extracto = await llamarHerramienta(
-    mcp, "extract_statement_data", { pdf_path: ruta, include_raw_text: false }, 180_000,
+    // Con el texto crudo: de ahí sale el margen, que el JSON no trae.
+    mcp, "extract_statement_data", { pdf_path: ruta, include_raw_text: true }, 180_000,
   );
   if (typeof extracto === "string") throw new Error(extracto);
 
@@ -237,7 +294,10 @@ export async function traerExtracto(
     statement_date: txt(e.statement_date) ?? fecha,
     cuenta: txt(cuenta.number) ?? "desconocida",
     cuenta_nombre: txt(cuenta.name),
-    balance: normalizarBalance(e.balances),
+    balance: completarBalance(
+      normalizarBalance(e.balances),
+      balanceDelTexto(typeof e.raw_text === "string" ? e.raw_text : null),
+    ),
     pnl: normalizarPnl(e.summary),
     posiciones: (posiciones as Record<string, unknown>[]).map((p) =>
       // La fecha del extracto hace falta para reconstruir la de operación: el

@@ -290,14 +290,16 @@ export function MercadoClient({
                   <Dato k={t.mercado.cuenta} v={d.broker.cuenta ?? "—"} />
                   <Dato k={t.mercado.equity} v={usd(d.broker.equity)} />
                   <Dato k={t.mercado.cajaDisponible} v={usd(d.broker.disponible)} />
+                  {d.broker.margenInicial !== null && (
+                    <Dato k={t.mercado.margenInicial} v={usd(d.broker.margenInicial)} />
+                  )}
                   <Dato k={`${t.mercado.pnlRealizado} (${d.broker.moneda})`} v={usd(d.broker.pnlYtd)} tono={(d.broker.pnlYtd ?? 0) < 0 ? "danger" : undefined} />
                 </dl>
 
-                {/* De dónde sale «disponible» y qué NO es. El extracto de StoneX
-                    trae cinco cifras de balance y el margen no está entre ellas,
-                    así que esto es lo que el bróker declara libre — no un equity
-                    menos margen calculado aquí. Decirlo evita comprometer ese
-                    dinero creyendo que ya se descontó la garantía. */}
+                {/* De dónde sale «disponible». Desde el 2026-11-04 el margen se
+                    lee del texto del PDF (el JSON del MCP no lo trae); en los
+                    estados viejos sin margen se sigue avisando que la cifra no
+                    es equity menos garantía. */}
                 <p className="mt-3 border-t border-border pt-2 text-xs text-fg-subtle">
                   {d.broker.margenInicial === null
                     ? t.mercado.notaSinMargen
