@@ -115,6 +115,8 @@ test("rankingsTareas arma los tres top 5 solo con quien tiene tareas", () => {
     persona({ id: "c", nombre: "Caro", cerradas_30d: 0, vencidas: 1, abiertas: 4 }),
     persona({ id: "d", nombre: "Dani", cerradas_30d: 0, vencidas: 0, abiertas: 1 }),
     persona({ id: "e", nombre: "Eva", tiene_tareas: false }),
+    // Tiene tareas pero ninguna abierta: no se está atrasando en nada.
+    persona({ id: "f", nombre: "Fede", cerradas_30d: 0, vencidas: 0, abiertas: 0 }),
   ];
   const r = rankingsTareas(ps, 3);
   assert.deepEqual(r.masCerradas.map((p) => p.id), ["a", "b"]);

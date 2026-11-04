@@ -20,9 +20,11 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { staggerContainer } from "@/lib/motion";
 import { useFormatos, useLocale, useT } from "@/lib/i18n/provider";
 import { cn } from "@/lib/utils";
+import { NAV_ITEMS } from "@/lib/nav";
 import {
   acciones,
   filaDeUso,
+  lunesDe,
   modulosDelEquipo,
   ordenarFilas,
   rankingsTareas,
@@ -87,15 +89,29 @@ export function UsoClient({ datos }: { datos: UsoCrm }) {
     [locale],
   );
 
+  // Las cerradas se atribuyen a su autor solo desde `eventos_desde`. Antes de
+  // esa semana no hay ceros, hay desconocimiento: pintarlas como barras en
+  // cero decía que nadie cerró nada en agosto (revisión 2026-11-04).
+  const desdeCerradas = datos.eventos_desde ? lunesDe(datos.eventos_desde) : null;
   const serieEquipo = React.useMemo(
     () =>
-      lunes.map((l, i) => ({
-        semana: l,
-        etiqueta: etiquetaSemana(l),
-        valor: filas.reduce((a, x) => a + valorDe(vista, x.serie[i]), 0),
-      })),
-    [lunes, filas, vista, etiquetaSemana],
+      lunes
+        .map((l, i) => ({
+          semana: l,
+          etiqueta: etiquetaSemana(l),
+          valor: filas.reduce((a, x) => a + valorDe(vista, x.serie[i]), 0),
+        }))
+        .filter((s) => vista !== "cerradas" || !desdeCerradas || s.semana >= desdeCerradas),
+    [lunes, filas, vista, etiquetaSemana, desdeCerradas],
   );
+
+  // El módulo llega como el segmento de la ruta («compras»); se muestra con el
+  // nombre del menú, que es el que la gente conoce —y que ya cambió una vez:
+  // «compras» es Compras Adm y «cotizaciones» es Compras Cacao.
+  const nombreModulo = (m: string) => {
+    const item = NAV_ITEMS.find((n) => n.href === `/${m.toLowerCase()}`);
+    return item ? t.nav[item.llave] : m.charAt(0).toUpperCase() + m.slice(1);
+  };
 
   if (filas.length === 0) {
     return (
@@ -245,7 +261,7 @@ export function UsoClient({ datos }: { datos: UsoCrm }) {
                 {modulos.slice(0, 8).map((m) => (
                   <li key={m.modulo}>
                     <div className="flex items-baseline justify-between text-sm">
-                      <span className="capitalize text-fg">{m.modulo}</span>
+                      <span className="text-fg">{nombreModulo(m.modulo)}</span>
                       <span className="tnum font-mono text-xs text-fg-muted">
                         {f.numero(m.minutos)} {t.uso.minutos}
                       </span>

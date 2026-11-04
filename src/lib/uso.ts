@@ -169,7 +169,7 @@ export type Rankings = {
   masCerradas: PersonaUso[];
   /** Quienes más tareas vencidas tienen hoy. */
   masVencidas: PersonaUso[];
-  /** Quienes menos tareas cerraron en 30 días, entre quienes tienen tareas. */
+  /** Quienes menos tareas cerraron en 30 días, entre quienes tienen abiertas. */
   menosCerradas: PersonaUso[];
 };
 
@@ -179,7 +179,9 @@ const porNombre = (a: PersonaUso, b: PersonaUso) => a.nombre.localeCompare(b.nom
  * Los tres top 5 de la reunión del 2026-11-04. Solo cuenta quien tiene tareas:
  * alguien sin ninguna asignada saldría siempre de último en cerradas sin que
  * eso diga nada de su trabajo. Un top de vencidas con ceros sería ruido, así
- * que solo entra quien tiene al menos una.
+ * que solo entra quien tiene al menos una. Y en «menos cerradas» solo quien
+ * tiene ABIERTAS: alguien con cero pendientes no está atrasando nada, y en
+ * producción ocupaba el puesto de quien sí acumula (revisión 2026-11-04).
  */
 export function rankingsTareas(personas: PersonaUso[], n = 5): Rankings {
   const conTareas = personas.filter((p) => p.tiene_tareas);
@@ -192,7 +194,8 @@ export function rankingsTareas(personas: PersonaUso[], n = 5): Rankings {
       .filter((p) => p.vencidas > 0)
       .sort((a, b) => b.vencidas - a.vencidas || porNombre(a, b))
       .slice(0, n),
-    menosCerradas: [...conTareas]
+    menosCerradas: conTareas
+      .filter((p) => p.abiertas > 0)
       .sort(
         (a, b) =>
           a.cerradas_30d - b.cerradas_30d ||
