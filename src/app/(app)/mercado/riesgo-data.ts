@@ -231,9 +231,17 @@ export async function cargarMercado(
     if (!g) return 9999;
     return Number(g[2]) * 12 + MESES.indexOf(g[1]);
   };
-  const delDia = [...porVencimiento.values()].sort(
-    (a, b) => orden(a.contract_month) - orden(b.contract_month),
-  );
+  // Fuera los vencimientos que ya no se actualizan. El sync deja de bajar un
+  // mes cuando vence, pero su último tablero sigue en la base: OCT26 quedó del
+  // 9-sep y, por ser el mes más cercano, salía primero en el selector y de él
+  // se sacaban los deltas — la cobertura efectiva dio 0,15 t en vez de 2,35 t
+  // (revisión del 2026-11-04). Se compara contra el tablero más reciente, no
+  // contra hoy, para no vaciar la pantalla si el sync lleva días caído.
+  const masReciente = Math.max(0, ...[...porVencimiento.values()].map((t) => Date.parse(t.date)));
+  const DIAS_VIGENTE = 7;
+  const delDia = [...porVencimiento.values()]
+    .filter((t) => masReciente - Date.parse(t.date) <= DIAS_VIGENTE * 86_400_000)
+    .sort((a, b) => orden(a.contract_month) - orden(b.contract_month));
 
   const elegido =
     delDia.find((t) => t.contract_month === contratoElegido) ?? delDia[0] ?? null;
@@ -339,11 +347,19 @@ export async function cargarMercado(
    * pantalla no podía decir cuánto protegía de verdad una cobertura; eso quedó
    * anotado en la revisión del 1-sep-2026.
    */
-  const { data: griegas } = board
+  //
+  // Y del tablero del MES DE LA POSICIÓN, no del que se esté mirando en la
+  // cadena: elegir FEB27 en el selector no cambia lo que protege un put DEC26.
+  const mesCobertura = posiciones.find(
+    (p) => (p.option_type ?? "").toUpperCase() === "PUT" && p.long_qty > 0,
+  )?.contract_month;
+  const tableroCobertura =
+    (mesCobertura ? porVencimiento.get(mesCobertura) : undefined) ?? board;
+  const { data: griegas } = tableroCobertura
     ? await db
         .from("options_chain")
         .select("strike, call_delta, call_delta_calc, put_delta, put_delta_calc")
-        .eq("board_id", board.id)
+        .eq("board_id", tableroCobertura.id)
         .or(
           "call_delta.not.is.null,put_delta.not.is.null,call_delta_calc.not.is.null,put_delta_calc.not.is.null",
         )
