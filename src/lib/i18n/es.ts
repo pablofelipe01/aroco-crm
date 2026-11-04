@@ -521,6 +521,7 @@ export const es = {
     ratiosProducto: "Ratios de producto",
     colProducto: "Producto",
     colRatio: "Ratio",
+    colSemana: "Semana",
     colPrecioUsdT: "US$/t",
     ratiosNota:
       "Cuántas veces el precio del futuro vale cada derivado. Un ratio de 1,74 significa que ese producto se cotiza a 1,74 veces el grano — es lo que dice si conviene vender cacao o transformarlo.",

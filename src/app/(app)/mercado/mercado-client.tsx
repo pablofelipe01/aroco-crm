@@ -464,7 +464,17 @@ export function MercadoClient({
                           se leía «1.52vs Europa +7,8 %US$ 9.266» sin saber qué
                           número era cuál (revisión del 2026-11-04). */}
                       <div className="overflow-x-auto">
-                        <table className="w-full min-w-[30rem] text-sm">
+                        {/* Anchos fijos: con el automático cada categoría
+                            calculaba los suyos y las columnas de Licor,
+                            Manteca y Polvo no quedaban una bajo la otra. */}
+                        <table className="w-full min-w-[30rem] table-fixed text-sm">
+                          <colgroup>
+                            <col />
+                            <col className="w-16" />
+                            <col className="w-24" />
+                            <col className="w-24" />
+                            <col className="w-20" />
+                          </colgroup>
                           <thead>
                             <tr className="text-[11px] text-fg-subtle">
                               <th scope="col" className="py-1 pr-2 text-left font-normal">
@@ -474,7 +484,7 @@ export function MercadoClient({
                                 {t.mercado.colRatio}
                               </th>
                               <th scope="col" className="px-2 py-1 text-right font-normal">
-                                {t.mercado.enLaSemana}
+                                {t.mercado.colSemana}
                               </th>
                               <th scope="col" className="px-2 py-1 text-right font-normal">
                                 {t.mercado.vsEuropa}
@@ -485,7 +495,10 @@ export function MercadoClient({
                             </tr>
                           </thead>
                           <tbody>
-                            {filas.map((fila) => {
+                            {/* De mayor a menor ratio: así la referencia
+                                europea queda en su sitio y se ve de un vistazo
+                                quién cotiza por encima y quién por debajo. */}
+                            {[...filas].sort((a, b) => b.ratio - a.ratio).map((fila) => {
                               const cambio =
                                 fila.ratio_anterior === null
                                   ? null
@@ -501,7 +514,7 @@ export function MercadoClient({
                                   key={`${fila.producto}-${fila.incoterm ?? ""}`}
                                   className="border-t border-border/50"
                                 >
-                                  <td className="py-1.5 pr-2 text-fg">
+                                  <td className="truncate py-1.5 pr-2 text-fg">
                                     {fila.producto}
                                     {fila.mercado && (
                                       <span className="ml-1.5 text-xs text-fg-subtle">

@@ -521,6 +521,7 @@ export const en: Diccionario = {
     ratiosProducto: "Product ratios",
     colProducto: "Product",
     colRatio: "Ratio",
+    colSemana: "Week",
     colPrecioUsdT: "US$/t",
     ratiosNota:
       "How many times the futures price each derivative is worth. A ratio of 1.74 means that product trades at 1.74 times the bean — it is what tells you whether to sell cocoa or process it.",
