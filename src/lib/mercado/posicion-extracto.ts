@@ -65,8 +65,7 @@ export function mesDeContrato(contrato: string | null): string | null {
 /**
  * Si la línea es una opción, cuál y a qué strike.
  *
- * Hoy la cuenta solo tiene futuros, pero el collar de Álvaro vuelve en cuanto
- * se arme otro y entonces el extracto traerá «DEC 26 ICE COCOA PUT 6000». Un
+ * El extracto real trae «PUT DEC 26 ICE COCOA 5200 SX» (25-sep-2026). Un
  * futuro devuelve las dos cosas en null, que es la convención que el resto del
  * módulo ya espera: `option_type` nulo significa futuro.
  */
@@ -78,9 +77,14 @@ export function instrumentoDeContrato(contrato: string | null): {
   const m = /\b(CALL|PUT)\b/i.exec(contrato);
   if (!m) return { option_type: null, strike: null };
   const tipo = m[1].toUpperCase() as "CALL" | "PUT";
-  // El strike es el número que sigue al tipo; el del mes ya quedó descartado
-  // porque se busca DESPUÉS de la palabra.
-  const resto = contrato.slice(m.index + m[0].length);
+  // Se quita el mes del contrato («DEC 26») y LUEGO se toma el primer número.
+  // Antes se buscaba el número que sigue a CALL/PUT, suponiendo el formato
+  // «DEC 26 ICE COCOA PUT 6000»; el extracto real pone el tipo primero —«PUT
+  // DEC 26 ICE COCOA 5200 SX»— y el strike salía 26, el año. Del 25-sep al
+  // 4-nov la pantalla dijo «collar entre US$ 26 y US$ 26» con el collar real
+  // en 5.200 / 6.150.
+  const sinMes = contrato.replace(/\b[A-Z]{3}\s*\d{2}\b/gi, " ");
+  const resto = sinMes.replace(/\b(CALL|PUT)\b/gi, " ");
   const s = /(\d[\d.,]*)/.exec(resto);
   const strike = s ? Number(s[1].replace(/,/g, "")) : null;
   return { option_type: tipo, strike: Number.isFinite(strike) ? strike : null };

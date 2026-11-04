@@ -50,6 +50,16 @@ test("un futuro no lleva tipo ni strike; una opción sí", () => {
     option_type: "CALL",
     strike: 6750,
   });
+  // Los dos contratos reales del extracto del 3-nov-2026, copiados del PDF:
+  // el tipo va PRIMERO y el «26» del año no es el strike.
+  assert.deepEqual(instrumentoDeContrato("PUT DEC 26 ICE COCOA 5200 SX"), {
+    option_type: "PUT",
+    strike: 5200,
+  });
+  assert.deepEqual(instrumentoDeContrato("CALL DEC 26 ICE COCOA 6150 SX"), {
+    option_type: "CALL",
+    strike: 6150,
+  });
 });
 
 test("el lado se cree cuando el extracto lo dice", () => {
