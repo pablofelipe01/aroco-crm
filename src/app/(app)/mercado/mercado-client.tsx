@@ -14,6 +14,7 @@ import { sincronizarAhora, subirTablero } from "./actions";
 import { AnalistaMercado } from "./analista";
 import { PosicionesManuales } from "./posiciones-manuales";
 import { PosicionesAbiertas } from "./posiciones-abiertas";
+import { MargenChart } from "./margen-chart";
 import { Modal } from "@/components/ui/modal";
 import { Field, Input, Select } from "@/components/ui/input";
 import { PageHeader } from "@/components/ui/page-header";
@@ -300,6 +301,15 @@ export function MercadoClient({
                     lee del texto del PDF (el JSON del MCP no lo trae); en los
                     estados viejos sin margen se sigue avisando que la cifra no
                     es equity menos garantía. */}
+                {/* Con dos puntos ya se ve hacia dónde va; con uno solo, la
+                    línea no dice nada. */}
+                {d.broker.margenSerie.length >= 2 && (
+                  <div className="mt-4">
+                    <p className="text-xs font-medium text-fg-muted">{t.mercado.margenEvolucion}</p>
+                    <p className="mb-1 text-[11px] text-fg-subtle">{t.mercado.margenEvolucionNota}</p>
+                    <MargenChart datos={d.broker.margenSerie} />
+                  </div>
+                )}
                 <p className="mt-3 border-t border-border pt-2 text-xs text-fg-subtle">
                   {d.broker.margenInicial === null
                     ? t.mercado.notaSinMargen

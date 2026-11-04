@@ -504,6 +504,8 @@ export const en: Diccionario = {
       "“Available” is the excess equity StoneX reports. The statement does not report the margin requirement, so this is not equity minus margin: confirm with the broker before committing it.",
     notaConMargen: "“Available” is the excess equity StoneX reports, net of margin.",
     margenInicial: "Initial margin",
+    margenEvolucion: "Initial margin by statement",
+    margenEvolucionNota: "What StoneX holds as collateral each day, with the same open position.",
     pnlRealizado: "Realised P&L",
     siElPrecio: "If the price moves",
     escenario: "Scenario",

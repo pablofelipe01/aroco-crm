@@ -38,6 +38,8 @@ export type DatosMercado = {
     pnlMtd: number | null;
     pnlYtd: number | null;
     moneda: string;
+    /** Margen inicial por estado, del más viejo al más reciente. */
+    margenSerie: { fecha: string; margen: number }[];
   } | null;
 
   /**
@@ -148,7 +150,7 @@ export async function cargarMercado(
   /** Vencimiento que se está mirando en la cadena. Por defecto, el primero. */
   contratoElegido?: string,
 ): Promise<DatosMercado> {
-  const [lotesRes, balRes, pnlRes, posRes, boardRes, trmRes, intelRes, difRes, ratRes, futRes, manRes] =
+  const [lotesRes, balRes, pnlRes, posRes, boardRes, trmRes, intelRes, difRes, ratRes, futRes, manRes, margenRes] =
     await Promise.all([
     db
       .from("inventory_lots")
@@ -191,6 +193,14 @@ export async function cargarMercado(
       .gte("fecha", hace30Dias())
       .order("fecha", { ascending: false })
       .order("created_at", { ascending: false }),
+    // Margen de los últimos ~4 meses de estados, para la gráfica de la
+    // tarjeta del bróker. Solo hay margen desde que se lee del PDF (0 antes).
+    db
+      .from("account_balance")
+      .select("statement_date, initial_margin")
+      .not("initial_margin", "is", null)
+      .order("statement_date", { ascending: false })
+      .limit(90),
   ]);
 
   const posicion = construirPosicion((lotesRes.data ?? []) as LoteRow[], new Date());
@@ -432,6 +442,10 @@ export async function cargarMercado(
           pnlMtd: pnl?.realized_pnl_mtd == null ? null : Number(pnl.realized_pnl_mtd),
           pnlYtd: pnl?.realized_pnl_ytd == null ? null : Number(pnl.realized_pnl_ytd),
           moneda: pnl?.currency ?? "USD",
+          margenSerie: (margenRes.data ?? [])
+            .map((m) => ({ fecha: m.statement_date, margen: Number(m.initial_margin) }))
+            .filter((m) => Number.isFinite(m.margen))
+            .reverse(),
         }
       : null,
     cadena: {

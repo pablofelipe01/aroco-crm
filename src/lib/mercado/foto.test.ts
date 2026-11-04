@@ -37,6 +37,7 @@ const base: DatosMercado = {
     cuenta: "AR-001",
     equity: 250_000,
     margenInicial: null,
+    margenSerie: [],
     disponible: 180_000,
     variacionMercado: -3200,
     pnlMtd: -5000,

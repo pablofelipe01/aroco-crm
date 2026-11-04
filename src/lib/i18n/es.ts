@@ -504,6 +504,8 @@ export const es = {
       "«Disponible» es el excedente que declara StoneX. El extracto no reporta el margen exigido, así que esta cifra no es equity menos garantía: antes de comprometerla, confírmala con el bróker.",
     notaConMargen: "«Disponible» es el excedente que declara StoneX, ya descontada la garantía.",
     margenInicial: "Margen inicial",
+    margenEvolucion: "Margen inicial por estado",
+    margenEvolucionNota: "Lo que StoneX retiene como garantía cada día, con la misma posición abierta.",
     pnlRealizado: "P&L realizado",
     siElPrecio: "Si el precio se mueve",
     escenario: "Escenario",
