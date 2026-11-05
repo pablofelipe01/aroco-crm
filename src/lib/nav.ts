@@ -16,6 +16,7 @@ import {
   Activity,
   Route,
   Settings,
+  FileSignature,
   type LucideIcon,
 } from "lucide-react";
 
@@ -152,6 +153,15 @@ export const NAV_ITEMS: NavItem[] = [
     label: "Comisiones",
     icon: Percent,
     departments: ["Dirección", "Financiero", "Comercial"],
+  },
+  {
+    // Firma electrónica de contratos. Cada quien ve los sobres que creó y
+    // Dirección todos (RLS de 0111); por eso entra quien los crea.
+    href: "/firmas",
+    llave: "firmas",
+    label: "Firmas",
+    icon: FileSignature,
+    departments: ["Dirección", "Comercial", "Administrativo", "Financiero"],
   },
   {
     href: "/precios",

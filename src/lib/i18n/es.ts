@@ -25,6 +25,7 @@ export const es = {
     mercado: "Mercado",
     ventas: "Ventas",
     comisiones: "Comisiones",
+    firmas: "Firmas",
     precios: "Precios",
     tareas: "Tareas",
     actas: "Actas",

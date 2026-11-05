@@ -21,6 +21,8 @@ export async function enviarCorreo(m: {
   asunto: string;
   html: string;
   texto: string;
+  /** Adjuntos en base64 (Resend acepta hasta 40 MB por correo). */
+  adjuntos?: { nombre: string; base64: string }[];
 }): Promise<{ ok: true; id: string | null } | { ok: false; error: string }> {
   if (!correosActivos()) return { ok: false, error: "Correos desactivados." };
   try {
@@ -36,6 +38,9 @@ export async function enviarCorreo(m: {
         subject: m.asunto,
         html: m.html,
         text: m.texto,
+        ...(m.adjuntos?.length
+          ? { attachments: m.adjuntos.map((a) => ({ filename: a.nombre, content: a.base64 })) }
+          : {}),
       }),
     });
     const cuerpo = (await res.json().catch(() => ({}))) as { id?: string; message?: string };

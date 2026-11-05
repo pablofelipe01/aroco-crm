@@ -20,6 +20,248 @@ export type Database = {
   };
   public: {
     Tables: {
+      firmas_eventos: {
+        Row: {
+          actor: string | null
+          detalle: Json
+          firmante_id: string | null
+          hash: string
+          hash_previo: string | null
+          id: number
+          ip: string | null
+          ocurrido_en: string
+          sobre_id: string
+          tipo: string
+          user_agent: string | null
+        }
+        Insert: {
+          actor?: string | null
+          detalle?: Json
+          firmante_id?: string | null
+          hash?: string
+          hash_previo?: string | null
+          id?: never
+          ip?: string | null
+          ocurrido_en?: string
+          sobre_id: string
+          tipo: string
+          user_agent?: string | null
+        }
+        Update: {
+          actor?: string | null
+          detalle?: Json
+          firmante_id?: string | null
+          hash?: string
+          hash_previo?: string | null
+          id?: never
+          ip?: string | null
+          ocurrido_en?: string
+          sobre_id?: string
+          tipo?: string
+          user_agent?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "firmas_eventos_actor_fkey"
+            columns: ["actor"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "firmas_eventos_firmante_id_fkey"
+            columns: ["firmante_id"]
+            isOneToOne: false
+            referencedRelation: "firmas_firmantes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "firmas_eventos_sobre_id_fkey"
+            columns: ["sobre_id"]
+            isOneToOne: false
+            referencedRelation: "firmas_sobres"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      firmas_firmantes: {
+        Row: {
+          codigo_hash: string | null
+          codigo_intentos: number
+          codigo_vence: string | null
+          created_at: string
+          documento: string | null
+          documento_firmado: string | null
+          email: string
+          estado: string
+          firma_modo: string | null
+          firma_path: string | null
+          firmado_en: string | null
+          firmado_ip: string | null
+          firmado_user_agent: string | null
+          id: string
+          motivo_rechazo: string | null
+          nombre: string
+          nombre_firmado: string | null
+          notificado_en: string | null
+          orden: number
+          rechazado_en: string | null
+          rol: string | null
+          sobre_id: string
+          token_hash: string | null
+          verificado_canal: string | null
+          verificado_en: string | null
+        }
+        Insert: {
+          codigo_hash?: string | null
+          codigo_intentos?: number
+          codigo_vence?: string | null
+          created_at?: string
+          documento?: string | null
+          documento_firmado?: string | null
+          email: string
+          estado?: string
+          firma_modo?: string | null
+          firma_path?: string | null
+          firmado_en?: string | null
+          firmado_ip?: string | null
+          firmado_user_agent?: string | null
+          id?: string
+          motivo_rechazo?: string | null
+          nombre: string
+          nombre_firmado?: string | null
+          notificado_en?: string | null
+          orden?: number
+          rechazado_en?: string | null
+          rol?: string | null
+          sobre_id: string
+          token_hash?: string | null
+          verificado_canal?: string | null
+          verificado_en?: string | null
+        }
+        Update: {
+          codigo_hash?: string | null
+          codigo_intentos?: number
+          codigo_vence?: string | null
+          created_at?: string
+          documento?: string | null
+          documento_firmado?: string | null
+          email?: string
+          estado?: string
+          firma_modo?: string | null
+          firma_path?: string | null
+          firmado_en?: string | null
+          firmado_ip?: string | null
+          firmado_user_agent?: string | null
+          id?: string
+          motivo_rechazo?: string | null
+          nombre?: string
+          nombre_firmado?: string | null
+          notificado_en?: string | null
+          orden?: number
+          rechazado_en?: string | null
+          rol?: string | null
+          sobre_id?: string
+          token_hash?: string | null
+          verificado_canal?: string | null
+          verificado_en?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "firmas_firmantes_sobre_id_fkey"
+            columns: ["sobre_id"]
+            isOneToOne: false
+            referencedRelation: "firmas_sobres"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      firmas_sobres: {
+        Row: {
+          anulado_en: string | null
+          codigo: string
+          completado_en: string | null
+          created_at: string
+          created_by: string
+          en_orden: boolean
+          enviado_en: string | null
+          estado: string
+          firmado_path: string | null
+          firmado_sha256: string | null
+          id: string
+          idioma: string
+          mensaje: string | null
+          motivo_anulacion: string | null
+          original_bytes: number
+          original_nombre: string
+          original_paginas: number
+          original_path: string
+          original_sha256: string
+          tipo: string
+          titulo: string
+          updated_at: string
+          vence_en: string | null
+        }
+        Insert: {
+          anulado_en?: string | null
+          codigo?: string
+          completado_en?: string | null
+          created_at?: string
+          created_by?: string
+          en_orden?: boolean
+          enviado_en?: string | null
+          estado?: string
+          firmado_path?: string | null
+          firmado_sha256?: string | null
+          id?: string
+          idioma?: string
+          mensaje?: string | null
+          motivo_anulacion?: string | null
+          original_bytes: number
+          original_nombre: string
+          original_paginas: number
+          original_path: string
+          original_sha256: string
+          tipo: string
+          titulo: string
+          updated_at?: string
+          vence_en?: string | null
+        }
+        Update: {
+          anulado_en?: string | null
+          codigo?: string
+          completado_en?: string | null
+          created_at?: string
+          created_by?: string
+          en_orden?: boolean
+          enviado_en?: string | null
+          estado?: string
+          firmado_path?: string | null
+          firmado_sha256?: string | null
+          id?: string
+          idioma?: string
+          mensaje?: string | null
+          motivo_anulacion?: string | null
+          original_bytes?: number
+          original_nombre?: string
+          original_paginas?: number
+          original_path?: string
+          original_sha256?: string
+          tipo?: string
+          titulo?: string
+          updated_at?: string
+          vence_en?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "firmas_sobres_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       commission_calcs: {
         Row: {
           agent: string | null;
@@ -3633,6 +3875,10 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
+      firmas_cadena_integra: {
+        Args: { p_sobre: string };
+        Returns: boolean;
+      };
       cotizador_referencias: {
         Args: Record<PropertyKey, never>;
         Returns: {
@@ -3851,3 +4097,6 @@ export type MovementKind = Enums<"movement_kind">;
 export type TaskStatusEnum = Enums<"task_status">;
 export type CommissionLevel = Enums<"commission_level">;
 export type CommissionRole = Enums<"commission_role">;
+export type FirmaSobre = Tables<"firmas_sobres">;
+export type FirmaFirmante = Tables<"firmas_firmantes">;
+export type FirmaEvento = Tables<"firmas_eventos">;

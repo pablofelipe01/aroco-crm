@@ -25,6 +25,7 @@ export const en: Diccionario = {
     mercado: "Market",
     ventas: "Sales",
     comisiones: "Commissions",
+    firmas: "Signatures",
     precios: "Prices",
     tareas: "Tasks",
     actas: "Minutes",
