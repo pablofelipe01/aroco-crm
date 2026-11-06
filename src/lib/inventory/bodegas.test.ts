@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { disponiblePorTipo, resumenPorBodega, totalTipos, type DisponiblePorClase } from "./bodegas";
+import { bodegaPorOrigen, disponiblePorTipo, resumenPorBodega, totalTipos, type DisponiblePorClase } from "./bodegas";
 
 const lote = (o: Partial<DisponiblePorClase> & { bodega?: string | null }) => ({
   qty_avail_premium_kg: 0,
@@ -51,4 +51,17 @@ test("el resumen separa por bodega y deja aparte los lotes sin asignar", () => {
 test("sin lotes sin asignar no aparece la fila de pendientes", () => {
   const { filas } = resumenPorBodega([lote({ bodega: "bogota", qty_avail_premium_kg: 5 })]);
   assert.deepEqual(filas.map((f) => f.bodega), ["cauca", "bogota", "nilo"]);
+});
+
+test("bodegaPorOrigen: Cauca a Cauca, Cundinamarca y Tolima a Nilo, lo demás a Bogotá", () => {
+  assert.equal(bodegaPorOrigen("CAUCA"), "cauca");
+  assert.equal(bodegaPorOrigen("Cundinamarca"), "nilo");
+  assert.equal(bodegaPorOrigen("TOLIMA"), "nilo");
+  assert.equal(bodegaPorOrigen("SANTANDER"), "bogota");
+  assert.equal(bodegaPorOrigen("META"), "bogota");
+  // Sin departamento, por el código.
+  assert.equal(bodegaPorOrigen(null, "CO-CAU-GUACH (RESCATE)-190825"), "cauca");
+  assert.equal(bodegaPorOrigen("", "COL-TOL-LIM-110826(ACOPIO)"), "nilo");
+  assert.equal(bodegaPorOrigen(null, "Cauca-190226(Ruta Padilla)"), "bogota");
+  assert.equal(bodegaPorOrigen(null, null), "bogota");
 });

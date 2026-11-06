@@ -12,7 +12,10 @@
  *   Orgánico = Orgánico
  *   Baba     = cacao en baba (fresco); el archivo no lo trae, entra por el CRM
  *
- * La bodega tampoco está en el archivo: se elige en el CRM por lote.
+ * La bodega tampoco está en el archivo. Desde 0114 se asigna sola por el
+ * departamento de origen (`bodegaPorOrigen`, igual que la función SQL
+ * inventario_bodega_por_origen); quien tenga permiso puede cambiarla a mano y
+ * esa elección se respeta.
  */
 
 export const BODEGAS = ["cauca", "bogota", "nilo"] as const;
@@ -26,6 +29,23 @@ export const NOMBRE_BODEGA: Record<Bodega, string> = {
 
 export function esBodega(v: unknown): v is Bodega {
   return typeof v === "string" && (BODEGAS as readonly string[]).includes(v);
+}
+
+/**
+ * La regla de bodega automática (Pablo, 2026-11-06): Cauca → Cauca;
+ * Cundinamarca y Tolima → Nilo; lo demás → Bogotá. Sin departamento, se mira
+ * el segundo tramo del código (CO-CAU-…). Debe coincidir con la función SQL
+ * inventario_bodega_por_origen (0114).
+ */
+export function bodegaPorOrigen(departamento: string | null | undefined, code?: string | null): Bodega {
+  const d = (departamento ?? "").trim().toUpperCase();
+  const seg = ((code ?? "").split("-")[1] ?? "").trim().toUpperCase();
+  if (d.startsWith("CAUCA")) return "cauca";
+  if (d.startsWith("CUNDINAMARCA") || d.startsWith("TOLIMA")) return "nilo";
+  if (d) return "bogota";
+  if (seg.startsWith("CAU")) return "cauca";
+  if (seg.startsWith("CUN") || seg.startsWith("TOL")) return "nilo";
+  return "bogota";
 }
 
 export const TIPOS = ["organico", "primera", "segunda", "baba"] as const;

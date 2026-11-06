@@ -21,6 +21,7 @@ import {
   NOMBRE_TIPO,
   TIPOS,
   disponiblePorTipo,
+  bodegaPorOrigen,
   esBodega,
   resumenPorBodega,
   type Bodega,
@@ -77,18 +78,30 @@ export function InventarioClient({
   // la lista que la originó: cuando llegan datos frescos, mandan los datos.
   const [cambios, setCambios] = React.useState<{
     base: InventoryLot[];
-    m: Record<string, Bodega | null>;
+    m: Record<string, Bodega | "auto">;
   }>({ base: initialLots, m: {} });
   const pendiente = React.useMemo(
     () => (cambios.base === initialLots ? cambios.m : {}),
     [cambios, initialLots],
   );
+  // La bodega sale sola del origen (0114) salvo que alguien la haya elegido a
+  // mano; «auto» es volver a la regla.
   const bodegaDe = React.useCallback(
-    (l: InventoryLot): Bodega | null =>
-      l.id in pendiente ? pendiente[l.id] : esBodega(l.bodega) ? l.bodega : null,
+    (l: InventoryLot): Bodega | null => {
+      const p = pendiente[l.id];
+      if (p === "auto") return bodegaPorOrigen(l.departamento, l.code);
+      if (p) return p;
+      return esBodega(l.bodega) ? l.bodega : bodegaPorOrigen(l.departamento, l.code);
+    },
     [pendiente],
   );
-  const setPendiente = (f: (m: Record<string, Bodega | null>) => Record<string, Bodega | null>) =>
+  const esManual = (l: InventoryLot) => {
+    const p = pendiente[l.id];
+    return p !== undefined ? p !== "auto" : l.bodega_por != null;
+  };
+  const setPendiente = (
+    f: (m: Record<string, Bodega | "auto">) => Record<string, Bodega | "auto">,
+  ) =>
     setCambios((c) => ({ base: initialLots, m: f(c.base === initialLots ? c.m : {}) }));
 
   // Deep link from the command palette (?lot=<id>).
@@ -154,7 +167,7 @@ export function InventarioClient({
 
   async function cambiarBodega(l: InventoryLot, valor: string) {
     const bodega = esBodega(valor) ? valor : null;
-    setPendiente((p) => ({ ...p, [l.id]: bodega }));
+    setPendiente((p) => ({ ...p, [l.id]: bodega ?? "auto" }));
     const res = await asignarBodega([l.id], bodega);
     if (!res.ok) {
       setPendiente((p) => {
@@ -328,7 +341,7 @@ export function InventarioClient({
                     {l.codigo_nuevo ?? l.code}
                   </span>
                   <Badge tone={l.bodega ? "neutral" : "warn"}>
-                    {l.bodega ? NOMBRE_BODEGA[l.bodega] : "sin bodega"}
+                    {l.bodega ? NOMBRE_BODEGA[l.bodega] : "—"}
                   </Badge>
                   {l.needs_review && <Badge tone="warn">verificar</Badge>}
                 </div>
@@ -425,11 +438,13 @@ export function InventarioClient({
                     {canWrite ? (
                       <Select
                         aria-label={`Bodega de ${l.codigo_nuevo ?? l.code}`}
-                        value={l.bodega ?? ""}
+                        value={esManual(l) ? (l.bodega ?? "auto") : "auto"}
                         onChange={(e) => void cambiarBodega(l, e.target.value)}
-                        className={cn("h-8 w-32 text-xs", !l.bodega && "text-warn")}
+                        className="h-8 w-40 text-xs"
                       >
-                        <option value="">Sin asignar</option>
+                        <option value="auto">
+                          {NOMBRE_BODEGA[bodegaPorOrigen(l.departamento, l.code)]} · automática
+                        </option>
                         {BODEGAS.map((b) => (
                           <option key={b} value={b}>
                             {NOMBRE_BODEGA[b]}
@@ -437,8 +452,9 @@ export function InventarioClient({
                         ))}
                       </Select>
                     ) : (
-                      <span className={cn("text-xs", l.bodega ? "text-fg-muted" : "text-warn")}>
-                        {l.bodega ? NOMBRE_BODEGA[l.bodega] : "Sin asignar"}
+                      <span className="text-xs text-fg-muted">
+                        {l.bodega ? NOMBRE_BODEGA[l.bodega] : "—"}
+                        {!esManual(l) && <span className="text-fg-subtle"> · auto</span>}
                       </span>
                     )}
                   </td>
@@ -644,8 +660,7 @@ function ResumenBodegas({
         Primera = Premium, Estándar, Fairtrade y Rainforest · Segunda = Corriente, Corriente C y
         Pasilla
         {!hayBaba && " · Baba (cacao fresco) entra con los ingresos registrados en el CRM"}
-        {filas.some((f) => f.bodega === null) &&
-          " · Asigna la bodega de cada lote en la columna «Bodega»"}
+        {" · La bodega sale del origen: Cauca → Cauca; Cundinamarca y Tolima → Nilo; lo demás → Bogotá. Se puede cambiar a mano en la columna «Bodega»"}
       </p>
     </Card>
   );

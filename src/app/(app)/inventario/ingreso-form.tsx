@@ -5,7 +5,7 @@ import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
 import { Field, Input, Select, Textarea } from "@/components/ui/input";
 import { useToast } from "@/components/ui/toast";
-import { BODEGAS, NOMBRE_BODEGA, NOMBRE_TIPO } from "@/lib/inventory/bodegas";
+import { BODEGAS, NOMBRE_BODEGA, NOMBRE_TIPO, bodegaPorOrigen } from "@/lib/inventory/bodegas";
 import {
   CLASES_CRM,
   NOMBRE_CLASE_CRM,
@@ -54,7 +54,8 @@ function inicial(l: InventoryLot | null): Estado {
   const base = l?.purchase_price_cop_kg != null ? l.purchase_price_cop_kg - (l.bonificacion_cop_kg ?? 0) : null;
   return {
     entry_date: l?.entry_date ?? hoy(),
-    bodega: l?.bodega ?? "",
+    // Vacía = automática; solo se precarga si alguien la eligió a mano.
+    bodega: l?.bodega_por ? (l.bodega ?? "") : "",
     proveedor_id: l?.proveedor_id ?? "",
     proveedor: l?.proveedor ?? "",
     departamento: l?.departamento ?? "",
@@ -132,7 +133,7 @@ export function IngresoForm({
     e.preventDefault();
     const datos = {
       entry_date: v.entry_date,
-      bodega: v.bodega,
+      bodega: v.bodega || null,
       proveedor_id: v.proveedor_id || null,
       proveedor: v.proveedor,
       departamento: v.departamento,
@@ -194,8 +195,10 @@ export function IngresoForm({
             <Input type="date" value={v.entry_date} onChange={(e) => set("entry_date", e.target.value)} required />
           </Field>
           <Field label="Bodega">
-            <Select value={v.bodega} onChange={(e) => set("bodega", e.target.value)} required>
-              <option value="">Elige…</option>
+            <Select value={v.bodega} onChange={(e) => set("bodega", e.target.value)}>
+              <option value="">
+                Automática · {NOMBRE_BODEGA[bodegaPorOrigen(v.departamento, null)]}
+              </option>
               {BODEGAS.map((b) => (
                 <option key={b} value={b}>
                   {NOMBRE_BODEGA[b]}

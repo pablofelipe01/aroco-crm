@@ -121,9 +121,10 @@ export async function crearIngreso(input: unknown): Promise<ResultadoCarga> {
         codigo_nuevo: code,
         clase: "",
         source: "crm",
-        bodega: p.data.bodega,
-        bodega_por: s.userId,
-        bodega_en: new Date().toISOString(),
+        // Sin bodega elegida, la base la asigna por el departamento (0114).
+        bodega: p.data.bodega ?? null,
+        bodega_por: p.data.bodega ? s.userId : null,
+        bodega_en: p.data.bodega ? new Date().toISOString() : null,
       })
       .select("id")
       .single();
@@ -143,17 +144,22 @@ export async function editarIngreso(id: string, input: unknown): Promise<Resulta
   const db = await createClient();
   const bloqueo = await cargaEnCrm(db);
   if (bloqueo) return { ok: false, error: bloqueo };
-  const { data: lote } = await db.from("inventory_lots").select("source, bodega").eq("id", id).maybeSingle();
+  const { data: lote } = await db
+    .from("inventory_lots")
+    .select("source, bodega, bodega_por")
+    .eq("id", id)
+    .maybeSingle();
   if (!lote || lote.source !== "crm") return { ok: false, error: "Ese lote no se puede editar aquí." };
 
   const { data, error } = await db
     .from("inventory_lots")
     .update({
       ...camposIngreso(p.data),
-      bodega: p.data.bodega,
-      ...(lote.bodega !== p.data.bodega
-        ? { bodega_por: s.userId, bodega_en: new Date().toISOString() }
-        : {}),
+      ...(p.data.bodega
+        ? lote.bodega !== p.data.bodega || !lote.bodega_por
+          ? { bodega: p.data.bodega, bodega_por: s.userId, bodega_en: new Date().toISOString() }
+          : {}
+        : { bodega: null, bodega_por: null, bodega_en: null }),
     })
     .eq("id", id)
     .select("id");

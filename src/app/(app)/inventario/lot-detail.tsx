@@ -195,7 +195,9 @@ export function LotDetail({
         <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
           <Meta
             label="Bodega"
-            value={esBodega(lot.bodega) ? NOMBRE_BODEGA[lot.bodega] : "Sin asignar"}
+            value={`${esBodega(lot.bodega) ? NOMBRE_BODEGA[lot.bodega] : "—"}${
+              lot.bodega_por ? "" : " (automática)"
+            }`}
           />
           {lot.proveedor && <Meta label="Proveedor" value={lot.proveedor} />}
           {(lot.departamento || lot.municipio) && (

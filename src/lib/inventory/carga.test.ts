@@ -7,11 +7,12 @@ const vacio = (): Record<ClaseCrm, number> => ({
   corriente_c: 0, pasilla: 0, organico: 0, baba: 0,
 });
 
-test("un ingreso necesita bodega y kilos de alguna clase", () => {
+test("un ingreso necesita kilos de alguna clase; la bodega puede ir automática", () => {
   const base = { entry_date: "2026-11-06", bodega: "nilo", kilos: { estandar: 0 } };
   assert.equal(ingresoSchema.safeParse(base).success, false);
   assert.equal(ingresoSchema.safeParse({ ...base, kilos: { baba: 300 } }).success, true);
   assert.equal(ingresoSchema.safeParse({ ...base, bodega: "medellin", kilos: { baba: 1 } }).success, false);
+  assert.equal(ingresoSchema.safeParse({ ...base, bodega: null, kilos: { baba: 1 } }).success, true);
   assert.equal(ingresoSchema.safeParse({ ...base, kilos: { baba: -5 } }).success, false);
 });
 

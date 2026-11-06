@@ -75,7 +75,8 @@ const clase = z.enum(CLASES_CRM);
 export const ingresoSchema = z
   .object({
     entry_date: fecha,
-    bodega: z.enum(BODEGAS, { message: "Elige la bodega." }),
+    /** Vacía = automática: la base la saca del departamento (0114). */
+    bodega: z.enum(BODEGAS).nullable().optional(),
     proveedor_id: z.string().uuid().nullable().optional(),
     proveedor: texto,
     departamento: texto,
