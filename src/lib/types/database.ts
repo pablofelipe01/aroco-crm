@@ -1482,6 +1482,11 @@ export type Database = {
       };
       dispatches: {
         Row: {
+          qty_estandar_kg: number;
+          qty_fairtrade_kg: number;
+          qty_rainforest_kg: number;
+          qty_pasilla_kg: number;
+          lote_origen_id: string | null;
           bultos: number | null;
           created_at: string;
           created_by: string | null;
@@ -1507,6 +1512,11 @@ export type Database = {
           updated_at: string;
         };
         Insert: {
+          qty_estandar_kg?: number;
+          qty_fairtrade_kg?: number;
+          qty_rainforest_kg?: number;
+          qty_pasilla_kg?: number;
+          lote_origen_id?: string | null;
           bultos?: number | null;
           created_at?: string;
           created_by?: string | null;
@@ -1532,6 +1542,11 @@ export type Database = {
           updated_at?: string;
         };
         Update: {
+          qty_estandar_kg?: number;
+          qty_fairtrade_kg?: number;
+          qty_rainforest_kg?: number;
+          qty_pasilla_kg?: number;
+          lote_origen_id?: string | null;
           bultos?: number | null;
           created_at?: string;
           created_by?: string | null;
@@ -1560,6 +1575,22 @@ export type Database = {
       };
       inventory_lots: {
         Row: {
+          bodega: string | null;
+          bodega_por: string | null;
+          bodega_en: string | null;
+          clase: string;
+          codigo_nuevo: string | null;
+          proveedor: string | null;
+          departamento: string | null;
+          municipio: string | null;
+          qty_in_estandar_kg: number;
+          qty_in_fairtrade_kg: number;
+          qty_in_rainforest_kg: number;
+          qty_in_pasilla_kg: number;
+          qty_avail_estandar_kg: number;
+          qty_avail_fairtrade_kg: number;
+          qty_avail_rainforest_kg: number;
+          qty_avail_pasilla_kg: number;
           bultos_in: number;
           bultos_out: number;
           bultos_total: number;
@@ -1606,6 +1637,22 @@ export type Database = {
           updated_at: string;
         };
         Insert: {
+          bodega?: string | null;
+          bodega_por?: string | null;
+          bodega_en?: string | null;
+          clase?: string;
+          codigo_nuevo?: string | null;
+          proveedor?: string | null;
+          departamento?: string | null;
+          municipio?: string | null;
+          qty_in_estandar_kg?: number;
+          qty_in_fairtrade_kg?: number;
+          qty_in_rainforest_kg?: number;
+          qty_in_pasilla_kg?: number;
+          qty_avail_estandar_kg?: number;
+          qty_avail_fairtrade_kg?: number;
+          qty_avail_rainforest_kg?: number;
+          qty_avail_pasilla_kg?: number;
           bultos_in?: number;
           bultos_out?: number;
           bultos_total?: number;
@@ -1652,6 +1699,22 @@ export type Database = {
           updated_at?: string;
         };
         Update: {
+          bodega?: string | null;
+          bodega_por?: string | null;
+          bodega_en?: string | null;
+          clase?: string;
+          codigo_nuevo?: string | null;
+          proveedor?: string | null;
+          departamento?: string | null;
+          municipio?: string | null;
+          qty_in_estandar_kg?: number;
+          qty_in_fairtrade_kg?: number;
+          qty_in_rainforest_kg?: number;
+          qty_in_pasilla_kg?: number;
+          qty_avail_estandar_kg?: number;
+          qty_avail_fairtrade_kg?: number;
+          qty_avail_rainforest_kg?: number;
+          qty_avail_pasilla_kg?: number;
           bultos_in?: number;
           bultos_out?: number;
           bultos_total?: number;

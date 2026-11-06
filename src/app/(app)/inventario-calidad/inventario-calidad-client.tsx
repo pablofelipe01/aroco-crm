@@ -59,7 +59,7 @@ export function InventarioCalidadClient({
     <div className="space-y-6">
       <PageHeader
         title="Inventario por calidad"
-        description="Stock actual por procedencia, ubicación y calidad — sincronizado a diario desde la hoja."
+        description="Foto del archivo de inventario anterior, congelada desde 2026-11-06."
         actions={
           <div className="flex items-center gap-2">
             {syncedAt && (
@@ -74,6 +74,15 @@ export function InventarioCalidadClient({
           </div>
         }
       />
+
+      <div className="rounded-[var(--radius-md)] border border-warn/30 bg-warn-soft px-4 py-3 text-sm text-fg">
+        Esta pestaña venía del archivo de inventario anterior, que ya no se actualiza. El disponible
+        por calidad, bodega y tipo está ahora en{" "}
+        <a href="/inventario" className="font-medium text-accent underline-offset-2 hover:underline">
+          Inventario
+        </a>
+        .
+      </div>
 
       {rows.length === 0 ? (
         <EmptyState

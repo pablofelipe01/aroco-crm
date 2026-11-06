@@ -18,6 +18,12 @@ import { CLASIFICACIONES } from "@/lib/schemas/inventory";
 import type { DispatchWithLinks } from "./page";
 import { DispatchTrace } from "./dispatch-trace";
 import { createDispatch, deleteDispatch } from "./actions";
+import { BODEGAS, NOMBRE_BODEGA, esBodega, type Bodega } from "@/lib/inventory/bodegas";
+
+/** Bodega de un despacho: la del lote del archivo del que salió. */
+function bodegaDe(d: DispatchWithLinks): Bodega | null {
+  return esBodega(d.origen?.bodega) ? d.origen.bodega : null;
+}
 
 interface FormValues {
   dispatch_date: string;
@@ -66,6 +72,7 @@ export function DespachosClient({
   const [destino, setDestino] = React.useState("");
   const [desde, setDesde] = React.useState("");
   const [hasta, setHasta] = React.useState("");
+  const [bodega, setBodega] = React.useState("");
   const { register, handleSubmit, reset, formState } = useForm<FormValues>({
     defaultValues: EMPTY,
   });
@@ -93,18 +100,20 @@ export function DespachosClient({
       )
         return false;
       if (destino && d.destination !== destino) return false;
+      if (bodega === "sin" ? bodegaDe(d) !== null : bodega && bodegaDe(d) !== bodega) return false;
       if (desde && (d.dispatch_date ?? "") < desde) return false;
       if (hasta && (d.dispatch_date ?? "") > hasta) return false;
       return true;
     });
-  }, [initialDispatches, query, destino, desde, hasta]);
+  }, [initialDispatches, query, destino, desde, hasta, bodega]);
 
-  const hasFilters = Boolean(query || destino || desde || hasta);
+  const hasFilters = Boolean(query || destino || desde || hasta || bodega);
   function clearFilters() {
     setQuery("");
     setDestino("");
     setDesde("");
     setHasta("");
+    setBodega("");
   }
 
   const onSubmit = handleSubmit(async (values) => {
@@ -178,6 +187,17 @@ export function DespachosClient({
             ))}
           </Select>
         </Field>
+        <Field label="Bodega" className="w-full sm:w-36">
+          <Select value={bodega} onChange={(e) => setBodega(e.target.value)}>
+            <option value="">Todas</option>
+            {BODEGAS.map((b) => (
+              <option key={b} value={b}>
+                {NOMBRE_BODEGA[b]}
+              </option>
+            ))}
+            <option value="sin">Sin asignar</option>
+          </Select>
+        </Field>
         <Field label="Desde" className="w-36">
           <Input type="date" value={desde} onChange={(e) => setDesde(e.target.value)} />
         </Field>
@@ -220,6 +240,7 @@ export function DespachosClient({
               </div>
               <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-fg-subtle">
                 <span className="font-mono">{formatDate(d.dispatch_date)}</span>
+                {bodegaDe(d) && <span>{NOMBRE_BODEGA[bodegaDe(d)!]}</span>}
                 {d.remision_salida && <span className="font-mono">Rem. {d.remision_salida}</span>}
                 {d.purchase_price_cop_kg != null && (
                   <span className="font-mono">{formatCOP(d.purchase_price_cop_kg)}/kg</span>
@@ -257,7 +278,7 @@ export function DespachosClient({
             fija al bajar (con overflow-x, un sticky no se pega al scroll de la
             página). */}
         <ScrollFijo className="hidden rounded-[var(--radius-lg)] border border-border bg-surface sm:block">
-          <table className="w-full min-w-[760px] text-sm">
+          <table className="w-full min-w-[840px] text-sm">
             <thead>
               {/* Cada th fijo con fondo; el borde va como sombra porque el de la
                   fila no viaja con un th fijo. */}
@@ -266,6 +287,7 @@ export function DespachosClient({
                 <th className="px-4 py-3 text-left font-medium">Remisión</th>
                 <th className="px-4 py-3 text-left font-medium">Destino</th>
                 <th className="px-4 py-3 text-left font-medium">Procedencia / Lote</th>
+                <th className="px-4 py-3 text-left font-medium">Bodega</th>
                 <th className="px-4 py-3 text-right font-medium">Cantidad</th>
                 <th className="px-4 py-3 text-right font-medium">Precio compra</th>
                 <th className="px-4 py-3" />
@@ -292,6 +314,9 @@ export function DespachosClient({
                         {d.lot.code}
                       </Badge>
                     )}
+                  </td>
+                  <td className="px-4 py-3 text-xs text-fg-muted">
+                    {bodegaDe(d) ? NOMBRE_BODEGA[bodegaDe(d)!] : "—"}
                   </td>
                   <td className="px-4 py-3 text-right font-mono tnum font-medium text-fg">
                     {formatKg(d.qty_kg)}

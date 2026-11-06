@@ -146,3 +146,35 @@ export function campoSalida(
   }
   return -1;
 }
+
+/**
+ * Índice de la primera columna cuyo encabezado EMPIEZA por alguna de las
+ * alternativas. Para los encabezados del archivo de 2026-11, que traen la
+ * instrucción pegada al nombre («Cantidad Teórica OC (kg) (CANTIDAD REPORTADA
+ * EN OC)», «CANTIDAD MERMA (incluye selección, movimiento…)»): exigir el texto
+ * completo rompería el sync la próxima vez que alguien reescriba la nota.
+ * Gana la columna más a la izquierda.
+ */
+export function columnaPrefijo(mapa: MapaColumnas, ...alternativas: string[]): number {
+  for (const alt of alternativas) {
+    const p = normalizarEncabezado(alt);
+    let mejor = -1;
+    for (const [clave, i] of mapa.indice) {
+      if (clave.startsWith(p) && (mejor < 0 || i < mejor)) mejor = i;
+    }
+    if (mejor >= 0) return mejor;
+  }
+  throw new ColumnaFaltante(
+    `No se encontró ninguna columna que empiece por «${alternativas[0]}». ` +
+      `¿Le cambiaron el encabezado? Alternativas probadas: ${alternativas.join(" / ")}`,
+  );
+}
+
+/** Igual que `columnaPrefijo`, pero devuelve -1 cuando la columna es opcional. */
+export function columnaPrefijoOpcional(mapa: MapaColumnas, ...alternativas: string[]): number {
+  try {
+    return columnaPrefijo(mapa, ...alternativas);
+  } catch {
+    return -1;
+  }
+}

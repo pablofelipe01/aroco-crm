@@ -2,21 +2,36 @@
 
 import * as React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Plus, Search, Boxes, Package, Layers } from "lucide-react";
+import { Plus, Search, Boxes, Warehouse } from "lucide-react";
 import { ScrollFijo } from "@/components/ui/scroll-fijo";
 import { BarraFija } from "@/components/ui/scroll-efectos";
 import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { StatCard } from "@/components/ui/stat-card";
+import { Select } from "@/components/ui/input";
+import { Card, CardHeader, CardTitle } from "@/components/ui/card";
+import { useToast } from "@/components/ui/toast";
 import { EmptyState } from "@/components/ui/empty-state";
-import { staggerContainer } from "@/lib/motion";
-import { motion } from "framer-motion";
-import { formatDate, formatNumber } from "@/lib/utils";
+import { cn, formatDate, formatNumber } from "@/lib/utils";
+import {
+  BODEGAS,
+  NOMBRE_BODEGA,
+  NOMBRE_TIPO,
+  TIPOS,
+  disponiblePorTipo,
+  esBodega,
+  resumenPorBodega,
+  type Bodega,
+  type FilaResumen,
+} from "@/lib/inventory/bodegas";
 import type { InventoryLot } from "@/lib/types/database";
 import { LotDetail } from "./lot-detail";
 import { LotForm } from "./lot-form";
+import { asignarBodega } from "./actions";
+
+/** Qué bodega se está mirando: todas (consolidado), una, o los sin asignar. */
+type Vista = "todas" | Bodega | "sin";
 
 export function InventarioClient({
   initialLots,
@@ -33,6 +48,25 @@ export function InventarioClient({
   const [selected, setSelected] = React.useState<InventoryLot | null>(null);
   const [formOpen, setFormOpen] = React.useState(false);
   const [editing, setEditing] = React.useState<InventoryLot | null>(null);
+  const [vista, setVista] = React.useState<Vista>("todas");
+  const { toast } = useToast();
+  // Bodega elegida en esta pantalla mientras el servidor confirma. Va atada a
+  // la lista que la originó: cuando llegan datos frescos, mandan los datos.
+  const [cambios, setCambios] = React.useState<{
+    base: InventoryLot[];
+    m: Record<string, Bodega | null>;
+  }>({ base: initialLots, m: {} });
+  const pendiente = React.useMemo(
+    () => (cambios.base === initialLots ? cambios.m : {}),
+    [cambios, initialLots],
+  );
+  const bodegaDe = React.useCallback(
+    (l: InventoryLot): Bodega | null =>
+      l.id in pendiente ? pendiente[l.id] : esBodega(l.bodega) ? l.bodega : null,
+    [pendiente],
+  );
+  const setPendiente = (f: (m: Record<string, Bodega | null>) => Record<string, Bodega | null>) =>
+    setCambios((c) => ({ base: initialLots, m: f(c.base === initialLots ? c.m : {}) }));
 
   // Deep link from the command palette (?lot=<id>).
   const searchParams = useSearchParams();
@@ -40,7 +74,6 @@ export function InventarioClient({
     const lotId = searchParams.get("lot");
     if (!lotId) return;
     const l = initialLots.find((x) => x.id === lotId);
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- open from deep link
     if (l) setSelected(l);
     router.replace("/inventario");
   }, [searchParams, initialLots, router]);
@@ -51,22 +84,51 @@ export function InventarioClient({
     ? initialLots.find((l) => l.id === selectedId) ?? null
     : null;
 
+  const lotes = React.useMemo(
+    () => initialLots.map((l) => ({ ...l, bodega: bodegaDe(l) })),
+    [initialLots, bodegaDe],
+  );
+  const resumen = React.useMemo(() => resumenPorBodega(lotes), [lotes]);
+  const sinAsignar = resumen.filas.find((f) => f.bodega === null)?.lotes ?? 0;
+
+  const enVista = React.useMemo(
+    () =>
+      lotes.filter((l) =>
+        vista === "todas" ? true : vista === "sin" ? l.bodega === null : l.bodega === vista,
+      ),
+    [lotes, vista],
+  );
   const totals = React.useMemo(() => {
-    const available = initialLots.reduce((s, l) => s + (l.qty_available_kg || 0), 0);
-    const withStock = initialLots.filter((l) => l.qty_available_kg > 0).length;
-    return { available, withStock, count: initialLots.length };
-  }, [initialLots]);
+    const withStock = enVista.filter((l) => l.qty_available_kg > 0).length;
+    return { withStock, count: enVista.length };
+  }, [enVista]);
+
+  async function cambiarBodega(l: InventoryLot, valor: string) {
+    const bodega = esBodega(valor) ? valor : null;
+    setPendiente((p) => ({ ...p, [l.id]: bodega }));
+    const res = await asignarBodega([l.id], bodega);
+    if (!res.ok) {
+      setPendiente((p) => {
+        const { [l.id]: _, ...resto } = p;
+        void _;
+        return resto;
+      });
+      toast({ tone: "error", title: "No se pudo cambiar la bodega", description: res.error });
+      return;
+    }
+    router.refresh();
+  }
 
   const filtered = React.useMemo(() => {
     const q = query.trim().toLowerCase();
-    return initialLots.filter((l) => {
+    return enVista.filter((l) => {
       if (onlyAvailable && l.qty_available_kg <= 0) return false;
       if (!q) return true;
-      return `${l.code} ${l.origin ?? ""} ${l.quality ?? ""} ${l.remision ?? ""} ${l.odc ?? ""}`
+      return `${l.code} ${l.codigo_nuevo ?? ""} ${l.proveedor ?? ""} ${l.origin ?? ""} ${l.quality ?? ""} ${l.remision ?? ""} ${l.recepcion ?? ""} ${l.odc ?? ""}`
         .toLowerCase()
         .includes(q);
     });
-  }, [initialLots, query, onlyAvailable]);
+  }, [enVista, query, onlyAvailable]);
 
   const hiddenByFilter = onlyAvailable ? totals.count - totals.withStock : 0;
 
@@ -74,7 +136,7 @@ export function InventarioClient({
     <div className="space-y-6">
       <PageHeader
         title="Inventario"
-        description="Lotes en bodega por procedencia y ledger de movimientos."
+        description="Disponible por bodega (Cauca, Bogotá, Nilo) y por tipo de cacao, lote por lote."
         actions={
           canWrite && (
             <Button
@@ -91,28 +153,46 @@ export function InventarioClient({
         }
       />
 
-      <motion.div
-        variants={staggerContainer}
-        initial="hidden"
-        animate="show"
-        className="grid grid-cols-1 gap-4 sm:grid-cols-3"
-      >
-        <StatCard label="Disponible total" value={totals.available} suffix=" kg" icon={Boxes} />
-        <StatCard label="Lotes con stock" value={totals.withStock} icon={Package} />
-        <StatCard label="Lotes totales" value={totals.count} icon={Layers} />
-      </motion.div>
+      <ResumenBodegas
+        filas={resumen.filas}
+        total={resumen.total}
+        vista={vista}
+        onVista={setVista}
+      />
 
       {/* Filtros fijos arriba al bajar (revisión del 2026-10-30): el título y
           los totales se van, los filtros y los encabezados de la tabla quedan.
           Fondo opaco. ScrollFijo la encuentra por data-fijo-encima y se para
           bajo ella. En celular no se fija. */}
       <BarraFija className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap gap-1" role="tablist" aria-label="Bodega">
+          {(["todas", ...BODEGAS, "sin"] as Vista[]).map((v) => {
+            if (v === "sin" && sinAsignar === 0) return null;
+            return (
+              <button
+                key={v}
+                role="tab"
+                aria-selected={vista === v}
+                onClick={() => setVista(v)}
+                className={cn(
+                  "rounded-full px-3 py-1 text-xs font-medium transition-colors",
+                  vista === v
+                    ? "bg-accent text-accent-fg"
+                    : "text-fg-muted hover:bg-bg-subtle hover:text-fg",
+                )}
+              >
+                {nombreVista(v)}
+                {v === "sin" && <span className="ml-1 font-mono tnum opacity-70">{sinAsignar}</span>}
+              </button>
+            );
+          })}
+        </div>
         <div className="relative max-w-xs flex-1">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-fg-subtle" />
           <Input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Buscar código, remisión, ODC…"
+            placeholder="Buscar código, proveedor, remisión…"
             className="pl-9"
           />
         </div>
@@ -135,7 +215,11 @@ export function InventarioClient({
       {filtered.length === 0 ? (
         <EmptyState
           icon={<Boxes className="h-6 w-6" />}
-          title={onlyAvailable ? "Sin lotes con saldo" : "Sin lotes"}
+          title={
+            onlyAvailable
+              ? `Sin lotes con saldo${vista === "todas" ? "" : ` en ${nombreVista(vista)}`}`
+              : "Sin lotes"
+          }
           description={
             onlyAvailable
               ? "Ningún lote coincide y tiene saldo en bodega."
@@ -161,14 +245,18 @@ export function InventarioClient({
               >
                 <div className="flex items-start justify-between gap-2">
                   <span className="min-w-0 flex-1 break-all font-mono text-xs text-fg">
-                    {l.code}
+                    {l.codigo_nuevo ?? l.code}
                   </span>
+                  <Badge tone={l.bodega ? "neutral" : "warn"}>
+                    {l.bodega ? NOMBRE_BODEGA[l.bodega] : "sin bodega"}
+                  </Badge>
                   {l.needs_review && <Badge tone="warn">verificar</Badge>}
                 </div>
                 <div className="flex items-end justify-between gap-2">
                   <div className="text-xs text-fg-subtle">
                     {l.entry_date ? formatDate(l.entry_date) : "—"}
                     {l.quality ? ` · ${l.quality}` : ""}
+                    {l.proveedor ? ` · ${l.proveedor}` : ""}
                     <div className="mt-0.5 font-mono">
                       In {formatNumber(l.qty_in_kg)} · Out {formatNumber(l.qty_out_kg)}
                     </div>
@@ -191,18 +279,20 @@ export function InventarioClient({
             fija al bajar (con overflow-x, un sticky no se pega al scroll de la
             página). */}
         <ScrollFijo className="hidden rounded-[var(--radius-lg)] border border-border bg-surface sm:block">
-          <table className="w-full min-w-[680px] text-sm">
+          <table className="w-full min-w-[860px] text-sm">
             <thead>
               {/* Cada th fijo con fondo; el borde va como sombra porque el de la
                   fila no viaja con un th fijo. */}
               <tr className="text-xs uppercase tracking-wide text-fg-subtle [&>th]:sticky [&>th]:top-0 [&>th]:z-10 [&>th]:bg-surface [&>th]:shadow-[inset_0_-1px_0_var(--color-border)]">
                 <th className="px-4 py-3 text-left font-medium">Código</th>
                 <th className="px-4 py-3 text-left font-medium">Ingreso</th>
+                <th className="px-4 py-3 text-left font-medium">Proveedor</th>
                 <th className="px-4 py-3 text-left font-medium">Remisión</th>
                 <th className="px-4 py-3 text-right font-medium">Ingresada</th>
                 <th className="px-4 py-3 text-right font-medium">Salida</th>
                 <th className="px-4 py-3 text-right font-medium">Disponible</th>
                 <th className="px-4 py-3 text-left font-medium">Clasificación</th>
+                <th className="px-4 py-3 text-left font-medium">Bodega</th>
               </tr>
             </thead>
             <tbody>
@@ -213,7 +303,9 @@ export function InventarioClient({
                   className="cursor-pointer border-b border-border last:border-0 hover:bg-bg-subtle/50"
                 >
                   <td className="px-4 py-3">
-                    <span className="font-mono text-xs text-fg">{l.code}</span>
+                    <span className="font-mono text-xs text-fg" title={l.code}>
+                      {l.codigo_nuevo ?? l.code}
+                    </span>
                     {l.needs_review && (
                       <Badge tone="warn" className="ml-2 align-middle">
                         verificar
@@ -223,6 +315,7 @@ export function InventarioClient({
                   <td className="px-4 py-3 font-mono text-xs text-fg-subtle">
                     {l.entry_date ? formatDate(l.entry_date) : "—"}
                   </td>
+                  <td className="px-4 py-3 text-xs text-fg-muted">{l.proveedor ?? "—"}</td>
                   <td className="px-4 py-3 font-mono text-xs text-fg-subtle">
                     {l.remision ?? "—"}
                   </td>
@@ -238,12 +331,36 @@ export function InventarioClient({
                   <td className="px-4 py-3 text-fg-muted">
                     <span className="inline-flex items-center gap-2">
                       {l.quality ?? "—"}
+                      {tipoDeLote(l) && (
+                        <span className="text-xs text-fg-subtle">· {tipoDeLote(l)}</span>
+                      )}
                       {l.cadmio && (
                         <Badge tone={/alto/i.test(l.cadmio) ? "danger" : "neutral"}>
                           Cd {l.cadmio.toLowerCase()}
                         </Badge>
                       )}
                     </span>
+                  </td>
+                  <td className="px-4 py-2" onClick={(e) => e.stopPropagation()}>
+                    {canWrite ? (
+                      <Select
+                        aria-label={`Bodega de ${l.codigo_nuevo ?? l.code}`}
+                        value={l.bodega ?? ""}
+                        onChange={(e) => void cambiarBodega(l, e.target.value)}
+                        className={cn("h-8 w-32 text-xs", !l.bodega && "text-warn")}
+                      >
+                        <option value="">Sin asignar</option>
+                        {BODEGAS.map((b) => (
+                          <option key={b} value={b}>
+                            {NOMBRE_BODEGA[b]}
+                          </option>
+                        ))}
+                      </Select>
+                    ) : (
+                      <span className={cn("text-xs", l.bodega ? "text-fg-muted" : "text-warn")}>
+                        {l.bodega ? NOMBRE_BODEGA[l.bodega] : "Sin asignar"}
+                      </span>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -276,5 +393,131 @@ export function InventarioClient({
         }}
       />
     </div>
+  );
+}
+
+function nombreVista(v: Vista): string {
+  return v === "todas" ? "Consolidado" : v === "sin" ? "Sin asignar" : NOMBRE_BODEGA[v];
+}
+
+/** «Primera», «Segunda»… del disponible del lote (o de lo ingresado si ya salió). */
+function tipoDeLote(l: InventoryLot): string | null {
+  const t = disponiblePorTipo(l);
+  const mayor = TIPOS.reduce((a, b) => (t[b] > t[a] ? b : a));
+  if (t[mayor] > 0) return NOMBRE_TIPO[mayor];
+  const entra = disponiblePorTipo({
+    qty_avail_premium_kg: l.qty_in_premium_kg,
+    qty_avail_estandar_kg: l.qty_in_estandar_kg,
+    qty_avail_corriente_kg: l.qty_in_corriente_kg,
+    qty_avail_corriente_c_kg: l.qty_in_corriente_c_kg,
+    qty_avail_fairtrade_kg: l.qty_in_fairtrade_kg,
+    qty_avail_rainforest_kg: l.qty_in_rainforest_kg,
+    qty_avail_organico_kg: l.qty_in_organico_kg,
+    qty_avail_pasilla_kg: l.qty_in_pasilla_kg,
+  });
+  const m2 = TIPOS.reduce((a, b) => (entra[b] > entra[a] ? b : a));
+  return entra[m2] > 0 ? NOMBRE_TIPO[m2] : null;
+}
+
+/**
+ * Disponible por bodega × tipo. Es la vista consolidada y, a la vez, el
+ * selector: tocar una fila filtra los lotes de esa bodega.
+ */
+function ResumenBodegas({
+  filas,
+  total,
+  vista,
+  onVista,
+}: {
+  filas: FilaResumen[];
+  total: FilaResumen;
+  vista: Vista;
+  onVista: (v: Vista) => void;
+}) {
+  const hayBaba = total.tipos.baba > 0;
+  const kg = (v: number) => (Math.abs(v) < 0.5 ? "—" : formatNumber(v));
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Warehouse className="h-4 w-4 text-fg-subtle" />
+          Disponible por bodega
+        </CardTitle>
+        <span className="font-mono text-xs text-fg-subtle tnum">kg</span>
+      </CardHeader>
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[520px] text-sm">
+          <thead>
+            <tr className="border-b border-border text-xs uppercase tracking-wide text-fg-subtle">
+              <th className="px-5 py-2.5 text-left font-medium">Bodega</th>
+              {TIPOS.map((t) => (
+                <th key={t} className="px-4 py-2.5 text-right font-medium">
+                  {NOMBRE_TIPO[t]}
+                </th>
+              ))}
+              <th className="px-5 py-2.5 text-right font-medium">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filas.map((f) => {
+              const v: Vista = f.bodega ?? "sin";
+              const activa = vista === v;
+              return (
+                <tr
+                  key={v}
+                  onClick={() => onVista(activa ? "todas" : v)}
+                  aria-selected={activa}
+                  className={cn(
+                    "cursor-pointer border-b border-border transition-colors hover:bg-bg-subtle/50",
+                    activa && "bg-accent-soft/40",
+                  )}
+                >
+                  <td className="px-5 py-2.5">
+                    <span className={cn("font-medium", f.bodega ? "text-fg" : "text-warn")}>
+                      {nombreVista(v)}
+                    </span>
+                    <span className="ml-2 font-mono text-xs text-fg-subtle tnum">
+                      {f.lotes} {f.lotes === 1 ? "lote" : "lotes"}
+                    </span>
+                  </td>
+                  {TIPOS.map((t) => (
+                    <td key={t} className="px-4 py-2.5 text-right font-mono tnum text-fg-muted">
+                      {kg(f.tipos[t])}
+                    </td>
+                  ))}
+                  <td className="px-5 py-2.5 text-right font-mono font-semibold tnum text-fg">
+                    {kg(f.total)}
+                  </td>
+                </tr>
+              );
+            })}
+            <tr
+              onClick={() => onVista("todas")}
+              className={cn(
+                "cursor-pointer bg-bg-subtle/40 transition-colors hover:bg-bg-subtle/70",
+                vista === "todas" && "bg-accent-soft/40",
+              )}
+            >
+              <td className="px-5 py-3 font-semibold text-fg">Consolidado</td>
+              {TIPOS.map((t) => (
+                <td key={t} className="px-4 py-3 text-right font-mono font-semibold tnum text-fg">
+                  {kg(total.tipos[t])}
+                </td>
+              ))}
+              <td className="px-5 py-3 text-right font-mono text-base font-semibold tnum text-fg">
+                {kg(total.total)}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p className="border-t border-border px-5 py-2.5 text-xs text-fg-subtle">
+        Primera = Premium, Estándar, Fairtrade y Rainforest · Segunda = Corriente, Corriente C y
+        Pasilla
+        {!hayBaba && " · Baba entra cuando se registren ingresos desde el CRM"}
+        {filas.some((f) => f.bodega === null) &&
+          " · Asigna la bodega de cada lote en la columna «Bodega»"}
+      </p>
+    </Card>
   );
 }

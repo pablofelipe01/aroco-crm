@@ -5,11 +5,15 @@ import {
   parseEsDate,
   parseCsv,
   parseInventorySheet,
-  dominantQuality,
+  claseDominante,
+  CLASES,
+  type PorClase,
 } from "./sheet-sync";
-import { construirMapa, columna, ColumnaFaltante } from "./sheet-columns";
+import { construirMapa, columna, columnaPrefijo, ColumnaFaltante } from "./sheet-columns";
+import { readFileSync } from "node:fs";
 
 test("parseEsDate handles Spanish abbreviations", () => {
+  assert.equal(parseEsDate("23-sept-2025"), "2025-09-23");
   assert.equal(parseEsDate("5-may-2025"), "2025-05-05");
   assert.equal(parseEsDate("26-may-2025"), "2025-05-26");
   assert.equal(parseEsDate("1-ago-2025"), "2025-08-01");
@@ -33,10 +37,12 @@ test("parseCsv keeps quoted commas as one field", () => {
   assert.deepEqual(rows[1], ["1", "2", "3"]);
 });
 
-test("dominantQuality picks the classification with most kilos", () => {
-  assert.equal(dominantQuality({ premium: 0, corriente: 0, corrienteC: 0, organico: 200 }), "Orgánico");
-  assert.equal(dominantQuality({ premium: 100, corriente: 0, corrienteC: 40, organico: 0 }), "Premium");
-  assert.equal(dominantQuality({ premium: 0, corriente: 0, corrienteC: 0, organico: 0 }), null);
+const cero = (): PorClase => Object.fromEntries(CLASES.map((c) => [c, 0])) as PorClase;
+
+test("claseDominante elige la clasificación con más kilos", () => {
+  assert.equal(claseDominante({ ...cero(), organico: 200 }), "organico");
+  assert.equal(claseDominante({ ...cero(), premium: 100, corriente_c: 40 }), "premium");
+  assert.equal(claseDominante(cero()), "");
 });
 
 // ── Localización de columnas por encabezado ─────────────────────────────────
@@ -61,211 +67,114 @@ test("columna lanza cuando el encabezado no existe", () => {
   assert.throws(() => columna(mapa, "CANTIDAD SALIDA"), ColumnaFaltante);
 });
 
-// ── Hoja completa ───────────────────────────────────────────────────────────
+test("columnaPrefijo encuentra encabezados con la instrucción pegada", () => {
+  const mapa = construirMapa(
+    ["CANTIDAD MERMA (incluye selección, movimiento y almacenamiento) (KG)"],
+    [""],
+  );
+  assert.equal(columnaPrefijo(mapa, "CANTIDAD MERMA"), 0);
+  assert.throws(() => columnaPrefijo(mapa, "CANTIDAD SALIDAS"), ColumnaFaltante);
+});
 
-/**
- * Reconstruye la hoja real: fila en blanco, grupos macro, subgrupos y nombres
- * finales. `extra` inserta columnas nuevas para comprobar que el parser las
- * ignora en vez de descolocarse — que es justo lo que rompió el sync dos veces.
- */
-function hoja({
-  extra = false,
-  recepciones = null,
-}: {
-  extra?: boolean;
-  /**
-   * Dos filas del MISMO lote y la MISMA remisión, cada una con su recepción:
-   * el caso que la 0061 hizo posible y que dejó el sync caído seis días.
-   */
-  recepciones?: [string, string] | null;
-} = {}) {
-  const sub: string[] = [];
-  const hojaFila: string[] = [];
-  const push = (s: string, h = "") => {
-    sub.push(s);
-    hojaFila.push(h);
-  };
+// ── Archivo de 2026-11 ──────────────────────────────────────────────────────
+//
+// El fixture son filas LITERALES del export CSV (encabezados + 11 filas con código y TOTALES),
+// no inventadas: suponer el formato ya costó dos fallos silenciosos.
 
-  push("Fecha");
-  push("# Remision");
-  push("# Recepcion");
-  push("CODIGO  DE PROCEDENCIA  Y/O DESTINO");
-  push("CANTIDAD INGRESADA (KG)");
-  push("CANTIDAD SALIDA");
-  push("CADMIO");
-  if (extra) push("SELECION SI/NO"); // la columna que insertaron de verdad
-  push("CANTIDAD INGRESADA", "PREMIUM");
-  push("", "CORRIENTE");
-  push("", "CORRIENTE C");
-  push("", "ORGANICO");
-  push("CANTIDAD DISPONIBLE EN BODEGA", "PREMIUM");
-  push("", "CORRIENTE");
-  push("", "CORRIENTE C");
-  push("", "ORGANICO");
-  const salidaEn = sub.length;
-  for (const n of [1, 2]) {
-    push(`SALIDA ${n}`, "FECHA");
-    push("", "PREMIUM");
-    push("", "CORRIENTE");
-    push("", "CORRIENTE C");
-    push("", n === 1 ? "ORGANNICO" : "ORGANICO"); // errata real de la hoja
-    push("", "BULTOS");
-    push("", "EMPRESA");
-    push("", "REMISION SALIDA");
+const FIXTURE = readFileSync(
+  new URL("./fixtures/inventario-2026-11.csv", import.meta.url),
+  "utf8",
+);
+
+test("lee lotes con sus ocho clasificaciones y el disponible del archivo", () => {
+  const { lots, rowsRead } = parseInventorySheet(FIXTURE);
+  // 11 filas con código; las dos órdenes de Chocomet sin llegar no son lotes.
+  assert.equal(rowsRead, 11);
+  assert.equal(lots.length, 9);
+
+  const santander = lots.find((l) => l.remision === "0230")!;
+  assert.equal(santander.clase, "estandar");
+  assert.equal(santander.quality, "Estándar");
+  assert.equal(santander.proveedor, "LOS SAUCES");
+  assert.equal(santander.departamento, "SANTANDER");
+  assert.equal(santander.code, "CO-SANTANDER -LEBRIJA -4112026");
+  assert.equal(santander.entry_date, "2026-11-04");
+  assert.equal(santander.qty_in_kg, 9560.3);
+  assert.equal(santander.qty_avail_estandar_kg, 9510.4);
+  assert.equal(santander.purchase_price_cop_kg, 15450);
+  assert.equal(santander.odc, "98");
+});
+
+test("disponible = ingresos − salidas − merma, como el trigger de la base", () => {
+  const { lots } = parseInventorySheet(FIXTURE);
+  for (const l of lots) {
+    const porClase =
+      l.qty_avail_premium_kg + l.qty_avail_estandar_kg + l.qty_avail_corriente_kg +
+      l.qty_avail_corriente_c_kg + l.qty_avail_fairtrade_kg + l.qty_avail_rainforest_kg +
+      l.qty_avail_organico_kg + l.qty_avail_pasilla_kg;
+    const calculado = l.qty_in_kg - l.qty_out_kg - l.merma_kg;
+    assert.ok(Math.abs(calculado - porClase) < 0.05, `${l.code}: ${calculado} vs ${porClase}`);
   }
+});
 
-  const fila = (v: Record<number, string>) => {
-    const out = new Array(sub.length).fill("");
-    for (const [i, x] of Object.entries(v)) out[Number(i)] = x;
-    return out.map((f) => (f.includes(",") ? `"${f}"` : f)).join(",");
-  };
+test("una recepción partida en dos filas por calidad da dos lotes distintos", () => {
+  const { lots } = parseInventorySheet(FIXTURE);
+  const partes = lots.filter((l) => l.code === "CO-CUN-NIL-230925");
+  assert.deepEqual(partes.map((l) => l.clase).sort(), ["estandar", "organico"]);
+  const cisca = lots.filter((l) => l.code === "COL-CAU-SAN-190926( CISCA RUTAS 2)");
+  assert.deepEqual(cisca.map((l) => l.clase).sort(), ["estandar", "pasilla"]);
+});
 
-  const off = extra ? 1 : 0;
-  const csv = [
-    "",
-    ",,,,ENTRADAS",
-    sub.map((s) => (s.includes(",") ? `"${s}"` : s)).join(","),
-    hojaFila.map((s) => (s.includes(",") ? `"${s}"` : s)).join(","),
-    fila({
-      0: "5-may-2025",
-      1: "2007",
-      3: "CO-ANT-URA-050525",
-      4: "200",
-      5: "3",
-      6: "ALTO",
-      [10 + off]: "200", // ingresada · orgánico
-      [14 + off]: "197", // disponible · orgánico
-      [salidaEn]: "8-jul-2025",
-      [salidaEn + 4]: "2",
-      [salidaEn + 6]: "MACRORUEDA",
-      [salidaEn + 7]: "2031",
-      [salidaEn + 12]: "1", // salida 2 · orgánico, sin fecha
-      [salidaEn + 14]: "MUESTRAS",
-    }),
-    fila({ 4: "201136,03", 5: "TOTAL" }), // fila TOTAL, sin código
-  ];
-  if (recepciones) {
-    // El mismo código y la misma remisión, dos recepciones, una salida cada una.
-    csv.splice(
-      4,
-      1,
-      ...recepciones.map((rec, i) =>
-        fila({
-          0: "21-ago-2026",
-          1: "24",
-          2: rec,
-          3: "COL-MET-GRA-210826(DELEITE)",
-          4: i === 0 ? "4499,8" : "50",
-          [10 + off]: i === 0 ? "4499,8" : "50",
-          [salidaEn]: i === 0 ? "27-ago-2026" : "21-ago-2026",
-          [salidaEn + 2]: i === 0 ? "4499,8" : "50",
-          [salidaEn + 6]: i === 0 ? "CASA LUKER" : "TIEMPO CHOCOLATE",
-          [salidaEn + 7]: i === 0 ? "2145" : "2144",
-        }),
-      ),
-    );
+test("una celda #VALUE! no tumba la fila", () => {
+  const { lots } = parseInventorySheet(FIXTURE);
+  const finca = lots.find((l) => l.code === "COL-CUN-NIL-220926(FINCA)" && l.clase === "estandar")!;
+  assert.equal(finca.qty_in_kg, 74);
+  assert.ok(Math.abs(finca.qty_in_kg - finca.qty_out_kg - finca.merma_kg) < 0.01);
+});
+
+test("las salidas suman lo mismo que descuentan los lotes", () => {
+  const { lots, dispatches } = parseInventorySheet(FIXTURE);
+  const salidas = dispatches.reduce((s, d) => s + d.qty_kg, 0);
+  const out = lots.reduce((s, l) => s + l.qty_out_kg, 0);
+  assert.ok(Math.abs(salidas - out) < 0.01, `${salidas} vs ${out}`);
+  const luker = dispatches.find((d) => d.remision_salida === "2010")!;
+  assert.equal(luker.destination, "CASA LUKER");
+  assert.equal(luker.dispatch_date, "2025-05-17");
+});
+
+test("la clave del despacho es la del lote más la casilla de salida", () => {
+  const { lots, dispatches } = parseInventorySheet(FIXTURE);
+  const clavesLote = new Set(lots.map((l) => `${l.code}#${l.remision ?? ""}#${l.recepcion ?? ""}#${l.clase}`));
+  for (const d of dispatches) {
+    const lote = d.source_key.replace(/#s\d+$/, "");
+    assert.ok(clavesLote.has(lote), `${d.source_key} no corresponde a ningún lote`);
+    assert.equal(lote, `${d.lot_code}#${d.lot_remision ?? ""}#${d.lot_recepcion ?? ""}#${d.lot_clase}`);
   }
-  return csv.join("\n");
-}
-
-test("parseInventorySheet lee lotes y salidas por nombre de columna", () => {
-  const { lots, dispatches, rowsRead } = parseInventorySheet(hoja());
-  assert.equal(rowsRead, 1);
-  assert.equal(lots.length, 1);
-
-  const l = lots[0];
-  assert.equal(l.code, "CO-ANT-URA-050525");
-  assert.equal(l.entry_date, "2025-05-05");
-  assert.equal(l.qty_in_kg, 200);
-  assert.equal(l.qty_out_kg, 3);
-  assert.equal(l.cadmio, "ALTO");
-  assert.equal(l.qty_in_organico_kg, 200);
-  assert.equal(l.qty_avail_organico_kg, 197);
-  assert.equal(l.quality, "Orgánico");
-
-  assert.equal(dispatches.length, 2);
-  assert.equal(dispatches[0].dispatch_date, "2025-07-08");
-  assert.equal(dispatches[0].destination, "MACRORUEDA");
-  assert.equal(dispatches[0].qty_kg, 2);
-  assert.equal(dispatches[0].remision_salida, "2031");
-  // Salida sin fecha: null en vez de inventarle un día.
-  assert.equal(dispatches[1].dispatch_date, null);
-  assert.equal(dispatches[1].destination, "MUESTRAS");
+  assert.equal(new Set(dispatches.map((d) => d.source_key)).size, dispatches.length);
 });
 
 test("una columna nueva en medio no descoloca el resto", () => {
-  // Es el fallo que rompió el sync dos veces: con índices fijos, insertar
-  // "SELECION SI/NO" corría todo lo de la derecha una casilla.
-  const sin = parseInventorySheet(hoja());
-  const con = parseInventorySheet(hoja({ extra: true }));
-  assert.deepEqual(con.lots, sin.lots);
-  assert.deepEqual(con.dispatches, sin.dispatches);
+  const filas = parseCsv(FIXTURE).map((f) => [...f.slice(0, 20), "", ...f.slice(20)]);
+  filas[2][20] = "COLUMNA NUEVA";
+  const csv = filas.map((f) => f.map((c) => `"${c.replace(/"/g, '""')}"`).join(",")).join("\n");
+  const a = parseInventorySheet(FIXTURE);
+  const b = parseInventorySheet(csv);
+  assert.deepEqual(b.lots, a.lots);
+  assert.deepEqual(b.dispatches, a.dispatches);
 });
 
-test("parseInventorySheet falla si desaparece una columna obligatoria", () => {
-  // Mejor una corrida en rojo que doscientas filas con los campos corridos.
-  const roto = hoja().replace("CANTIDAD SALIDA", "CANT. DE SALIDA TOTAL");
-  assert.throws(() => parseInventorySheet(roto), ColumnaFaltante);
+test("falla si desaparece una columna obligatoria", () => {
+  const filas = parseCsv(FIXTURE);
+  const i = filas[2].findIndex((c) => c.startsWith("CANTIDAD SALIDAS"));
+  filas[2][i] = "OTRA COSA";
+  const csv = filas.map((f) => f.map((c) => `"${c.replace(/"/g, '""')}"`).join(",")).join("\n");
+  assert.throws(() => parseInventorySheet(csv), ColumnaFaltante);
 });
 
-test("la clave del despacho lleva la recepción, como la del lote", () => {
-  // Un lote puede llegar varias veces bajo la misma remisión. La 0061 metió la
-  // recepción en la clave del lote y dejó la del despacho como estaba, así que
-  // la primera salida de dos recepciones distintas se llamaba igual y Postgres
-  // abortaba el upsert entero: seis días de inventario congelado.
-  const { lots, dispatches } = parseInventorySheet(
-    hoja({ recepciones: ["2414", "2416"] }),
-  );
-  assert.equal(lots.length, 2);
-  assert.equal(dispatches.length, 2);
-  assert.notEqual(dispatches[0].source_key, dispatches[1].source_key);
-  assert.match(dispatches[0].source_key, /#24#2414#s1$/);
-  assert.match(dispatches[1].source_key, /#24#2416#s1$/);
-});
-
-test("lotes distintos dan claves de despacho distintas", () => {
-  // Las dos claves van juntas: la del despacho es la del lote más la casilla.
-  // Cambiar una sin la otra es exactamente el fallo de arriba, y este test es
-  // lo que impide que vuelva a pasar sin que nadie se entere.
-  const { lots, dispatches } = parseInventorySheet(
-    hoja({ recepciones: ["2414", "2416"] }),
-  );
-  const clavesLote = new Set(
-    lots.map((l) => `${l.code}|${l.remision ?? ""}|${l.recepcion ?? ""}`),
-  );
-  const prefijos = new Set(
-    dispatches.map((d) => d.source_key.split("#").slice(0, 3).join("|")),
-  );
-  assert.equal(clavesLote.size, lots.length, "cada lote, una clave");
-  for (const p of prefijos) {
-    assert.ok(clavesLote.has(p), `«${p}» no corresponde a ningún lote`);
-  }
-});
-
-test("una fila de notas arriba y la unidad en el encabezado no tumban el sync", () => {
-  // El 13-sep la hoja ganó una fila «Letras en rojo = Columnas formuladas»
-  // encima del encabezado y sus columnas pasaron de «(KG)» a «(kilos)». Con
-  // las filas de encabezado fijas el sync estuvo diecisiete días en rojo.
-  const nueva = hoja()
-    .replace("\n", "\nLetras en rojo = Columnas formuladas \n")
-    .replace("CANTIDAD INGRESADA (KG)", "CANTIDAD INGRESADA (kilos)")
-    .replace("CANTIDAD SALIDA", "CANTIDAD SALIDA (kilos)");
-  const antes = parseInventorySheet(hoja());
-  const despues = parseInventorySheet(nueva);
-  assert.deepEqual(despues.lots, antes.lots);
-  assert.deepEqual(despues.dispatches, antes.dispatches);
-});
-
-test("una orden de compra que aún no llega no es un lote", () => {
-  // Filas del 14-sep: dos pedidos a Chocomet, sin remisión, sin recepción y
-  // sin kilos. Para el CRM eran el mismo lote y abortaban el upsert entero.
-  const lineas = hoja().split("\n");
-  const vacia = lineas[4]
-    .split(",")
-    .map((_, i) => (i === 0 ? "14-sept-2026" : i === 3 ? "COL-MET-GRA-140926 (CHOCOMET)" : ""))
-    .join(",");
-  lineas.splice(5, 0, vacia, vacia);
-  const { lots } = parseInventorySheet(lineas.join("\n"));
-  assert.equal(lots.length, 1);
-  assert.equal(lots[0].code, "CO-ANT-URA-050525");
+test("dos filas con la misma clave se nombran en el error", () => {
+  const filas = parseCsv(FIXTURE);
+  const fila = filas.find((f) => f[11] === "CO-ANT-URA-050525")!;
+  filas.push([...fila]);
+  const csv = filas.map((f) => f.map((c) => `"${c.replace(/"/g, '""')}"`).join(",")).join("\n");
+  assert.throws(() => parseInventorySheet(csv), /CO-ANT-URA-050525/);
 });

@@ -2,6 +2,7 @@ import "server-only";
 import type Anthropic from "@anthropic-ai/sdk";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/types/database";
+import { NOMBRE_BODEGA, esBodega, resumenPorBodega } from "@/lib/inventory/bodegas";
 import { cotizar } from "@/lib/calc/cotizador";
 import { quoteSchema, toCotizadorInput, fijosDe } from "@/lib/schemas/quote";
 import {
@@ -64,7 +65,7 @@ export const AI_TOOLS: Anthropic.Tool[] = [
   {
     name: "get_inventory_summary",
     description:
-      "Inventario actual en bodega: kg disponibles, lotes con saldo, desglose por procedencia y por clasificación (premium / corriente / corriente C / orgánico), y marca de cadmio. Para '¿cuál es el inventario actual?', '¿cuánto cacao queda disponible?', '¿cuánto hay del Meta?' o '¿qué lotes tienen cadmio alto?'.",
+      "Inventario actual en bodega: kg disponibles, lotes con saldo, desglose por procedencia, por clasificación (premium / estándar / fairtrade / rainforest / corriente / corriente C / pasilla / orgánico), por bodega o centro de costo (Cauca / Bogotá / Nilo) en tipos Orgánico / Primera / Segunda / Baba, y marca de cadmio. Para '¿cuál es el inventario actual?', '¿cuánto cacao queda disponible?', '¿cuánto hay en Nilo?', '¿cuánto hay del Meta?' o '¿qué lotes tienen cadmio alto?'.",
     input_schema: {
       type: "object",
       properties: {
@@ -769,7 +770,7 @@ export async function executeTool(
         // Un solo literal: TypeScript no constant-folds `+`, y el parser de
         // tipos de supabase-js necesita el string completo para inferir la fila.
         .select(
-          "code, remision, entry_date, quality, cadmio, qty_available_kg, qty_avail_premium_kg, qty_avail_corriente_kg, qty_avail_corriente_c_kg, qty_avail_organico_kg, purchase_price_cop_kg, pct_humedad",
+          "code, codigo_nuevo, proveedor, bodega, remision, entry_date, quality, cadmio, qty_available_kg, qty_avail_premium_kg, qty_avail_estandar_kg, qty_avail_corriente_kg, qty_avail_corriente_c_kg, qty_avail_fairtrade_kg, qty_avail_rainforest_kg, qty_avail_organico_kg, qty_avail_pasilla_kg, purchase_price_cop_kg, pct_humedad",
         )
         .order("qty_available_kg", { ascending: false });
       if (str(input.region)) q = q.ilike("code", `%${str(input.region)}%`);
@@ -805,10 +806,26 @@ export async function executeTool(
         ),
         por_clasificacion: {
           premium: sum("qty_avail_premium_kg"),
+          estandar: sum("qty_avail_estandar_kg"),
+          fairtrade: sum("qty_avail_fairtrade_kg"),
+          rainforest: sum("qty_avail_rainforest_kg"),
           corriente: sum("qty_avail_corriente_kg"),
           corriente_c: sum("qty_avail_corriente_c_kg"),
+          pasilla: sum("qty_avail_pasilla_kg"),
           organico: sum("qty_avail_organico_kg"),
         },
+        // Centros de costo (Cauca/Bogotá/Nilo) × tipo (Orgánico/Primera/
+        // Segunda/Baba), igual que la vista /inventario.
+        por_bodega: (() => {
+          const { filas, total: t } = resumenPorBodega(conSaldo);
+          const r = (v: number) => Math.round(v);
+          return Object.fromEntries(
+            [...filas, t].map((f, i) => [
+              i === filas.length ? "consolidado" : f.bodega ? NOMBRE_BODEGA[f.bodega] : "sin asignar",
+              { total_kg: r(f.total), organico: r(f.tipos.organico), primera: r(f.tipos.primera), segunda: r(f.tipos.segunda), baba: r(f.tipos.baba), lotes: f.lotes },
+            ]),
+          );
+        })(),
         con_cadmio: conSaldo
           .filter((l) => l.cadmio)
           .map((l) => ({ lote: l.code, cadmio: l.cadmio })),
@@ -816,7 +833,9 @@ export async function executeTool(
           input.include_lots === false
             ? undefined
             : lots.slice(0, 40).map((l) => ({
-                codigo: l.code,
+                codigo: l.codigo_nuevo ?? l.code,
+                proveedor: l.proveedor,
+                bodega: esBodega(l.bodega) ? NOMBRE_BODEGA[l.bodega] : null,
                 remision: l.remision,
                 ingreso: l.entry_date,
                 clasificacion: l.quality,
@@ -1011,7 +1030,7 @@ export async function executeTool(
       let q = db
         .from("dispatches")
         .select(
-          "dispatch_date, destination, remision_salida, remision_entrada, origin, qty_kg, qty_premium_kg, qty_corriente_kg, qty_corriente_c_kg, qty_organico_kg",
+          "dispatch_date, destination, remision_salida, remision_entrada, origin, qty_kg, qty_premium_kg, qty_estandar_kg, qty_fairtrade_kg, qty_rainforest_kg, qty_corriente_kg, qty_corriente_c_kg, qty_pasilla_kg, qty_organico_kg",
         )
         .order("dispatch_date", { ascending: false, nullsFirst: false })
         .limit(60);
@@ -1037,8 +1056,12 @@ export async function executeTool(
           kg: Number(d.qty_kg) || 0,
           clasificacion: {
             premium: Number(d.qty_premium_kg) || 0,
+            estandar: Number(d.qty_estandar_kg) || 0,
+            fairtrade: Number(d.qty_fairtrade_kg) || 0,
+            rainforest: Number(d.qty_rainforest_kg) || 0,
             corriente: Number(d.qty_corriente_kg) || 0,
             corriente_c: Number(d.qty_corriente_c_kg) || 0,
+            pasilla: Number(d.qty_pasilla_kg) || 0,
             organico: Number(d.qty_organico_kg) || 0,
           },
         })),

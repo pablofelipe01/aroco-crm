@@ -117,13 +117,14 @@ export const serverEnv = {
     );
   },
   /**
-   * Published CSV export of the inventory Google Sheet. Defaults to the AROCO
-   * sheet's `gid=826514579` tab; override per-environment if it ever moves.
+   * Export CSV del archivo de inventario de bodega, pestaña «Inventario».
+   * Archivo nuevo desde 2026-11 (lo pasó Nicolás); el anterior
+   * (1ozHRo…, gid 826514579) quedó congelado.
    */
   get INVENTORY_SHEET_CSV_URL() {
     return (
       process.env.INVENTORY_SHEET_CSV_URL ??
-      "https://docs.google.com/spreadsheets/d/1ozHRoAKiNNwMHOMCY-lwYaoJYxba71lo6sr1ltsg094/export?format=csv&gid=826514579"
+      "https://docs.google.com/spreadsheets/d/1Mh4_WYEeRzJxyd4omy9WHp_vG_6rLCq9Tj4d7xA1plI/export?format=csv&gid=1872049864"
     );
   },
   /** Inventory-by-quality tab (gid=1083634413) of the same sheet. */

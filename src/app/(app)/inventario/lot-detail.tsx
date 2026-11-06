@@ -11,6 +11,7 @@ import { useToast } from "@/components/ui/toast";
 import { createClient } from "@/lib/supabase/client";
 import { formatKg, formatDate, formatCOP, formatNumber } from "@/lib/utils";
 import type { InventoryLot, InventoryMovement } from "@/lib/types/database";
+import { NOMBRE_BODEGA, esBodega } from "@/lib/inventory/bodegas";
 import { addMovement, deleteMovement, deleteLot } from "./actions";
 
 export function LotDetail({
@@ -148,10 +149,22 @@ export function LotDetail({
           <Stat label="Disponible" value={formatKg(lot.qty_available_kg)} accent />
         </div>
         <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+          <Meta
+            label="Bodega"
+            value={esBodega(lot.bodega) ? NOMBRE_BODEGA[lot.bodega] : "Sin asignar"}
+          />
+          {lot.proveedor && <Meta label="Proveedor" value={lot.proveedor} />}
+          {(lot.departamento || lot.municipio) && (
+            <Meta
+              label="Origen"
+              value={[lot.municipio, lot.departamento].filter(Boolean).join(", ")}
+            />
+          )}
+          {lot.codigo_nuevo && <Meta label="Código" value={lot.codigo_nuevo} />}
           {lot.remision && <Meta label="Remisión" value={lot.remision} />}
           {lot.odc && <Meta label="ODC" value={lot.odc} />}
           {lot.recepcion && <Meta label="Recepción" value={lot.recepcion} />}
-          {lot.origin && <Meta label="Procedencia" value={lot.origin} />}
+          {(lot.origin ?? lot.code) && <Meta label="Procedencia" value={lot.origin ?? lot.code} />}
           {lot.purchase_price_cop_kg != null && (
             <Meta label="Precio compra" value={`${formatCOP(lot.purchase_price_cop_kg)}/kg`} />
           )}
@@ -269,8 +282,12 @@ export function LotDetail({
 function Classification({ lot }: { lot: InventoryLot }) {
   const rows = [
     { label: "Premium", in: lot.qty_in_premium_kg, avail: lot.qty_avail_premium_kg },
+    { label: "Estándar", in: lot.qty_in_estandar_kg, avail: lot.qty_avail_estandar_kg },
+    { label: "Fairtrade", in: lot.qty_in_fairtrade_kg, avail: lot.qty_avail_fairtrade_kg },
+    { label: "Rainforest", in: lot.qty_in_rainforest_kg, avail: lot.qty_avail_rainforest_kg },
     { label: "Corriente", in: lot.qty_in_corriente_kg, avail: lot.qty_avail_corriente_kg },
     { label: "Corriente C", in: lot.qty_in_corriente_c_kg, avail: lot.qty_avail_corriente_c_kg },
+    { label: "Pasilla", in: lot.qty_in_pasilla_kg, avail: lot.qty_avail_pasilla_kg },
     { label: "Orgánico", in: lot.qty_in_organico_kg, avail: lot.qty_avail_organico_kg },
   ].filter((r) => r.in > 0 || r.avail > 0);
 

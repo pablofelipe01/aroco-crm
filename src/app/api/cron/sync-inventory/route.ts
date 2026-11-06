@@ -2,7 +2,6 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { serverEnv } from "@/lib/env";
 import { parseInventorySheet } from "@/lib/inventory/sheet-sync";
-import { parseQualitySheet } from "@/lib/inventory/quality-sheet";
 import { avisarFalloSync } from "@/lib/sync-alerta";
 
 export const runtime = "nodejs";
@@ -76,7 +75,12 @@ export async function GET(request: NextRequest) {
     return await fail(db, startedAt, rowsRead, new Error(error.message));
   }
 
-  const counts = (data ?? {}) as { lots?: number; dispatches?: number };
+  const counts = (data ?? {}) as {
+    lots?: number;
+    dispatches?: number;
+    lots_deleted?: number;
+    dispatches_deleted?: number;
+  };
   const durationMs = Date.now() - startedAt;
 
   await db.from("inventory_sync_runs").insert({
@@ -87,68 +91,19 @@ export async function GET(request: NextRequest) {
     duration_ms: durationMs,
   });
 
-  // 4) Inventory-by-quality tab (separate snapshot). Failures here are isolated
-  //    so they don't affect the lots/dispatches result above.
-  const quality = await syncQuality(db, startedAt);
+  // La pestaña «inventario por calidad» era del archivo anterior y nadie la
+  // actualiza desde 2026-11: el archivo nuevo trae la calidad por lote y
+  // /inventario la agrupa. Ya no se sincroniza (su tabla queda como estaba).
 
   return NextResponse.json({
     ok: true,
     rows_read: rowsRead,
     lots_upserted: counts.lots ?? 0,
     dispatches_upserted: counts.dispatches ?? 0,
-    quality,
+    lots_deleted: counts.lots_deleted ?? 0,
+    dispatches_deleted: counts.dispatches_deleted ?? 0,
     duration_ms: durationMs,
   });
-}
-
-/** Fetch + full-replace the inventory-by-quality snapshot. */
-async function syncQuality(
-  db: ReturnType<typeof createAdminClient>,
-  startedAt: number,
-): Promise<{ ok: boolean; rows?: number; error?: string }> {
-  try {
-    const res = await fetch(serverEnv.INVENTORY_QUALITY_SHEET_CSV_URL, {
-      cache: "no-store",
-      redirect: "follow",
-    });
-    if (!res.ok) throw new Error(`HTTP ${res.status} al leer la hoja de calidad`);
-    const csv = await res.text();
-    if (csv.trimStart().startsWith("<!DOCTYPE")) {
-      throw new Error("La hoja de calidad no devolvió CSV (¿compartir?).");
-    }
-    const { rows } = parseQualitySheet(csv);
-    if (rows.length === 0) throw new Error("0 filas de inventario por calidad.");
-
-    const { data, error } = await db.rpc("replace_inventory_quality", {
-      p_rows: rows,
-    });
-    if (error) throw new Error(error.message);
-
-    const count = Number(data ?? rows.length);
-    await db.from("inventory_sync_runs").insert({
-      source: "inventory_quality_sheet",
-      status: "ok",
-      rows_read: count,
-      duration_ms: Date.now() - startedAt,
-    });
-    return { ok: true, rows: count };
-  } catch (e) {
-    const message = e instanceof Error ? e.message : "Error desconocido.";
-    await db.from("inventory_sync_runs").insert({
-      source: "inventory_quality_sheet",
-      status: "error",
-      duration_ms: Date.now() - startedAt,
-      error: message,
-    });
-    await avisarFalloSync(
-      db,
-      "inventory_quality_sheet",
-      "el inventario por calidad",
-      message,
-    );
-    console.error("[sync-inventory-quality]", message);
-    return { ok: false, error: message };
-  }
 }
 
 /** Log the failed run and return a 500. */
