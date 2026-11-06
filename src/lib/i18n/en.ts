@@ -169,6 +169,10 @@ export const en: Diccionario = {
     titulo: "Sales",
     descripcion: "Volume and revenue against the annual goal",
     errorCarga: "Sales could not be loaded",
+    historicoTitulo: "Sales history",
+    historicoDescripcion: "Data Studio report with the filters the client asked for: date, client, period, supplier and department.",
+    historicoAbrir: "Open in Data Studio",
+    historicoAyuda: "If it doesn't load, sign in to Google with your AROCO account or open it separately.",
     tablaVacia: "The sales table is empty",
     tablaVaciaDetalle:
       "The sync with the sales sheet has not run yet. Until it does, this page has no figures to draw on.",

@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { agregarVentas, type VentaRow } from "@/lib/ventas";
 import { VentasClient } from "./ventas-client";
 import { OperacionesMargen, type OperacionVista } from "./operaciones";
+import { HistoricoVentas } from "./historico";
 
 export const dynamic = "force-dynamic";
 
@@ -67,6 +68,9 @@ export default async function VentasPage({
       error={error?.message ?? null}
       vacio={ventas.length === 0}
     />
+    <div className="mt-6">
+      <HistoricoVentas />
+    </div>
     {operaciones.length > 0 && (
       <div className="mt-6">
         <OperacionesMargen operaciones={operaciones} />

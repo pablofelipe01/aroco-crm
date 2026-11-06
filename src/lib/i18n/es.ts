@@ -169,6 +169,10 @@ export const es = {
     titulo: "Ventas",
     descripcion: "Volumen y facturación contra la meta anual",
     errorCarga: "No se pudieron cargar las ventas",
+    historicoTitulo: "Histórico de ventas",
+    historicoDescripcion: "Informe de Data Studio con los filtros que pidió el cliente: fecha, cliente, período, proveedor y departamento.",
+    historicoAbrir: "Abrir en Data Studio",
+    historicoAyuda: "Si no carga, inicia sesión en Google con tu cuenta de AROCO o ábrelo aparte.",
     tablaVacia: "La tabla de ventas está vacía",
     tablaVaciaDetalle:
       "Todavía no ha corrido el sync con la hoja de ventas. Hasta entonces esta página no tiene de dónde sacar cifras.",
