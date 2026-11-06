@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { Pencil, Trash2, ArrowDownToLine, ArrowUpFromLine, Plus } from "lucide-react";
+import { Pencil, Trash2, ArrowUpFromLine, Scale, Shuffle, LogOut } from "lucide-react";
 import { Drawer } from "@/components/ui/drawer";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -10,103 +10,137 @@ import { Field, Input, Select } from "@/components/ui/input";
 import { useToast } from "@/components/ui/toast";
 import { createClient } from "@/lib/supabase/client";
 import { formatKg, formatDate, formatCOP, formatNumber } from "@/lib/utils";
-import type { InventoryLot, InventoryMovement } from "@/lib/types/database";
+import type { InventoryLot, InventarioAjuste } from "@/lib/types/database";
 import { NOMBRE_BODEGA, esBodega } from "@/lib/inventory/bodegas";
-import { addMovement, deleteMovement, deleteLot } from "./actions";
+import {
+  CLASES_CRM,
+  NOMBRE_CLASE_CRM,
+  colSalida,
+  disponibleDeClases,
+  type ClaseCrm,
+} from "@/lib/inventory/carga";
+import { borrarAjuste, borrarIngreso, borrarSalida, registrarAjuste } from "./carga-actions";
+
+type SalidaLote = {
+  id: string;
+  dispatch_date: string | null;
+  destination: string | null;
+  remision_salida: string | null;
+  qty_kg: number;
+  source: string | null;
+  clase: ClaseCrm | null;
+};
+
+type Evento =
+  | { tipo: "salida"; fecha: string | null; s: SalidaLote }
+  | { tipo: "ajuste"; fecha: string | null; a: InventarioAjuste };
+
+const hoy = () =>
+  new Intl.DateTimeFormat("en-CA", { timeZone: "America/Bogota" }).format(new Date());
 
 export function LotDetail({
   lot,
   open,
   canWrite,
+  puedeSalida,
+  modoCrm,
   onClose,
-  onEdit,
+  onEditar,
+  onSalida,
   onChanged,
 }: {
   lot: InventoryLot | null;
   open: boolean;
+  /** Puede registrar ingresos y ajustes (Bodega Central, Administrativo, Operaciones). */
   canWrite: boolean;
+  /** Puede registrar salidas (Bodega Central, Comercial, Operaciones). */
+  puedeSalida: boolean;
+  /** La carga ya es desde el CRM (0113). */
+  modoCrm: boolean;
   onClose: () => void;
-  onEdit: (l: InventoryLot) => void;
+  onEditar: (l: InventoryLot) => void;
+  onSalida: (loteId: string) => void;
   onChanged: () => void;
 }) {
   const router = useRouter();
   const { toast } = useToast();
-  const [movements, setMovements] = React.useState<InventoryMovement[]>([]);
-  const [loading, setLoading] = React.useState(false);
-  const [kind, setKind] = React.useState<"entrada" | "salida">("salida");
-  const [qty, setQty] = React.useState("");
-  const [note, setNote] = React.useState("");
-  const [saving, setSaving] = React.useState(false);
+  const [eventos, setEventos] = React.useState<Evento[]>([]);
+  const [cargando, setCargando] = React.useState(false);
+  const [ajuste, setAjuste] = React.useState<"merma" | "reclasificacion" | null>(null);
 
-  const load = React.useCallback(async (lotId: string) => {
-    setLoading(true);
-    const supabase = createClient();
-    const { data } = await supabase
-      .from("inventory_movements")
-      .select("*")
-      .eq("lot_id", lotId)
-      .order("date", { ascending: false })
-      .order("created_at", { ascending: false });
-    setMovements(data ?? []);
-    setLoading(false);
+  const cargar = React.useCallback(async (lotId: string) => {
+    setCargando(true);
+    const db = createClient();
+    const [{ data: salidas }, { data: ajustes }] = await Promise.all([
+      db
+        .from("dispatches")
+        .select(
+          "id, dispatch_date, destination, remision_salida, qty_kg, source, qty_premium_kg, qty_estandar_kg, qty_fairtrade_kg, qty_rainforest_kg, qty_corriente_kg, qty_corriente_c_kg, qty_pasilla_kg, qty_organico_kg, qty_baba_kg",
+        )
+        .eq("lote_origen_id", lotId),
+      db.from("inventario_ajustes").select("*").eq("lot_id", lotId),
+    ]);
+    const ev: Evento[] = [
+      ...(salidas ?? []).map((d) => ({
+        tipo: "salida" as const,
+        fecha: d.dispatch_date,
+        s: {
+          id: d.id,
+          dispatch_date: d.dispatch_date,
+          destination: d.destination,
+          remision_salida: d.remision_salida,
+          qty_kg: Number(d.qty_kg) || 0,
+          source: d.source,
+          clase:
+            CLASES_CRM.find((c) => Number((d as Record<string, unknown>)[colSalida(c)]) > 0) ?? null,
+        },
+      })),
+      ...(ajustes ?? []).map((a) => ({ tipo: "ajuste" as const, fecha: a.fecha, a })),
+    ].sort((x, y) => (y.fecha ?? "").localeCompare(x.fecha ?? ""));
+    setEventos(ev);
+    setCargando(false);
   }, []);
 
-  React.useEffect(() => {
-    /* eslint-disable react-hooks/set-state-in-effect -- sync drawer state to the opened lot */
-    if (open && lot) {
-      void load(lot.id);
-      setQty("");
-      setNote("");
-      setKind("salida");
+  const [visto, setVisto] = React.useState<string | null>(null);
+  const clave = open && lot ? `${lot.id}|${lot.updated_at}` : null;
+  if (clave !== visto) {
+    setVisto(clave);
+    if (clave && lot) {
+      setAjuste(null);
+      void cargar(lot.id);
     }
-    /* eslint-enable react-hooks/set-state-in-effect */
-  }, [open, lot, load]);
+  }
 
   if (!lot) return null;
+  const esCrm = lot.source === "crm";
+  const editable = modoCrm && esCrm && canWrite;
+  const delCrm = esCrm && lot.created_by != null;
 
-  async function onAdd(e: React.FormEvent) {
-    e.preventDefault();
-    if (!lot || !qty) return;
-    setSaving(true);
-    const res = await addMovement({
-      lot_id: lot.id,
-      kind,
-      qty_kg: Number(qty),
-      notes: note || null,
-    });
-    setSaving(false);
-    if (!res.ok) {
-      toast({ tone: "error", title: "No se pudo registrar", description: res.error });
-      return;
-    }
-    setQty("");
-    setNote("");
-    await load(lot.id);
+  async function refrescar() {
+    if (lot) await cargar(lot.id);
     onChanged();
     router.refresh();
   }
 
-  async function onDeleteMovement(id: string) {
-    if (!lot) return;
-    const res = await deleteMovement(id);
-    if (!res.ok) {
-      toast({ tone: "error", title: "No se pudo eliminar", description: res.error });
-      return;
-    }
-    await load(lot.id);
-    onChanged();
-    router.refresh();
+  async function quitarAjuste(id: string) {
+    const r = await borrarAjuste(id);
+    if (!r.ok) return toast({ tone: "error", title: "No se pudo borrar", description: r.error });
+    await refrescar();
   }
 
-  async function onDeleteLot() {
+  async function quitarSalida(id: string) {
+    if (!confirm("¿Borrar esta salida? Sus kilos vuelven al lote.")) return;
+    const r = await borrarSalida(id);
+    if (!r.ok) return toast({ tone: "error", title: "No se pudo borrar", description: r.error });
+    await refrescar();
+  }
+
+  async function quitarLote() {
     if (!lot) return;
-    if (!confirm(`¿Eliminar el lote ${lot.code}? Se borrarán sus movimientos.`)) return;
-    const res = await deleteLot(lot.id);
-    if (!res.ok) {
-      toast({ tone: "error", title: "No se pudo eliminar", description: res.error });
-      return;
-    }
-    toast({ tone: "success", title: "Lote eliminado" });
+    if (!confirm(`¿Borrar el ingreso ${lot.codigo_nuevo ?? lot.code}?`)) return;
+    const r = await borrarIngreso(lot.id);
+    if (!r.ok) return toast({ tone: "error", title: "No se pudo borrar", description: r.error });
+    toast({ tone: "success", title: "Ingreso borrado" });
     onClose();
     router.refresh();
   }
@@ -116,7 +150,7 @@ export function LotDetail({
       open={open}
       onClose={onClose}
       width="lg"
-      title={<span className="font-mono">{lot.code}</span>}
+      title={<span className="font-mono">{lot.codigo_nuevo ?? lot.code}</span>}
       subtitle={
         <div className="flex flex-wrap items-center gap-2">
           {lot.quality && <Badge tone="accent">{lot.quality}</Badge>}
@@ -127,25 +161,35 @@ export function LotDetail({
         </div>
       }
       footer={
-        canWrite && (
+        (editable || (modoCrm && esCrm && puedeSalida)) && (
           <>
-            <Button variant="ghost" size="sm" onClick={onDeleteLot}>
-              <Trash2 className="h-4 w-4 text-danger" />
-              Eliminar
-            </Button>
-            <Button variant="secondary" size="sm" onClick={() => onEdit(lot)}>
-              <Pencil className="h-4 w-4" />
-              Editar
-            </Button>
+            {editable && delCrm && (
+              <Button variant="ghost" size="sm" onClick={quitarLote}>
+                <Trash2 className="h-4 w-4 text-danger" />
+                Borrar
+              </Button>
+            )}
+            {editable && delCrm && (
+              <Button variant="secondary" size="sm" onClick={() => onEditar(lot)}>
+                <Pencil className="h-4 w-4" />
+                Corregir
+              </Button>
+            )}
+            {modoCrm && esCrm && puedeSalida && lot.qty_available_kg > 0 && (
+              <Button size="sm" onClick={() => onSalida(lot.id)}>
+                <LogOut className="h-4 w-4" />
+                Registrar salida
+              </Button>
+            )}
           </>
         )
       }
     >
       <div className="space-y-6">
-        {/* Stock summary */}
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-4 gap-3">
           <Stat label="Ingresada" value={formatKg(lot.qty_in_kg)} />
           <Stat label="Salida" value={formatKg(lot.qty_out_kg)} />
+          <Stat label="Merma" value={formatKg(lot.merma_kg)} />
           <Stat label="Disponible" value={formatKg(lot.qty_available_kg)} accent />
         </div>
         <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
@@ -192,89 +236,235 @@ export function LotDetail({
         <Classification lot={lot} />
         <QualityMeasurement lot={lot} />
 
-        {/* Add movement */}
-        {canWrite && (
-          <form onSubmit={onAdd} className="rounded-[var(--radius-md)] border border-border bg-bg-subtle/40 p-3">
-            <p className="mb-2 text-xs font-medium uppercase tracking-wide text-fg-subtle">
-              Registrar movimiento
-            </p>
-            <div className="flex flex-wrap items-end gap-2">
-              <Field label="Tipo" className="w-32">
-                <Select value={kind} onChange={(e) => setKind(e.target.value as "entrada" | "salida")}>
-                  <option value="salida">Salida</option>
-                  <option value="entrada">Entrada</option>
-                </Select>
-              </Field>
-              <Field label="Cantidad (kg)" className="w-32">
-                <Input type="number" step="any" value={qty} onChange={(e) => setQty(e.target.value)} className="font-mono tnum" />
-              </Field>
-              <Field label="Nota" className="flex-1">
-                <Input value={note} onChange={(e) => setNote(e.target.value)} />
-              </Field>
-              <Button type="submit" size="sm" loading={saving} disabled={!qty}>
-                <Plus className="h-4 w-4" />
-                Agregar
-              </Button>
-            </div>
-          </form>
+        {editable && (
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant={ajuste === "merma" ? "primary" : "secondary"}
+              size="sm"
+              onClick={() => setAjuste(ajuste === "merma" ? null : "merma")}
+            >
+              <Scale className="h-4 w-4" />
+              Registrar merma
+            </Button>
+            <Button
+              variant={ajuste === "reclasificacion" ? "primary" : "secondary"}
+              size="sm"
+              onClick={() => setAjuste(ajuste === "reclasificacion" ? null : "reclasificacion")}
+            >
+              <Shuffle className="h-4 w-4" />
+              Reclasificar (selección)
+            </Button>
+          </div>
+        )}
+        {editable && ajuste && (
+          <AjusteForm
+            key={ajuste}
+            lot={lot}
+            tipo={ajuste}
+            onListo={async () => {
+              setAjuste(null);
+              await refrescar();
+            }}
+          />
         )}
 
-        {/* Movements ledger */}
         <div>
           <h3 className="mb-3 text-xs font-medium uppercase tracking-wide text-fg-subtle">
-            Movimientos
+            Historial del lote
           </h3>
-          {loading ? (
+          {cargando && eventos.length === 0 ? (
             <p className="text-sm text-fg-subtle">Cargando…</p>
-          ) : movements.length === 0 ? (
-            <p className="text-sm text-fg-subtle">Sin movimientos registrados.</p>
+          ) : eventos.length === 0 ? (
+            <p className="text-sm text-fg-subtle">Sin salidas ni ajustes.</p>
           ) : (
             <ul className="space-y-1.5">
-              {movements.map((m) => (
-                <li
-                  key={m.id}
-                  className="group flex items-center gap-3 rounded-[var(--radius-sm)] border border-border px-3 py-2"
-                >
-                  <span
-                    className={
-                      m.kind === "entrada"
-                        ? "text-success"
-                        : "text-warn"
-                    }
+              {eventos.map((e) =>
+                e.tipo === "salida" ? (
+                  <li
+                    key={`s${e.s.id}`}
+                    className="group flex items-center gap-3 rounded-[var(--radius-sm)] border border-border px-3 py-2"
                   >
-                    {m.kind === "entrada" ? (
-                      <ArrowDownToLine className="h-4 w-4" />
-                    ) : (
-                      <ArrowUpFromLine className="h-4 w-4" />
+                    <ArrowUpFromLine className="h-4 w-4 shrink-0 text-warn" />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-fg">
+                        Salida · <span className="font-mono tnum">{formatKg(e.s.qty_kg)}</span>
+                        {e.s.clase && (
+                          <span className="font-normal text-fg-muted"> · {NOMBRE_CLASE_CRM[e.s.clase]}</span>
+                        )}
+                      </p>
+                      <p className="truncate text-xs text-fg-subtle">
+                        {formatDate(e.s.dispatch_date)}
+                        {e.s.destination ? ` · ${e.s.destination}` : ""}
+                        {e.s.remision_salida ? ` · Rem. ${e.s.remision_salida}` : ""}
+                        {e.s.source === "crm" ? "" : " · del archivo"}
+                      </p>
+                    </div>
+                    {modoCrm && puedeSalida && e.s.source === "crm" && (
+                      <button
+                        onClick={() => quitarSalida(e.s.id)}
+                        className="rounded p-1 text-fg-subtle opacity-0 transition-opacity hover:bg-danger-soft hover:text-danger focus:opacity-100 group-hover:opacity-100"
+                        aria-label="Borrar salida"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
                     )}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-fg">
-                      {m.kind === "entrada" ? "Entrada" : "Salida"} ·{" "}
-                      <span className="font-mono tnum">{formatKg(m.qty_kg)}</span>
-                    </p>
-                    <p className="truncate text-xs text-fg-subtle">
-                      {formatDate(m.date)}
-                      {m.company ? ` · ${m.company}` : ""}
-                      {m.notes ? ` · ${m.notes}` : ""}
-                    </p>
-                  </div>
-                  {canWrite && (
-                    <button
-                      onClick={() => onDeleteMovement(m.id)}
-                      className="rounded p-1 text-fg-subtle opacity-0 transition-opacity hover:bg-danger-soft hover:text-danger group-hover:opacity-100"
-                      aria-label="Eliminar movimiento"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
-                  )}
-                </li>
-              ))}
+                  </li>
+                ) : (
+                  <li
+                    key={`a${e.a.id}`}
+                    className="group flex items-center gap-3 rounded-[var(--radius-sm)] border border-border px-3 py-2"
+                  >
+                    {e.a.tipo === "reclasificacion" ? (
+                      <Shuffle className="h-4 w-4 shrink-0 text-fg-muted" />
+                    ) : (
+                      <Scale className="h-4 w-4 shrink-0 text-fg-muted" />
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-fg">
+                        {e.a.tipo === "merma"
+                          ? "Merma"
+                          : e.a.tipo === "reclasificacion"
+                            ? "Reclasificación"
+                            : "Saldo de apertura"}{" "}
+                        · <span className="font-mono tnum">{formatNumber(e.a.kg, 2)} kg</span>
+                        <span className="font-normal text-fg-muted">
+                          {" "}
+                          · {NOMBRE_CLASE_CRM[e.a.clase_origen as ClaseCrm] ?? e.a.clase_origen}
+                          {e.a.clase_destino
+                            ? ` → ${NOMBRE_CLASE_CRM[e.a.clase_destino as ClaseCrm] ?? e.a.clase_destino}`
+                            : ""}
+                        </span>
+                      </p>
+                      <p className="truncate text-xs text-fg-subtle">
+                        {formatDate(e.a.fecha)}
+                        {e.a.nota ? ` · ${e.a.nota}` : ""}
+                      </p>
+                    </div>
+                    {editable && e.a.tipo !== "apertura" && (
+                      <button
+                        onClick={() => quitarAjuste(e.a.id)}
+                        className="rounded p-1 text-fg-subtle opacity-0 transition-opacity hover:bg-danger-soft hover:text-danger focus:opacity-100 group-hover:opacity-100"
+                        aria-label="Borrar ajuste"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </li>
+                ),
+              )}
             </ul>
           )}
         </div>
       </div>
     </Drawer>
+  );
+}
+
+/**
+ * Merma (kilos que se pierden de una clase) o reclasificación (kilos que
+ * pasan de una clase a otra, como la pasilla que sale de la selección).
+ */
+function AjusteForm({
+  lot,
+  tipo,
+  onListo,
+}: {
+  lot: InventoryLot;
+  tipo: "merma" | "reclasificacion";
+  onListo: () => void | Promise<void>;
+}) {
+  const { toast } = useToast();
+  const disp = disponibleDeClases(lot);
+  const conSaldo = CLASES_CRM.filter((c) => disp[c] > 0.0005);
+  const [origen, setOrigen] = React.useState<ClaseCrm | "">(conSaldo[0] ?? "");
+  const [destino, setDestino] = React.useState<ClaseCrm | "">(tipo === "reclasificacion" ? "pasilla" : "");
+  const [kg, setKg] = React.useState("");
+  const [fecha, setFecha] = React.useState(hoy);
+  const [nota, setNota] = React.useState("");
+  const [guardando, setGuardando] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+
+  async function guardar(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    const k = Number(kg);
+    if (origen && k > disp[origen] + 0.001) {
+      setError(`Quedan ${formatNumber(disp[origen], 2)} kg de ${NOMBRE_CLASE_CRM[origen]}.`);
+      return;
+    }
+    setGuardando(true);
+    const r = await registrarAjuste({
+      lot_id: lot.id,
+      fecha,
+      tipo,
+      clase_origen: origen,
+      clase_destino: tipo === "reclasificacion" ? destino || null : null,
+      kg: k,
+      nota: nota.trim() || null,
+    });
+    setGuardando(false);
+    if (!r.ok) {
+      setError(r.error ?? "No se pudo registrar.");
+      return;
+    }
+    toast({ tone: "success", title: tipo === "merma" ? "Merma registrada" : "Reclasificación registrada" });
+    await onListo();
+  }
+
+  return (
+    <form onSubmit={guardar} className="space-y-3 rounded-[var(--radius-md)] border border-border bg-bg-subtle/40 p-3">
+      <div className="flex flex-wrap items-end gap-2">
+        <Field label={tipo === "merma" ? "Clase" : "De"} className="w-40">
+          <Select value={origen} onChange={(e) => setOrigen(e.target.value as ClaseCrm)} required>
+            {conSaldo.length === 0 && <option value="">Sin saldo</option>}
+            {conSaldo.map((c) => (
+              <option key={c} value={c}>
+                {NOMBRE_CLASE_CRM[c]} · {formatNumber(disp[c], 1)}
+              </option>
+            ))}
+          </Select>
+        </Field>
+        {tipo === "reclasificacion" && (
+          <Field label="A" className="w-36">
+            <Select value={destino} onChange={(e) => setDestino(e.target.value as ClaseCrm)} required>
+              {CLASES_CRM.filter((c) => c !== origen).map((c) => (
+                <option key={c} value={c}>
+                  {NOMBRE_CLASE_CRM[c]}
+                </option>
+              ))}
+            </Select>
+          </Field>
+        )}
+        <Field label="Kilos" className="w-28">
+          <Input
+            type="number"
+            min="0"
+            step="0.01"
+            inputMode="decimal"
+            value={kg}
+            onChange={(e) => setKg(e.target.value)}
+            className="font-mono tnum"
+            required
+          />
+        </Field>
+        <Field label="Fecha" className="w-40">
+          <Input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} required />
+        </Field>
+      </div>
+      <div className="flex flex-wrap items-end gap-2">
+        <Field label="Nota" className="min-w-48 flex-1">
+          <Input
+            value={nota}
+            onChange={(e) => setNota(e.target.value)}
+            placeholder={tipo === "merma" ? "Movimiento, almacenamiento…" : "Selección del 6-nov…"}
+          />
+        </Field>
+        <Button type="submit" size="sm" loading={guardando} disabled={!origen || !kg}>
+          Guardar
+        </Button>
+      </div>
+      {error && <p className="text-xs text-danger">{error}</p>}
+    </form>
   );
 }
 
@@ -289,6 +479,7 @@ function Classification({ lot }: { lot: InventoryLot }) {
     { label: "Corriente C", in: lot.qty_in_corriente_c_kg, avail: lot.qty_avail_corriente_c_kg },
     { label: "Pasilla", in: lot.qty_in_pasilla_kg, avail: lot.qty_avail_pasilla_kg },
     { label: "Orgánico", in: lot.qty_in_organico_kg, avail: lot.qty_avail_organico_kg },
+    { label: "Baba", in: lot.qty_in_baba_kg, avail: lot.qty_avail_baba_kg },
   ].filter((r) => r.in > 0 || r.avail > 0);
 
   if (rows.length === 0) return null;
@@ -358,7 +549,7 @@ function QualityMeasurement({ lot }: { lot: InventoryLot }) {
 
 function Stat({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
   return (
-    <div className={`rounded-[var(--radius-md)] border border-border p-3 ${accent ? "bg-accent-soft/50" : "bg-bg-subtle/40"}`}>
+    <div className={`min-w-0 rounded-[var(--radius-md)] border border-border p-2.5 ${accent ? "bg-accent-soft/50" : "bg-bg-subtle/40"}`}>
       <p className="text-[11px] uppercase tracking-wide text-fg-subtle">{label}</p>
       <p className={`mt-0.5 font-mono text-sm font-semibold tnum ${accent ? "text-accent-soft-fg" : "text-fg"}`}>
         {value}

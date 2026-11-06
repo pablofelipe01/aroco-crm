@@ -65,7 +65,7 @@ export const AI_TOOLS: Anthropic.Tool[] = [
   {
     name: "get_inventory_summary",
     description:
-      "Inventario actual en bodega: kg disponibles, lotes con saldo, desglose por procedencia, por clasificación (premium / estándar / fairtrade / rainforest / corriente / corriente C / pasilla / orgánico), por bodega o centro de costo (Cauca / Bogotá / Nilo) en tipos Orgánico / Primera / Segunda / Baba, y marca de cadmio. Para '¿cuál es el inventario actual?', '¿cuánto cacao queda disponible?', '¿cuánto hay en Nilo?', '¿cuánto hay del Meta?' o '¿qué lotes tienen cadmio alto?'.",
+      "Inventario actual en bodega: kg disponibles, lotes con saldo, desglose por procedencia, por clasificación (premium / estándar / fairtrade / rainforest / corriente / corriente C / pasilla / orgánico / baba), por bodega o centro de costo (Cauca / Bogotá / Nilo) en tipos Orgánico / Primera / Segunda / Baba, y marca de cadmio. Para '¿cuál es el inventario actual?', '¿cuánto cacao queda disponible?', '¿cuánto hay en Nilo?', '¿cuánto hay del Meta?' o '¿qué lotes tienen cadmio alto?'.",
     input_schema: {
       type: "object",
       properties: {
@@ -770,7 +770,7 @@ export async function executeTool(
         // Un solo literal: TypeScript no constant-folds `+`, y el parser de
         // tipos de supabase-js necesita el string completo para inferir la fila.
         .select(
-          "code, codigo_nuevo, proveedor, bodega, remision, entry_date, quality, cadmio, qty_available_kg, qty_avail_premium_kg, qty_avail_estandar_kg, qty_avail_corriente_kg, qty_avail_corriente_c_kg, qty_avail_fairtrade_kg, qty_avail_rainforest_kg, qty_avail_organico_kg, qty_avail_pasilla_kg, purchase_price_cop_kg, pct_humedad",
+          "code, codigo_nuevo, proveedor, bodega, remision, entry_date, quality, cadmio, qty_available_kg, qty_avail_premium_kg, qty_avail_estandar_kg, qty_avail_corriente_kg, qty_avail_corriente_c_kg, qty_avail_fairtrade_kg, qty_avail_rainforest_kg, qty_avail_organico_kg, qty_avail_pasilla_kg, qty_avail_baba_kg, purchase_price_cop_kg, pct_humedad",
         )
         .order("qty_available_kg", { ascending: false });
       if (str(input.region)) q = q.ilike("code", `%${str(input.region)}%`);
@@ -813,6 +813,7 @@ export async function executeTool(
           corriente_c: sum("qty_avail_corriente_c_kg"),
           pasilla: sum("qty_avail_pasilla_kg"),
           organico: sum("qty_avail_organico_kg"),
+          baba: sum("qty_avail_baba_kg"),
         },
         // Centros de costo (Cauca/Bogotá/Nilo) × tipo (Orgánico/Primera/
         // Segunda/Baba), igual que la vista /inventario.
@@ -1030,7 +1031,7 @@ export async function executeTool(
       let q = db
         .from("dispatches")
         .select(
-          "dispatch_date, destination, remision_salida, remision_entrada, origin, qty_kg, qty_premium_kg, qty_estandar_kg, qty_fairtrade_kg, qty_rainforest_kg, qty_corriente_kg, qty_corriente_c_kg, qty_pasilla_kg, qty_organico_kg",
+          "dispatch_date, destination, remision_salida, remision_entrada, origin, qty_kg, qty_premium_kg, qty_estandar_kg, qty_fairtrade_kg, qty_rainforest_kg, qty_corriente_kg, qty_corriente_c_kg, qty_pasilla_kg, qty_organico_kg, qty_baba_kg",
         )
         .order("dispatch_date", { ascending: false, nullsFirst: false })
         .limit(60);
@@ -1063,6 +1064,7 @@ export async function executeTool(
             corriente_c: Number(d.qty_corriente_c_kg) || 0,
             pasilla: Number(d.qty_pasilla_kg) || 0,
             organico: Number(d.qty_organico_kg) || 0,
+            baba: Number(d.qty_baba_kg) || 0,
           },
         })),
       };

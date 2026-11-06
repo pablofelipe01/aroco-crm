@@ -2,7 +2,6 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { useForm } from "react-hook-form";
 import { Plus, Truck, Trash2, Search, X } from "lucide-react";
 import { ScrollFijo } from "@/components/ui/scroll-fijo";
 import { BarraFija } from "@/components/ui/scroll-efectos";
@@ -10,59 +9,32 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
 import { Input, Select, Field } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Modal } from "@/components/ui/modal";
 import { EmptyState } from "@/components/ui/empty-state";
 import { useToast } from "@/components/ui/toast";
 import { formatKg, formatDate, formatCOP } from "@/lib/utils";
-import { CLASIFICACIONES } from "@/lib/schemas/inventory";
 import type { DispatchWithLinks } from "./page";
 import { DispatchTrace } from "./dispatch-trace";
-import { createDispatch, deleteDispatch } from "./actions";
+import { deleteDispatch } from "./actions";
+import { SalidaForm, type LoteConSaldo } from "../inventario/salida-form";
 import { BODEGAS, NOMBRE_BODEGA, esBodega, type Bodega } from "@/lib/inventory/bodegas";
 
-/** Bodega de un despacho: la del lote del archivo del que salió. */
+/** Bodega de un despacho: la del lote del que salió. */
 function bodegaDe(d: DispatchWithLinks): Bodega | null {
   return esBodega(d.origen?.bodega) ? d.origen.bodega : null;
 }
 
-interface FormValues {
-  dispatch_date: string;
-  remision_salida: string;
-  destination: string;
-  oc: string;
-  lot_id: string;
-  lead_id: string;
-  origin: string;
-  qty_kg: string;
-  clasificacion: string;
-  purchase_price_cop_kg: string;
-  remision_entrada: string;
-}
-
-const EMPTY: FormValues = {
-  dispatch_date: new Date().toISOString().slice(0, 10),
-  remision_salida: "",
-  destination: "",
-  oc: "",
-  lot_id: "",
-  lead_id: "",
-  origin: "",
-  qty_kg: "",
-  clasificacion: "Premium",
-  purchase_price_cop_kg: "",
-  remision_entrada: "",
-};
-
 export function DespachosClient({
   initialDispatches,
-  lots,
-  leads,
+  lotesConSaldo,
   canWrite,
+  modoCrm,
 }: {
   initialDispatches: DispatchWithLinks[];
-  lots: { id: string; code: string; qty_available_kg: number }[];
-  leads: { id: string; company: string }[];
+  /** Lotes del libro del CRM con saldo, para la «Nueva salida». */
+  lotesConSaldo: LoteConSaldo[];
   canWrite: boolean;
+  /** Las salidas se registran aquí solo cuando la carga ya es desde el CRM. */
+  modoCrm: boolean;
 }) {
   const router = useRouter();
   const { toast } = useToast();
@@ -73,15 +45,6 @@ export function DespachosClient({
   const [desde, setDesde] = React.useState("");
   const [hasta, setHasta] = React.useState("");
   const [bodega, setBodega] = React.useState("");
-  const { register, handleSubmit, reset, formState } = useForm<FormValues>({
-    defaultValues: EMPTY,
-  });
-  const [prevOpen, setPrevOpen] = React.useState(false);
-  if (open !== prevOpen) {
-    setPrevOpen(open);
-    if (open) reset(EMPTY);
-  }
-
   // Distinct destinations for the dropdown.
   const destinations = React.useMemo(
     () =>
@@ -116,25 +79,6 @@ export function DespachosClient({
     setBodega("");
   }
 
-  const onSubmit = handleSubmit(async (values) => {
-    const res = await createDispatch({
-      ...values,
-      lot_id: values.lot_id || null,
-      lead_id: values.lead_id || null,
-    });
-    if (!res.ok) {
-      toast({ tone: "error", title: "No se pudo crear", description: res.error });
-      return;
-    }
-    toast({
-      tone: "success",
-      title: "Despacho creado",
-      description: values.lot_id ? "El inventario se descontó automáticamente." : undefined,
-    });
-    setOpen(false);
-    router.refresh();
-  });
-
   async function onDelete(d: DispatchWithLinks) {
     if (!confirm(`¿Eliminar el despacho ${d.remision_salida ?? ""}?`)) return;
     const res = await deleteDispatch(d.id);
@@ -152,10 +96,10 @@ export function DespachosClient({
         title="Despachos"
         description={`${initialDispatches.length} salidas registradas`}
         actions={
-          canWrite && (
+          canWrite && modoCrm && (
             <Button size="sm" onClick={() => setOpen(true)}>
               <Plus className="h-4 w-4" />
-              Nuevo despacho
+              Nueva salida
             </Button>
           )
         }
@@ -368,80 +312,16 @@ export function DespachosClient({
         onClose={() => setTrace(null)}
       />
 
-      <Modal
+      <SalidaForm
         open={open}
         onClose={() => setOpen(false)}
-        size="lg"
-        title="Nuevo despacho"
-        footer={
-          <>
-            <Button variant="secondary" size="sm" onClick={() => setOpen(false)}>
-              Cancelar
-            </Button>
-            <Button size="sm" onClick={onSubmit} loading={formState.isSubmitting}>
-              Crear despacho
-            </Button>
-          </>
-        }
-      >
-        <form onSubmit={onSubmit} className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Field label="Fecha salida">
-            <Input type="date" {...register("dispatch_date")} />
-          </Field>
-          <Field label="Remisión salida">
-            <Input {...register("remision_salida")} />
-          </Field>
-          <Field label="Destino (cliente)" className="sm:col-span-2">
-            <Input {...register("destination")} placeholder="CASA LUKER, NAL. CHOCOLATES…" />
-          </Field>
-          <Field label="Lote (descuenta inventario)">
-            <Select {...register("lot_id")} defaultValue="">
-              <option value="">— Sin lote —</option>
-              {lots.map((l) => (
-                <option key={l.id} value={l.id}>
-                  {l.code} ({formatKg(l.qty_available_kg)})
-                </option>
-              ))}
-            </Select>
-          </Field>
-          <Field label="Lead (opcional)">
-            <Select {...register("lead_id")} defaultValue="">
-              <option value="">— Sin lead —</option>
-              {leads.map((l) => (
-                <option key={l.id} value={l.id}>
-                  {l.company}
-                </option>
-              ))}
-            </Select>
-          </Field>
-          <Field label="Procedencia (texto)">
-            <Input {...register("origin")} />
-          </Field>
-          <Field label="Cantidad (kg) *">
-            <Input type="number" step="any" {...register("qty_kg", { required: true })} className="font-mono tnum" />
-          </Field>
-          <Field label="Clasificación">
-            <Select {...register("clasificacion")}>
-              <option value="">— Sin clasificar —</option>
-              {CLASIFICACIONES.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </Select>
-          </Field>
-          <Field label="OC">
-            <Input {...register("oc")} />
-          </Field>
-          <Field label="Precio compra (COP/kg)">
-            <Input type="number" step="any" {...register("purchase_price_cop_kg")} className="font-mono tnum" />
-          </Field>
-          <p className="text-xs text-fg-subtle sm:col-span-2">
-            Si eliges un lote, se genera un movimiento de salida y se descuenta el
-            disponible automáticamente.
-          </p>
-        </form>
-      </Modal>
+        lotes={lotesConSaldo}
+        destinos={destinations}
+        onGuardado={() => {
+          setOpen(false);
+          router.refresh();
+        }}
+      />
     </div>
   );
 }

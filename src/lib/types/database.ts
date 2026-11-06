@@ -1482,6 +1482,7 @@ export type Database = {
       };
       dispatches: {
         Row: {
+          qty_baba_kg: number;
           qty_estandar_kg: number;
           qty_fairtrade_kg: number;
           qty_rainforest_kg: number;
@@ -1512,6 +1513,7 @@ export type Database = {
           updated_at: string;
         };
         Insert: {
+          qty_baba_kg?: number;
           qty_estandar_kg?: number;
           qty_fairtrade_kg?: number;
           qty_rainforest_kg?: number;
@@ -1542,6 +1544,7 @@ export type Database = {
           updated_at?: string;
         };
         Update: {
+          qty_baba_kg?: number;
           qty_estandar_kg?: number;
           qty_fairtrade_kg?: number;
           qty_rainforest_kg?: number;
@@ -1573,8 +1576,74 @@ export type Database = {
         };
         Relationships: [];
       };
+      inventario_ajustes: {
+        Row: {
+          id: string;
+          lot_id: string;
+          fecha: string;
+          tipo: string;
+          clase_origen: string;
+          clase_destino: string | null;
+          kg: number;
+          nota: string | null;
+          created_by: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          lot_id: string;
+          fecha?: string;
+          tipo: string;
+          clase_origen: string;
+          clase_destino?: string | null;
+          kg: number;
+          nota?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          lot_id?: string;
+          fecha?: string;
+          tipo?: string;
+          clase_origen?: string;
+          clase_destino?: string | null;
+          kg?: number;
+          nota?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      inventario_config: {
+        Row: {
+          id: boolean;
+          fuente: string;
+          cambiado_en: string | null;
+          cambiado_por: string | null;
+        };
+        Insert: {
+          id?: boolean;
+          fuente?: string;
+          cambiado_en?: string | null;
+          cambiado_por?: string | null;
+        };
+        Update: {
+          id?: boolean;
+          fuente?: string;
+          cambiado_en?: string | null;
+          cambiado_por?: string | null;
+        };
+        Relationships: [];
+      };
       inventory_lots: {
         Row: {
+          qty_in_baba_kg: number;
+          qty_avail_baba_kg: number;
+          proveedor_id: string | null;
+          responsable: string | null;
+          bonificacion_cop_kg: number | null;
+          created_by: string | null;
           bodega: string | null;
           bodega_por: string | null;
           bodega_en: string | null;
@@ -1637,6 +1706,12 @@ export type Database = {
           updated_at: string;
         };
         Insert: {
+          qty_in_baba_kg?: number;
+          qty_avail_baba_kg?: number;
+          proveedor_id?: string | null;
+          responsable?: string | null;
+          bonificacion_cop_kg?: number | null;
+          created_by?: string | null;
           bodega?: string | null;
           bodega_por?: string | null;
           bodega_en?: string | null;
@@ -1699,6 +1774,12 @@ export type Database = {
           updated_at?: string;
         };
         Update: {
+          qty_in_baba_kg?: number;
+          qty_avail_baba_kg?: number;
+          proveedor_id?: string | null;
+          responsable?: string | null;
+          bonificacion_cop_kg?: number | null;
+          created_by?: string | null;
           bodega?: string | null;
           bodega_por?: string | null;
           bodega_en?: string | null;
@@ -3938,6 +4019,10 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
+      inventario_pasar_a_crm: {
+        Args: Record<PropertyKey, never>;
+        Returns: Json;
+      };
       firmas_cadena_integra: {
         Args: { p_sobre: string };
         Returns: boolean;
@@ -4103,6 +4188,7 @@ export type LeadActivity = Tables<"lead_activities">;
 export type Quote = Tables<"quotes">;
 export type CotizadorParametro = Tables<"cotizador_parametros">;
 export type InventoryLot = Tables<"inventory_lots">;
+export type InventarioAjuste = Tables<"inventario_ajustes">;
 export type InventoryMovement = Tables<"inventory_movements">;
 export type InventoryQuality = Tables<"inventory_quality">;
 export type Dispatch = Tables<"dispatches">;

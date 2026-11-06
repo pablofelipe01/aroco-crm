@@ -10,7 +10,9 @@ export const maxDuration = 60;
 
 /**
  * Daily inventory sync: reads the published Google Sheet CSV and upserts lots +
- * salidas (as dispatches) into Supabase. The sheet is the source of truth.
+ * salidas (as dispatches) into Supabase. The sheet is the source of truth
+ * hasta que un admin pasa la carga al CRM (inventario_config.fuente = 'crm');
+ * desde ahí esta ruta no hace nada.
  *
  * Triggered by Vercel Cron (see vercel.json), which sends
  * `Authorization: Bearer ${CRON_SECRET}`. Can also be invoked manually with the
@@ -24,6 +26,13 @@ export async function GET(request: NextRequest) {
 
   const startedAt = Date.now();
   const db = createAdminClient();
+
+  // Desde que la carga pasó al CRM (0113) el Excel ya no manda: no se lee. La
+  // base también lo rechazaría, pero así la corrida no queda en rojo.
+  const { data: cfg } = await db.from("inventario_config").select("fuente").maybeSingle();
+  if (cfg?.fuente === "crm") {
+    return NextResponse.json({ ok: true, skipped: "La carga del inventario es desde el CRM." });
+  }
 
   // 1) Fetch the published CSV.
   let csv: string;

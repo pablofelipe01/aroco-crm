@@ -2,7 +2,8 @@
 
 import * as React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Plus, Search, Boxes, Warehouse } from "lucide-react";
+import { Plus, Search, Boxes, Warehouse, LogOut, FileSpreadsheet, ArrowRightLeft } from "lucide-react";
+import { Modal } from "@/components/ui/modal";
 import { ScrollFijo } from "@/components/ui/scroll-fijo";
 import { BarraFija } from "@/components/ui/scroll-efectos";
 import { PageHeader } from "@/components/ui/page-header";
@@ -27,8 +28,11 @@ import {
 } from "@/lib/inventory/bodegas";
 import type { InventoryLot } from "@/lib/types/database";
 import { LotDetail } from "./lot-detail";
-import { LotForm } from "./lot-form";
 import { asignarBodega } from "./actions";
+import { pasarCargaAlCrm } from "./carga-actions";
+import { IngresoForm, type ProveedorOpcion } from "./ingreso-form";
+import { SalidaForm, type LoteConSaldo } from "./salida-form";
+import { disponibleDeClases } from "@/lib/inventory/carga";
 
 /** Qué bodega se está mirando: todas (consolidado), una, o los sin asignar. */
 type Vista = "todas" | Bodega | "sin";
@@ -36,9 +40,22 @@ type Vista = "todas" | Bodega | "sin";
 export function InventarioClient({
   initialLots,
   canWrite,
+  puedeSalida,
+  esAdmin,
+  modoCrm,
+  proveedores,
+  destinos,
 }: {
   initialLots: InventoryLot[];
+  /** Ingresos, ajustes y bodega (Bodega Central, Administrativo, Operaciones). */
   canWrite: boolean;
+  /** Salidas (Bodega Central, Comercial, Operaciones). */
+  puedeSalida: boolean;
+  esAdmin: boolean;
+  /** La carga ya es desde el CRM; si no, manda el Excel. */
+  modoCrm: boolean;
+  proveedores: ProveedorOpcion[];
+  destinos: string[];
 }) {
   const router = useRouter();
   const [query, setQuery] = React.useState("");
@@ -48,6 +65,12 @@ export function InventarioClient({
   const [selected, setSelected] = React.useState<InventoryLot | null>(null);
   const [formOpen, setFormOpen] = React.useState(false);
   const [editing, setEditing] = React.useState<InventoryLot | null>(null);
+  const [salida, setSalida] = React.useState<{ abierta: boolean; lote: string | null }>({
+    abierta: false,
+    lote: null,
+  });
+  const [corte, setCorte] = React.useState(false);
+  const [cortando, setCortando] = React.useState(false);
   const [vista, setVista] = React.useState<Vista>("todas");
   const { toast } = useToast();
   // Bodega elegida en esta pantalla mientras el servidor confirma. Va atada a
@@ -103,6 +126,32 @@ export function InventarioClient({
     return { withStock, count: enVista.length };
   }, [enVista]);
 
+  const lotesConSaldo = React.useMemo<LoteConSaldo[]>(
+    () =>
+      lotes
+        .filter((l) => l.source === "crm" && l.qty_available_kg > 0.0005)
+        .map((l) => ({
+          id: l.id,
+          nombre: `${l.codigo_nuevo ?? l.code} · ${formatNumber(l.qty_available_kg, 1)} kg`,
+          bodega: l.bodega,
+          disponible: disponibleDeClases(l),
+        })),
+    [lotes],
+  );
+
+  async function confirmarCorte() {
+    setCortando(true);
+    const r = await pasarCargaAlCrm();
+    setCortando(false);
+    if (!r.ok) {
+      toast({ tone: "error", title: "No se pudo pasar al CRM", description: r.error });
+      return;
+    }
+    setCorte(false);
+    toast({ tone: "success", title: "La carga ya es desde el CRM", description: r.detalle });
+    router.refresh();
+  }
+
   async function cambiarBodega(l: InventoryLot, valor: string) {
     const bodega = esBodega(valor) ? valor : null;
     setPendiente((p) => ({ ...p, [l.id]: bodega }));
@@ -138,20 +187,51 @@ export function InventarioClient({
         title="Inventario"
         description="Disponible por bodega (Cauca, Bogotá, Nilo) y por tipo de cacao, lote por lote."
         actions={
-          canWrite && (
-            <Button
-              size="sm"
-              onClick={() => {
-                setEditing(null);
-                setFormOpen(true);
-              }}
-            >
-              <Plus className="h-4 w-4" />
-              Nuevo lote
-            </Button>
-          )
+          modoCrm && (canWrite || puedeSalida) ? (
+            <div className="flex flex-wrap gap-2">
+              {puedeSalida && (
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => setSalida({ abierta: true, lote: null })}
+                >
+                  <LogOut className="h-4 w-4" />
+                  Nueva salida
+                </Button>
+              )}
+              {canWrite && (
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    setEditing(null);
+                    setFormOpen(true);
+                  }}
+                >
+                  <Plus className="h-4 w-4" />
+                  Nuevo ingreso
+                </Button>
+              )}
+            </div>
+          ) : undefined
         }
       />
+
+      {!modoCrm && (
+        <div className="flex flex-col gap-3 rounded-[var(--radius-lg)] border border-border bg-bg-subtle/50 px-4 py-3 sm:flex-row sm:items-center">
+          <FileSpreadsheet className="hidden h-5 w-5 shrink-0 text-fg-subtle sm:block" />
+          <p className="flex-1 text-sm text-fg-muted">
+            El inventario todavía se carga en el Excel de bodega y llega aquí cada mañana. Cuando la
+            bodega deje de usarlo, un administrador pasa la carga al CRM: desde ahí los ingresos,
+            salidas y mermas se registran aquí.
+          </p>
+          {esAdmin && (
+            <Button size="sm" variant="secondary" onClick={() => setCorte(true)}>
+              <ArrowRightLeft className="h-4 w-4" />
+              Pasar la carga al CRM
+            </Button>
+          )}
+        </div>
+      )}
 
       <ResumenBodegas
         filas={resumen.filas}
@@ -374,24 +454,72 @@ export function InventarioClient({
         lot={liveSelected}
         open={selected !== null}
         canWrite={canWrite}
+        puedeSalida={puedeSalida}
+        modoCrm={modoCrm}
         onClose={() => setSelected(null)}
-        onEdit={(l) => {
+        onEditar={(l) => {
           setSelected(null);
           setEditing(l);
           setFormOpen(true);
         }}
+        onSalida={(id) => {
+          setSelected(null);
+          setSalida({ abierta: true, lote: id });
+        }}
         onChanged={() => router.refresh()}
       />
 
-      <LotForm
+      <IngresoForm
         open={formOpen}
         onClose={() => setFormOpen(false)}
-        initial={editing}
-        onSaved={() => {
+        lote={editing}
+        proveedores={proveedores}
+        onGuardado={() => {
           setFormOpen(false);
           router.refresh();
         }}
       />
+
+      <SalidaForm
+        open={salida.abierta}
+        onClose={() => setSalida({ abierta: false, lote: null })}
+        lotes={lotesConSaldo}
+        destinos={destinos}
+        loteInicial={salida.lote}
+        onGuardado={() => {
+          setSalida({ abierta: false, lote: null });
+          router.refresh();
+        }}
+      />
+
+      <Modal
+        open={corte}
+        onClose={() => setCorte(false)}
+        title="Pasar la carga del inventario al CRM"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setCorte(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={confirmarCorte} loading={cortando}>
+              Pasar al CRM
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-3 text-sm text-fg-muted">
+          <p>
+            Desde ese momento el Excel de bodega deja de llegar al CRM: los ingresos, salidas,
+            mermas y selecciones se registran aquí. <strong className="text-fg">No se puede
+            deshacer desde la aplicación.</strong>
+          </p>
+          <p>
+            Cada lote conserva el saldo que tiene hoy por clase. Lo que el archivo no detallaba
+            (merma, selección) queda como un «saldo de apertura» en su historial.
+          </p>
+          <p>Hazlo cuando la bodega ya no vaya a anotar en el Excel, para no contar nada dos veces.</p>
+        </div>
+      </Modal>
     </div>
   );
 }
@@ -414,6 +542,7 @@ function tipoDeLote(l: InventoryLot): string | null {
     qty_avail_rainforest_kg: l.qty_in_rainforest_kg,
     qty_avail_organico_kg: l.qty_in_organico_kg,
     qty_avail_pasilla_kg: l.qty_in_pasilla_kg,
+    qty_avail_baba_kg: l.qty_in_baba_kg,
   });
   const m2 = TIPOS.reduce((a, b) => (entra[b] > entra[a] ? b : a));
   return entra[m2] > 0 ? NOMBRE_TIPO[m2] : null;
@@ -514,7 +643,7 @@ function ResumenBodegas({
       <p className="border-t border-border px-5 py-2.5 text-xs text-fg-subtle">
         Primera = Premium, Estándar, Fairtrade y Rainforest · Segunda = Corriente, Corriente C y
         Pasilla
-        {!hayBaba && " · Baba entra cuando se registren ingresos desde el CRM"}
+        {!hayBaba && " · Baba (cacao fresco) entra con los ingresos registrados en el CRM"}
         {filas.some((f) => f.bodega === null) &&
           " · Asigna la bodega de cada lote en la columna «Bodega»"}
       </p>

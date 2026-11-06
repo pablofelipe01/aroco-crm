@@ -26,9 +26,9 @@ test("las ocho calidades caen en Primera, Segunda u Orgánico sin perder kilos",
     qty_avail_pasilla_kg: 64,
     qty_avail_organico_kg: 128,
   });
-  const t = disponiblePorTipo(l);
-  assert.deepEqual(t, { organico: 128, primera: 15, segunda: 112, baba: 0 });
-  assert.equal(totalTipos(t), 255);
+  const t = disponiblePorTipo({ ...l, qty_avail_baba_kg: 256 });
+  assert.deepEqual(t, { organico: 128, primera: 15, segunda: 112, baba: 256 });
+  assert.equal(totalTipos(t), 511);
 });
 
 test("el resumen separa por bodega y deja aparte los lotes sin asignar", () => {

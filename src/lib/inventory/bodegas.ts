@@ -10,7 +10,7 @@
  *   Primera  = Premium + Estándar + Fairtrade + Rainforest
  *   Segunda  = Corriente + Corriente C + Pasilla
  *   Orgánico = Orgánico
- *   Baba     = cacao en baba; el archivo no lo trae, entra por el CRM (fase 2)
+ *   Baba     = cacao en baba (fresco); el archivo no lo trae, entra por el CRM
  *
  * La bodega tampoco está en el archivo: se elige en el CRM por lote.
  */
@@ -50,6 +50,8 @@ export type DisponiblePorClase = {
   qty_avail_rainforest_kg: number | null;
   qty_avail_organico_kg: number | null;
   qty_avail_pasilla_kg: number | null;
+  /** Solo existe desde 0113; los lotes del archivo no la traen. */
+  qty_avail_baba_kg?: number | null;
 };
 
 const n = (v: number | null | undefined) => Number(v) || 0;
@@ -68,7 +70,7 @@ export function disponiblePorTipo(l: DisponiblePorClase): PorTipo {
       n(l.qty_avail_fairtrade_kg) +
       n(l.qty_avail_rainforest_kg),
     segunda: n(l.qty_avail_corriente_kg) + n(l.qty_avail_corriente_c_kg) + n(l.qty_avail_pasilla_kg),
-    baba: 0,
+    baba: n(l.qty_avail_baba_kg),
   };
 }
 
