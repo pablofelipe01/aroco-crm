@@ -3,6 +3,7 @@ import mammoth from "mammoth";
 import { createClient } from "@/lib/supabase/server";
 import { getSessionContext } from "@/lib/auth";
 import { extractActaTasks, type ActaContent } from "@/lib/ai/actas";
+import { conNota, miembrosPresentes, reasignarAusentes, type Asistente } from "@/lib/actas/ausentes";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -77,7 +78,7 @@ export async function POST(request: NextRequest) {
   // Team names for assignee matching.
   const { data: team } = await supabase
     .from("team_members")
-    .select("id, name")
+    .select("id, name, profile_id, manager_id")
     .eq("active", true);
   const members = team ?? [];
 
@@ -100,6 +101,9 @@ export async function POST(request: NextRequest) {
       .normalize("NFD")
       .replace(/[̀-ͯ]/g, "")
       .trim();
+
+  // Quienes estuvieron: deciden a quién se le puede proponer una tarea.
+  let asistentes: Asistente[] = [];
 
   // Invitados detectados en el acta: alimentan quién puede leerla si luego se
   // marca como restringida. Un fallo aquí no debe frustrar la extracción.
@@ -130,11 +134,16 @@ export async function POST(request: NextRequest) {
         },
       ];
     });
+    asistentes = rows;
     if (rows.length > 0) {
       const { error: atErr } = await supabase.from("meeting_attendees").insert(rows);
       if (atErr) console.error("[actas] invitados:", atErr.message);
     }
   }
+
+  // Quien no estuvo en la reunión no recibe tareas: se proponen a su jefe de
+  // sección con una nota para que se las mencione (ver lib/actas/ausentes.ts).
+  const presentes = miembrosPresentes(asistentes, members);
 
   // Resolve assignee names → team member ids. Una tarea puede traer varios.
   const proposals = extracted.tasks.map((t) => {
@@ -152,13 +161,14 @@ export async function POST(request: NextRequest) {
         unmatched.push(raw);
       }
     }
+    const { assignees, remitidas } = reasignarAusentes(assignee_ids, presentes, members);
     return {
       name: t.name,
-      description: t.description,
+      description: conNota(t.description, remitidas),
       due_date: t.due_date,
-      assignee_ids,
+      assignee_ids: assignees,
       // Nombre sugerido cuando el acta menciona a alguien fuera del equipo.
-      person_name: assignee_ids.length === 0 ? (unmatched[0] ?? null) : null,
+      person_name: assignees.length === 0 ? (unmatched[0] ?? null) : null,
     };
   });
 

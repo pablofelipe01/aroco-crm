@@ -5,6 +5,7 @@ import { hasGmailEnv, listActaMessageIds, fetchEmail } from "@/lib/gmail";
 import { serverEnv } from "@/lib/env";
 import { emparejarNombre, type Candidato } from "@/lib/actas/nombres";
 import { detectarParecidas } from "@/lib/tareas/parecidas";
+import { conNota, miembrosPresentes, reasignarAusentes, type Asistente } from "@/lib/actas/ausentes";
 
 export interface IngestSummary {
   configured: boolean;
@@ -70,7 +71,7 @@ export async function ingestActasFromGmail(): Promise<IngestSummary> {
 
   const { data: team } = await db
     .from("team_members")
-    .select("id, name, profile_id")
+    .select("id, name, profile_id, manager_id")
     .eq("active", true);
   const members = team ?? [];
 
@@ -157,6 +158,9 @@ export async function ingestActasFromGmail(): Promise<IngestSummary> {
         members.map((m) => m.name),
       );
 
+      // Quienes estuvieron: deciden a quién se le puede dejar una tarea.
+      let asistentes: Asistente[] = [];
+
       // Invitados: se resuelven contra los perfiles por correo y contra el
       // equipo por nombre. Alimentan quién puede leer el acta si alguien la
       // marca como restringida.
@@ -193,12 +197,17 @@ export async function ingestActasFromGmail(): Promise<IngestSummary> {
           seen.add(key);
           return true;
         });
+        asistentes = unique;
         if (unique.length > 0) {
           const { error: atErr } = await db.from("meeting_attendees").insert(unique);
           // Un fallo aquí no debe tumbar la ingesta del acta completa.
           if (atErr) console.error("[actas] invitados:", atErr.message);
         }
       }
+      // Quien no estuvo en la reunión no recibe tareas: pasan a su jefe de
+      // sección con una nota para que se las mencione (ver ausentes.ts).
+      const presentes = miembrosPresentes(asistentes, members);
+
       // Cada tarea puede quedar en manos de varias personas. Se resuelven
       // contra el catálogo del equipo; los nombres que no coincidan se guardan
       // como texto en `person_name` para no perderlos.
@@ -217,10 +226,11 @@ export async function ingestActasFromGmail(): Promise<IngestSummary> {
             unmatched.push(raw);
           }
         }
+        const { assignees, remitidas } = reasignarAusentes(matched, presentes, members);
         return {
           row: {
             name: t.name,
-            description: t.description,
+            description: conNota(t.description, remitidas),
             due_date: t.due_date || null,
             // person_id / person_name los deriva el trigger a partir de los
             // responsables; aquí solo se deja el texto suelto cuando nadie
@@ -230,7 +240,7 @@ export async function ingestActasFromGmail(): Promise<IngestSummary> {
             source: "Acta (email)",
             meeting_id: meeting.id,
           },
-          assignees: matched,
+          assignees,
         };
       });
 
