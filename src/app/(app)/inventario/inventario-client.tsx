@@ -14,7 +14,7 @@ import { Select } from "@/components/ui/input";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/components/ui/toast";
 import { EmptyState } from "@/components/ui/empty-state";
-import { cn, formatDate, formatNumber } from "@/lib/utils";
+import { cn, formatCOP, formatDate, formatNumber } from "@/lib/utils";
 import {
   BODEGAS,
   NOMBRE_BODEGA,
@@ -22,7 +22,9 @@ import {
   TIPOS,
   disponiblePorTipo,
   bodegaAutomatica,
+  coberturaPrecio,
   esBodega,
+  valorPorKg,
   resumenPorBodega,
   type Bodega,
   type FilaResumen,
@@ -350,8 +352,9 @@ export function InventarioClient({
                     {l.entry_date ? formatDate(l.entry_date) : "—"}
                     {l.quality ? ` · ${l.quality}` : ""}
                     {l.proveedor ? ` · ${l.proveedor}` : ""}
-                    <div className="mt-0.5 font-mono">
+                    <div className="mt-0.5 font-mono tnum">
                       In {formatNumber(l.qty_in_kg)} · Out {formatNumber(l.qty_out_kg)}
+                      {l.purchase_price_cop_kg ? ` · ${formatCOP(l.purchase_price_cop_kg)}/kg` : ""}
                     </div>
                   </div>
                   <div className="text-right">
@@ -372,7 +375,7 @@ export function InventarioClient({
             fija al bajar (con overflow-x, un sticky no se pega al scroll de la
             página). */}
         <ScrollFijo className="hidden rounded-[var(--radius-lg)] border border-border bg-surface sm:block">
-          <table className="w-full min-w-[860px] text-sm">
+          <table className="w-full min-w-[940px] text-sm">
             <thead>
               {/* Cada th fijo con fondo; el borde va como sombra porque el de la
                   fila no viaja con un th fijo. */}
@@ -384,6 +387,7 @@ export function InventarioClient({
                 <th className="px-4 py-3 text-right font-medium">Ingresada</th>
                 <th className="px-4 py-3 text-right font-medium">Salida</th>
                 <th className="px-4 py-3 text-right font-medium">Disponible</th>
+                <th className="px-4 py-3 text-right font-medium">COP/kg</th>
                 <th className="px-4 py-3 text-left font-medium">Clasificación</th>
                 <th className="px-4 py-3 text-left font-medium">Bodega</th>
               </tr>
@@ -420,6 +424,9 @@ export function InventarioClient({
                   </td>
                   <td className="px-4 py-3 text-right font-mono tnum font-semibold text-fg">
                     {formatNumber(l.qty_available_kg)}
+                  </td>
+                  <td className="px-4 py-3 text-right font-mono text-xs tnum text-fg-muted">
+                    {l.purchase_price_cop_kg ? formatCOP(l.purchase_price_cop_kg) : "—"}
                   </td>
                   <td className="px-4 py-3 text-fg-muted">
                     <span className="inline-flex items-center gap-2">
@@ -597,7 +604,7 @@ function ResumenBodegas({
         <span className="font-mono text-xs text-fg-subtle tnum">kg</span>
       </CardHeader>
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[520px] text-sm">
+        <table className="w-full min-w-[620px] text-sm">
           <thead>
             <tr className="border-b border-border text-xs uppercase tracking-wide text-fg-subtle">
               <th className="px-5 py-2.5 text-left font-medium">Bodega</th>
@@ -607,6 +614,12 @@ function ResumenBodegas({
                 </th>
               ))}
               <th className="px-5 py-2.5 text-right font-medium">Total</th>
+              <th
+                className="px-5 py-2.5 text-right font-medium"
+                title="Precio de compra promedio, ponderado por los kilos disponibles"
+              >
+                COP/kg
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -639,6 +652,7 @@ function ResumenBodegas({
                   <td className="px-5 py-2.5 text-right font-mono font-semibold tnum text-fg">
                     {kg(f.total)}
                   </td>
+                  <ValorKg fila={f} />
                 </tr>
               );
             })}
@@ -658,16 +672,51 @@ function ResumenBodegas({
               <td className="px-5 py-3 text-right font-mono text-base font-semibold tnum text-fg">
                 {kg(total.total)}
               </td>
+              <ValorKg fila={total} fuerte />
             </tr>
           </tbody>
         </table>
       </div>
       <p className="border-t border-border px-5 py-2.5 text-xs text-fg-subtle">
         Primera = Premium, Estándar, Fairtrade y Rainforest · Segunda = Corriente, Corriente C y
-        Pasilla
+        Pasilla · COP/kg = precio de compra (base + bonificación) promedio, ponderado por los kilos
+        disponibles; los lotes sin precio no entran y el % dice cuántos kilos sí lo traen
         {!hayBaba && " · Baba (cacao fresco) entra con los ingresos registrados en el CRM"}
         {" · La bodega es dónde está el grano: la de la columna «BODEGA» del archivo o la elegida a mano. Sin ninguna de las dos se estima por el origen y el lote sale «por confirmar»"}
       </p>
     </Card>
+  );
+}
+
+/**
+ * Celda de valor por kg del resumen. Si no todos los kilos traen precio, lo
+ * dice: un promedio de 2 lotes sobre 20 t no es el valor de la bodega.
+ */
+function ValorKg({ fila, fuerte }: { fila: FilaResumen; fuerte?: boolean }) {
+  const v = valorPorKg(fila);
+  const cob = coberturaPrecio(fila);
+  return (
+    <td
+      className={cn(
+        "px-5 text-right font-mono tnum",
+        fuerte ? "py-3 font-semibold text-fg" : "py-2.5 text-fg-muted",
+      )}
+    >
+      {v == null ? (
+        <span className="text-fg-subtle">{fila.total > 0 ? "sin precio" : "—"}</span>
+      ) : (
+        <>
+          {formatCOP(v)}
+          {cob < 0.995 && (
+            <span
+              className="block text-[10px] font-normal text-warn"
+              title={`${formatNumber(fila.kgConPrecio)} de ${formatNumber(fila.total)} kg traen precio`}
+            >
+              {Math.round(cob * 100)} % con precio
+            </span>
+          )}
+        </>
+      )}
+    </td>
   );
 }

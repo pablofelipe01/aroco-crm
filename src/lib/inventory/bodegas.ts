@@ -132,29 +132,69 @@ export function disponiblePorTipo(l: DisponiblePorClase): PorTipo {
 
 export const totalTipos = (t: PorTipo) => TIPOS.reduce((s, k) => s + t[k], 0);
 
-export type FilaResumen = { bodega: Bodega | null; tipos: PorTipo; total: number; lotes: number };
+export type FilaResumen = {
+  bodega: Bodega | null;
+  tipos: PorTipo;
+  total: number;
+  lotes: number;
+  /** Σ kg disponibles × precio de compra, solo de los lotes que traen precio. */
+  valor: number;
+  /** Kilos disponibles que sí traen precio: el denominador del valor por kg. */
+  kgConPrecio: number;
+};
+
+const filaVacia = (bodega: Bodega | null): FilaResumen => ({
+  bodega,
+  tipos: tipoVacio(),
+  total: 0,
+  lotes: 0,
+  valor: 0,
+  kgConPrecio: 0,
+});
+
+/**
+ * Valor por kilogramo de una fila: promedio del precio de compra ponderado por
+ * los kilos disponibles. Los lotes sin precio no cuentan como $0 (bajarían el
+ * promedio): quedan fuera y `coberturaPrecio` dice cuánto pesan. Nulo si
+ * ningún lote de la fila trae precio.
+ */
+export function valorPorKg(f: Pick<FilaResumen, "valor" | "kgConPrecio">): number | null {
+  return f.kgConPrecio > 0 ? f.valor / f.kgConPrecio : null;
+}
+
+/** Fracción (0–1) de los kilos de la fila que tienen precio de compra. */
+export function coberturaPrecio(f: Pick<FilaResumen, "total" | "kgConPrecio">): number {
+  return f.total > 0 ? Math.min(1, f.kgConPrecio / f.total) : 0;
+}
 
 /**
  * Resumen por bodega: una fila por bodega (y una para los lotes sin asignar,
  * solo si hay alguno con saldo) más el total consolidado.
  */
-export function resumenPorBodega<L extends DisponiblePorClase & { bodega: string | null }>(
+export function resumenPorBodega<
+  L extends DisponiblePorClase & { bodega: string | null; purchase_price_cop_kg?: number | null },
+>(
   lotes: L[],
 ): { filas: FilaResumen[]; total: FilaResumen } {
   const filas = new Map<Bodega | null, FilaResumen>();
-  for (const b of BODEGAS) filas.set(b, { bodega: b, tipos: tipoVacio(), total: 0, lotes: 0 });
-  const total: FilaResumen = { bodega: null, tipos: tipoVacio(), total: 0, lotes: 0 };
+  for (const b of BODEGAS) filas.set(b, filaVacia(b));
+  const total = filaVacia(null);
 
   for (const l of lotes) {
     const t = disponiblePorTipo(l);
     const kg = totalTipos(t);
     if (kg <= 0) continue;
     const b = esBodega(l.bodega) ? l.bodega : null;
-    if (!filas.has(b)) filas.set(b, { bodega: b, tipos: tipoVacio(), total: 0, lotes: 0 });
+    if (!filas.has(b)) filas.set(b, filaVacia(b));
+    const precio = Number(l.purchase_price_cop_kg) || 0;
     for (const f of [filas.get(b)!, total]) {
       for (const k of TIPOS) f.tipos[k] += t[k];
       f.total += kg;
       f.lotes += 1;
+      if (precio > 0) {
+        f.valor += kg * precio;
+        f.kgConPrecio += kg;
+      }
     }
   }
   return { filas: [...filas.values()], total };

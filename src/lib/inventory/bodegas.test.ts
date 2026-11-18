@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { bodegaAutomatica, bodegaPorOrigen, leerBodega, disponiblePorTipo, resumenPorBodega, totalTipos, type DisponiblePorClase } from "./bodegas";
+import { bodegaAutomatica, bodegaPorOrigen, coberturaPrecio, leerBodega, valorPorKg, disponiblePorTipo, resumenPorBodega, totalTipos, type DisponiblePorClase } from "./bodegas";
 
 const lote = (o: Partial<DisponiblePorClase> & { bodega?: string | null }) => ({
   qty_avail_premium_kg: 0,
@@ -83,4 +83,19 @@ test("la hoja gana sobre el origen: 888 kg del Cauca en Bogotá van a Bogotá", 
     bodega: "cauca",
     origen: "estimada",
   });
+});
+
+test("valor por kg: promedio ponderado por kilos, sin contar como $0 los lotes sin precio", () => {
+  const { filas, total } = resumenPorBodega([
+    { ...lote({ qty_avail_estandar_kg: 1000, bodega: "bogota" }), purchase_price_cop_kg: 15000 },
+    { ...lote({ qty_avail_premium_kg: 3000, bodega: "bogota" }), purchase_price_cop_kg: 17000 },
+    { ...lote({ qty_avail_corriente_kg: 1000, bodega: "bogota" }), purchase_price_cop_kg: null },
+    { ...lote({ qty_avail_corriente_kg: 500, bodega: "cauca" }), purchase_price_cop_kg: null },
+  ]);
+  const bog = filas.find((f) => f.bodega === "bogota")!;
+  assert.equal(valorPorKg(bog), 16500); // (1000×15000 + 3000×17000) / 4000
+  assert.equal(coberturaPrecio(bog), 0.8);
+  assert.equal(valorPorKg(filas.find((f) => f.bodega === "cauca")!), null);
+  assert.equal(valorPorKg(total), 16500);
+  assert.equal(coberturaPrecio(total), 4000 / 5500);
 });
