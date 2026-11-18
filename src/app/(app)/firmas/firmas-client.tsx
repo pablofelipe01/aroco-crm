@@ -21,7 +21,10 @@ import {
   type EstadoSobre,
   type TipoSobre,
 } from "@/lib/firmas/tipos";
+import { CampoDocumento } from "@/components/firma/campo-documento";
+import type { PosicionFirma } from "@/lib/firmas/tipos";
 import { crearSobre } from "./actions";
+import { UbicarFirmas } from "./ubicar-firmas";
 import { EnlacesModal, type EnlaceFirma } from "./enlaces";
 
 export type FilaSobre = {
@@ -197,8 +200,14 @@ export function FirmasClient({
   );
 }
 
-type FirmanteForm = { nombre: string; email: string; documento: string; rol: string };
-const firmanteVacio = (): FirmanteForm => ({ nombre: "", email: "", documento: "", rol: "" });
+type FirmanteForm = {
+  nombre: string;
+  email: string;
+  documento: string;
+  rol: string;
+  posicion: PosicionFirma | null;
+};
+const firmanteVacio = (): FirmanteForm => ({ nombre: "", email: "", documento: "", rol: "", posicion: null });
 
 function NuevoSobre({ userId, onClose }: { userId: string; onClose: () => void }) {
   const router = useRouter();
@@ -214,7 +223,7 @@ function NuevoSobre({ userId, onClose }: { userId: string; onClose: () => void }
   const [error, setError] = React.useState<string | null>(null);
   const [enlaces, setEnlaces] = React.useState<{ id: string; lista: EnlaceFirma[] } | null>(null);
 
-  const cambiar = (i: number, k: keyof FirmanteForm, v: string) =>
+  const cambiar = <K extends keyof FirmanteForm>(i: number, k: K, v: FirmanteForm[K]) =>
     setFirmantes((fs) => fs.map((f, j) => (j === i ? { ...f, [k]: v } : f)));
   const mover = (i: number, d: -1 | 1) =>
     setFirmantes((fs) => {
@@ -365,7 +374,14 @@ function NuevoSobre({ userId, onClose }: { userId: string; onClose: () => void }
               <div className="grid min-w-0 flex-1 gap-2 sm:grid-cols-2">
                 <Input aria-label={`Nombre del firmante ${i + 1}`} placeholder="Nombre completo" value={f.nombre} onChange={(e) => cambiar(i, "nombre", e.target.value)} />
                 <Input aria-label={`Correo del firmante ${i + 1}`} placeholder="Correo" type="email" value={f.email} onChange={(e) => cambiar(i, "email", e.target.value)} />
-                <Input aria-label={`Documento del firmante ${i + 1}`} placeholder="Cédula / NIT / pasaporte (opcional)" value={f.documento} onChange={(e) => cambiar(i, "documento", e.target.value)} />
+                <CampoDocumento
+                  valor={f.documento}
+                  onCambio={(v) => cambiar(i, "documento", v)}
+                  idioma={idioma}
+                  etiquetaTipo={`Tipo de documento del firmante ${i + 1}`}
+                  etiquetaNumero={`Número de documento del firmante ${i + 1}`}
+                  placeholder="Número (opcional)"
+                />
                 <Input aria-label={`Rol del firmante ${i + 1}`} placeholder="Rol: Comprador, Representante legal AROCO…" value={f.rol} onChange={(e) => cambiar(i, "rol", e.target.value)} />
               </div>
               <div className="flex shrink-0 flex-col gap-0.5">
@@ -403,6 +419,18 @@ function NuevoSobre({ userId, onClose }: { userId: string; onClose: () => void }
             Si AROCO también firma, agrega al representante legal como un firmante más (normalmente el último).
           </p>
         </fieldset>
+
+        {archivo && (
+          <fieldset className="flex flex-col gap-2">
+            <legend className="mb-1 text-xs font-medium text-fg-muted">Dónde firma cada quien</legend>
+            <UbicarFirmas
+              archivo={archivo}
+              firmantes={firmantes}
+              posiciones={firmantes.map((f) => f.posicion)}
+              onCambio={(i, p) => cambiar(i, "posicion", p)}
+            />
+          </fieldset>
+        )}
 
         {error && (
           <p role="alert" className="flex items-start gap-2 rounded-[var(--radius-md)] bg-danger-soft px-3 py-2 text-sm text-danger">

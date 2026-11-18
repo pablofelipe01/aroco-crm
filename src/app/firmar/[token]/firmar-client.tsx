@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input, Textarea } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { textosFirma } from "@/lib/firmas/textos";
+import { CampoDocumento } from "@/components/firma/campo-documento";
 import { enviarCodigo, firmar, rechazar, verificarCodigo } from "./actions";
 
 type Props = {
@@ -159,10 +160,16 @@ export function FirmarClient(p: Props) {
             {t.nombreCompleto}
             <Input value={nombre} onChange={(e) => setNombre(e.target.value)} autoComplete="name" />
           </label>
-          <label className="flex flex-col gap-1.5 text-xs font-medium text-fg-muted">
+          <div className="flex flex-col gap-1.5 text-xs font-medium text-fg-muted">
             {t.documento}
-            <Input value={documento} onChange={(e) => setDocumento(e.target.value)} />
-          </label>
+            <CampoDocumento
+              valor={documento}
+              onCambio={setDocumento}
+              idioma={p.idioma}
+              etiquetaTipo={t.documentoTipo}
+              etiquetaNumero={t.documentoNumero}
+            />
+          </div>
         </div>
 
         {modo === "dibujada" ? (

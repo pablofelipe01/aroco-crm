@@ -14,7 +14,7 @@ import {
   notificarFirmante,
   registrarEvento,
 } from "@/lib/firmas/servidor";
-import { DIAS_VIGENCIA, TIPOS_SOBRE } from "@/lib/firmas/tipos";
+import { DIAS_VIGENCIA, TIPOS_SOBRE, posicionValida } from "@/lib/firmas/tipos";
 
 /**
  * Acciones del módulo Firmas en el CRM. Las lecturas y escrituras de sobres y
@@ -43,6 +43,11 @@ const esquemaSobre = z.object({
         email: z.string().trim().toLowerCase().email("Hay un correo de firmante que no es válido."),
         documento: z.string().trim().max(40).optional(),
         rol: z.string().trim().max(80).optional(),
+        /** Recuadro de la firma sobre el PDF (fracciones de la página); se valida contra el PDF. */
+        posicion: z
+          .object({ pagina: z.number().int(), x: z.number(), y: z.number(), w: z.number(), h: z.number() })
+          .nullable()
+          .optional(),
       }),
     )
     .min(1, "Agrega al menos un firmante.")
@@ -79,12 +84,23 @@ export async function crearSobre(
   const admin = createAdminClient();
   let bytes: Uint8Array;
   let paginas: number;
+  let giradas: number[];
   try {
     bytes = await descargar(admin, d.path);
     if (bytes.length > MAX_BYTES) return { ok: false, error: "El PDF pasa de 15 MB." };
-    ({ paginas } = await inspeccionarPdf(bytes));
+    ({ paginas, giradas } = await inspeccionarPdf(bytes));
   } catch (e) {
     return { ok: false, error: e instanceof PdfNoValido ? e.message : "No se pudo leer el PDF subido." };
+  }
+
+  for (const f of d.firmantes) {
+    if (!f.posicion) continue;
+    if (!posicionValida(f.posicion, paginas)) {
+      return { ok: false, error: `El lugar de la firma de ${f.nombre} quedó fuera del documento. Vuelve a ubicarlo.` };
+    }
+    if (giradas.includes(f.posicion.pagina)) {
+      return { ok: false, error: `La página ${f.posicion.pagina} está girada: ubica la firma de ${f.nombre} en otra página.` };
+    }
   }
 
   const { data: sobre, error } = await supabase
@@ -115,6 +131,7 @@ export async function crearSobre(
       email: f.email,
       documento: f.documento || null,
       rol: f.rol || null,
+      posicion: f.posicion ?? null,
     })),
   );
   if (eF) {

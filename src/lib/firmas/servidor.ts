@@ -8,7 +8,14 @@ import { botonCorreo, escapar, marcoCorreo } from "@/lib/correo/html";
 import type { FirmaFirmante, FirmaSobre, Json } from "@/lib/types/database";
 import { fechaColombia, sellarPdf, sha256Hex, type FirmanteSellado } from "./pdf";
 import { textosFirma } from "./textos";
-import { MINUTOS_CODIGO, MINUTOS_VERIFICACION, turnoActual, type IdiomaFirma, type TipoSobre } from "./tipos";
+import {
+  MINUTOS_CODIGO,
+  MINUTOS_VERIFICACION,
+  posicionValida,
+  turnoActual,
+  type IdiomaFirma,
+  type TipoSobre,
+} from "./tipos";
 
 /**
  * Lo que la firma hace del lado del servidor, con service_role.
@@ -251,6 +258,7 @@ export async function cerrarSiCompleto(admin: Admin, sobreId: string, ctx: Conte
       firmadoEn: f.firmado_en!,
       ip: f.firmado_ip,
       userAgent: f.firmado_user_agent,
+      posicion: posicionValida(f.posicion, sobre.original_paginas) ? f.posicion : null,
       firma:
         f.firma_modo === "dibujada" && f.firma_path
           ? { modo: "dibujada", png: await descargar(admin, f.firma_path) }

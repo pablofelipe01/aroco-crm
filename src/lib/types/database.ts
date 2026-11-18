@@ -105,6 +105,7 @@ export type Database = {
           nombre_firmado: string | null
           notificado_en: string | null
           orden: number
+          posicion: Json | null
           rechazado_en: string | null
           rol: string | null
           sobre_id: string
@@ -132,6 +133,7 @@ export type Database = {
           nombre_firmado?: string | null
           notificado_en?: string | null
           orden?: number
+          posicion?: Json | null
           rechazado_en?: string | null
           rol?: string | null
           sobre_id: string
@@ -159,6 +161,7 @@ export type Database = {
           nombre_firmado?: string | null
           notificado_en?: string | null
           orden?: number
+          posicion?: Json | null
           rechazado_en?: string | null
           rol?: string | null
           sobre_id?: string

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { PDFDocument, StandardFonts } from "pdf-lib";
+import { PDFDict, PDFDocument, PDFName, StandardFonts, degrees } from "pdf-lib";
 import {
   fechaColombia,
   inspeccionarPdf,
@@ -90,7 +90,7 @@ test("sha256Hex da la huella conocida", () => {
 });
 
 test("inspeccionarPdf cuenta páginas y rechaza lo que no es PDF", async () => {
-  assert.deepEqual(await inspeccionarPdf(await pdfDe(3)), { paginas: 3 });
+  assert.deepEqual(await inspeccionarPdf(await pdfDe(3)), { paginas: 3, giradas: [] });
   await assert.rejects(inspeccionarPdf(new TextEncoder().encode("hola")), PdfNoValido);
   await assert.rejects(inspeccionarPdf(new TextEncoder().encode("%PDF-basura")), PdfNoValido);
 });
@@ -142,4 +142,27 @@ test("enmascararCorreo y resumirAgente", () => {
     resumirAgente("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0) AppleWebKit Version/17.0 Mobile Safari/604.1"),
     "Safari · iOS",
   );
+});
+
+test("la firma queda en el recuadro marcado del documento, no solo en el certificado", async () => {
+  const original = await pdfDe(3);
+  const e = entrada(original);
+  e.firmantes[0].posicion = { pagina: 3, x: 0.1, y: 0.8, w: 0.3, h: 0.07 };
+  e.firmantes[1].posicion = { pagina: 3, x: 0.6, y: 0.8, w: 0.3, h: 0.07 };
+  const conLugar = await PDFDocument.load(await sellarPdf(e));
+  const sinLugar = await PDFDocument.load(await sellarPdf(entrada(original)));
+  // Mismo número de páginas: la firma va encima del original, no en una hoja nueva.
+  assert.equal(conLugar.getPageCount(), sinLugar.getPageCount());
+  // La página 3 del original lleva ahora la imagen de la firma dibujada.
+  const imagenes = (d: PDFDocument, i: number) =>
+    d.getPage(i).node.Resources()?.lookupMaybe(PDFName.of("XObject"), PDFDict)?.keys().length ?? 0;
+  assert.equal(imagenes(conLugar, 2), 1);
+  assert.equal(imagenes(sinLugar, 2), 0);
+  assert.equal(imagenes(conLugar, 0), 0);
+});
+
+test("inspeccionarPdf avisa qué páginas están giradas", async () => {
+  const d = await PDFDocument.load(await pdfDe(2));
+  d.getPage(1).setRotation(degrees(90));
+  assert.deepEqual(await inspeccionarPdf(await d.save()), { paginas: 2, giradas: [2] });
 });

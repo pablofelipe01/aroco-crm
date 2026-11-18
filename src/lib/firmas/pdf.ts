@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage, type PDFImage } from "pdf-lib";
-import { NOMBRE_TIPO, resumirAgente, type IdiomaFirma, type TipoSobre } from "./tipos";
+import { NOMBRE_TIPO, resumirAgente, type IdiomaFirma, type PosicionFirma, type TipoSobre } from "./tipos";
 
 /**
  * El PDF de la firma: inspeccionar el original y sellar el firmado.
@@ -22,7 +22,9 @@ export function sha256Hex(bytes: Uint8Array): string {
 export class PdfNoValido extends Error {}
 
 /** Páginas del PDF, o `PdfNoValido` con un motivo que se le puede mostrar a la persona. */
-export async function inspeccionarPdf(bytes: Uint8Array): Promise<{ paginas: number }> {
+export async function inspeccionarPdf(
+  bytes: Uint8Array,
+): Promise<{ paginas: number; giradas: number[] }> {
   if (bytes.length < 5 || new TextDecoder().decode(bytes.slice(0, 5)) !== "%PDF-") {
     throw new PdfNoValido("El archivo no es un PDF.");
   }
@@ -40,7 +42,12 @@ export async function inspeccionarPdf(bytes: Uint8Array): Promise<{ paginas: num
   }
   const paginas = doc.getPageCount();
   if (!paginas) throw new PdfNoValido("El PDF no tiene páginas.");
-  return { paginas };
+  // Páginas giradas (1-based): en ellas no se ubica la firma (ver `sellarPdf`).
+  const giradas = doc
+    .getPages()
+    .map((p, i) => (p.getRotation().angle % 360 !== 0 ? i + 1 : 0))
+    .filter(Boolean);
+  return { paginas, giradas };
 }
 
 export interface FirmanteSellado {
@@ -55,6 +62,8 @@ export interface FirmanteSellado {
   ip: string | null;
   userAgent: string | null;
   firma: { modo: "dibujada"; png: Uint8Array } | { modo: "escrita" };
+  /** Dónde va la firma en el documento; sin ella, solo en el certificado. */
+  posicion?: PosicionFirma | null;
 }
 
 export interface EventoSellado {
@@ -109,6 +118,7 @@ const ETIQUETAS = {
     dispositivo: "Dispositivo",
     firma: "Firma",
     firmaEscrita: "(firma con nombre escrito)",
+    enLinea: (c: string, f: string) => `Firmado electrónicamente · ${f} · ${c}`,
     registro: "Registro de eventos",
     fecha: "Fecha y hora (Colombia, UTC-5)",
     evento: "Evento",
@@ -161,6 +171,7 @@ const ETIQUETAS = {
     dispositivo: "Device",
     firma: "Signature",
     firmaEscrita: "(typed-name signature)",
+    enLinea: (c: string, f: string) => `Electronically signed · ${f} · ${c}`,
     registro: "Event log",
     fecha: "Date and time (Colombia, UTC-5)",
     evento: "Event",
@@ -300,6 +311,23 @@ class Escritor {
   }
 }
 
+type Caja = { x: number; y: number; width: number; height: number };
+
+/** La firma dentro de una caja: la imagen escalada y centrada, o el nombre en cursiva. */
+function dibujarFirma(p: PDFPage, caja: Caja, f: FirmanteSellado, img: PDFImage | undefined, cursiva: PDFFont) {
+  if (img) {
+    const escala = Math.min((caja.width - 4) / img.width, (caja.height - 4) / img.height);
+    const iw = img.width * escala;
+    const ih = img.height * escala;
+    p.drawImage(img, { x: caja.x + (caja.width - iw) / 2, y: caja.y + (caja.height - ih) / 2, width: iw, height: ih });
+    return;
+  }
+  const nombre = seguroWinAnsi(f.nombreFirmado);
+  let tam = Math.min(18, caja.height * 0.6);
+  while (tam > 6 && cursiva.widthOfTextAtSize(nombre, tam) > caja.width - 8) tam--;
+  p.drawText(nombre, { x: caja.x + 4, y: caja.y + caja.height / 2 - tam / 3, size: tam, font: cursiva, color: CACAO });
+}
+
 export async function sellarPdf(e: EntradaSellado): Promise<Uint8Array> {
   const L = ETIQUETAS[e.idioma];
   const doc = await PDFDocument.load(e.original, { updateMetadata: false });
@@ -323,6 +351,38 @@ export async function sellarPdf(e: EntradaSellado): Promise<Uint8Array> {
     });
   }
 
+  // 1b · La firma de cada quien en el lugar que le marcó el que creó el sobre
+  // (revisión de Nicolás, 2026-11-17: quedaba solo en el certificado). Encima
+  // del contenido, como una firma a mano sobre la línea; con su leyenda debajo
+  // para que nadie la confunda con una imagen pegada.
+  const imagenes = new Map<number, PDFImage>();
+  for (let i = 0; i < e.firmantes.length; i++) {
+    const f = e.firmantes[i];
+    if (f.firma.modo === "dibujada") imagenes.set(i, await doc.embedPng(f.firma.png));
+  }
+  const originales = doc.getPages();
+  e.firmantes.forEach((f, i) => {
+    const pos = f.posicion;
+    const p = pos ? originales[pos.pagina - 1] : undefined;
+    // Una página girada pondría la firma de lado: ahí queda solo en el
+    // certificado (el CRM no deja ubicarla en esas páginas).
+    if (!pos || !p || p.getRotation().angle % 360 !== 0) return;
+    const c = p.getCropBox();
+    const caja = {
+      x: c.x + pos.x * c.width,
+      y: c.y + (1 - pos.y - pos.h) * c.height,
+      width: pos.w * c.width,
+      height: pos.h * c.height,
+    };
+    // La leyenda va arriba, dentro del recuadro: debajo está la línea y, casi
+    // siempre, el rótulo del firmante («Vendedor»), que no se debe tapar.
+    const leyenda = seguroWinAnsi(L.enLinea(e.sobre.codigo, fechaColombia(f.firmadoEn)));
+    let tam = 5.5;
+    while (tam > 3.5 && normal.widthOfTextAtSize(leyenda, tam) > Math.max(caja.width, 140)) tam -= 0.25;
+    p.drawText(leyenda, { x: caja.x, y: caja.y + caja.height - tam, size: tam, font: normal, color: TENUE });
+    dibujarFirma(p, { ...caja, height: caja.height - tam - 1 }, f, imagenes.get(i), cursiva);
+  });
+
   // 2 · Certificado de evidencias.
   const w = new Escritor(doc, normal, negrita);
   w.texto("AROCO S.A.S", { tam: 8, fuente: negrita, color: CACAO });
@@ -343,11 +403,6 @@ export async function sellarPdf(e: EntradaSellado): Promise<Uint8Array> {
 
   w.texto(L.firmantes, { tam: 11, fuente: negrita });
   w.y -= 4;
-  const imagenes = new Map<number, PDFImage>();
-  for (let i = 0; i < e.firmantes.length; i++) {
-    const f = e.firmantes[i];
-    if (f.firma.modo === "dibujada") imagenes.set(i, await doc.embedPng(f.firma.png));
-  }
   e.firmantes.forEach((f, i) => {
     w.espacio(150);
     w.texto(`${i + 1}. ${f.nombreFirmado}`, { tam: 10, fuente: negrita });
@@ -374,16 +429,8 @@ export async function sellarPdf(e: EntradaSellado): Promise<Uint8Array> {
     w.pagina.drawText(seguroWinAnsi(L.firma), { x: MARGEN + 12, y: w.y - 9, size: 9, font: normal, color: TENUE });
     w.pagina.drawRectangle({ ...caja, borderColor: LINEA, borderWidth: 0.5 });
     const img = imagenes.get(i);
-    if (img) {
-      const escala = Math.min((caja.width - 12) / img.width, (caja.height - 10) / img.height);
-      const iw = img.width * escala;
-      const ih = img.height * escala;
-      w.pagina.drawImage(img, { x: caja.x + (caja.width - iw) / 2, y: caja.y + (caja.height - ih) / 2, width: iw, height: ih });
-    } else {
-      const nombre = seguroWinAnsi(f.nombreFirmado);
-      let tam = 18;
-      while (tam > 8 && cursiva.widthOfTextAtSize(nombre, tam) > caja.width - 16) tam--;
-      w.pagina.drawText(nombre, { x: caja.x + 8, y: caja.y + caja.height / 2 - tam / 3, size: tam, font: cursiva, color: CACAO });
+    dibujarFirma(w.pagina, caja, f, img, cursiva);
+    if (!img) {
       w.pagina.drawText(seguroWinAnsi(L.firmaEscrita), { x: caja.x + caja.width + 8, y: caja.y + 4, size: 7, font: normal, color: TENUE });
     }
     w.y -= altoCaja + 10;
