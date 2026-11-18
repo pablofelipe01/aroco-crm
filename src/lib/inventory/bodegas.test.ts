@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { bodegaPorOrigen, disponiblePorTipo, resumenPorBodega, totalTipos, type DisponiblePorClase } from "./bodegas";
+import { bodegaAutomatica, bodegaPorOrigen, leerBodega, disponiblePorTipo, resumenPorBodega, totalTipos, type DisponiblePorClase } from "./bodegas";
 
 const lote = (o: Partial<DisponiblePorClase> & { bodega?: string | null }) => ({
   qty_avail_premium_kg: 0,
@@ -64,4 +64,23 @@ test("bodegaPorOrigen: Cauca a Cauca, Cundinamarca y Tolima a Nilo, lo demás a 
   assert.equal(bodegaPorOrigen("", "COL-TOL-LIM-110826(ACOPIO)"), "nilo");
   assert.equal(bodegaPorOrigen(null, "Cauca-190226(Ruta Padilla)"), "bogota");
   assert.equal(bodegaPorOrigen(null, null), "bogota");
+});
+
+test("leerBodega entiende cómo la escribe la bodega y no adivina lo demás", () => {
+  assert.equal(leerBodega("Bogotá"), "bogota");
+  assert.equal(leerBodega(" BODEGA BOGOTA "), "bogota");
+  assert.equal(leerBodega("El Nilo"), "nilo");
+  assert.equal(leerBodega("cauca"), "cauca");
+  assert.equal(leerBodega("Medellín"), null);
+  assert.equal(leerBodega(""), null);
+  assert.equal(leerBodega(null), null);
+});
+
+test("la hoja gana sobre el origen: 888 kg del Cauca en Bogotá van a Bogotá", () => {
+  const l = { departamento: "CAUCA", code: "CO-CAUCA -Ruta 4 - CALOTO", bodega_hoja: "bogota" };
+  assert.deepEqual(bodegaAutomatica(l), { bodega: "bogota", origen: "hoja" });
+  assert.deepEqual(bodegaAutomatica({ ...l, bodega_hoja: null }), {
+    bodega: "cauca",
+    origen: "estimada",
+  });
 });

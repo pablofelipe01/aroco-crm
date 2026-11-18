@@ -178,3 +178,36 @@ test("dos filas con la misma clave se nombran en el error", () => {
   const csv = filas.map((f) => f.map((c) => `"${c.replace(/"/g, '""')}"`).join(",")).join("\n");
   assert.throws(() => parseInventorySheet(csv), /CO-ANT-URA-050525/);
 });
+
+/** El fixture con una columna «BODEGA» insertada tras «CODIGO MUNICIPIO». */
+function conColumnaBodega(valor: (fila: string[]) => string): string {
+  const m = parseCsv(FIXTURE);
+  const enc = m.findIndex((f) => f.includes("CODIGO MUNICIPIO"));
+  const i = m[enc].indexOf("CODIGO MUNICIPIO") + 1;
+  const dep = m[enc].indexOf("CODIGO DEPARTAMENTO");
+  const out = m.map((f, r) => {
+    const g = [...f];
+    g.splice(i, 0, r === enc ? "BODEGA" : r > enc + 1 ? valor(f.length > dep ? f : []) : "");
+    return g;
+  });
+  return out.map((f) => f.map((c) => `"${c.replace(/"/g, '""')}"`).join(",")).join("\n");
+}
+
+test("sin columna «BODEGA» la bodega de la hoja queda nula", () => {
+  const { lots } = parseInventorySheet(FIXTURE);
+  assert.ok(lots.every((l) => l.bodega_hoja === null));
+});
+
+test("la columna «BODEGA» dice dónde está el grano, no de dónde viene (acta 2026-11-17)", () => {
+  const csv = conColumnaBodega(() => "Bogotá");
+  const { lots } = parseInventorySheet(csv);
+  const cauca = lots.filter((l) => l.departamento === "CAUCA");
+  assert.ok(cauca.length > 0);
+  assert.ok(cauca.every((l) => l.bodega_hoja === "bogota"));
+  // Insertar la columna no corre nada más.
+  const sin = parseInventorySheet(FIXTURE).lots;
+  assert.deepEqual(
+    lots.map((l) => ({ ...l, bodega_hoja: null })),
+    sin,
+  );
+});

@@ -33,6 +33,7 @@ import {
   normalizarEncabezado,
   ColumnaFaltante,
 } from "@/lib/inventory/sheet-columns";
+import { leerBodega, type Bodega } from "@/lib/inventory/bodegas";
 
 /** Celdas que identifican la fila de encabezado con los subgrupos. */
 const MARCAS_ENCABEZADO = ["Fecha Ingreso", "CODIGO CONCATENADO PROCEDENCIA"];
@@ -71,6 +72,8 @@ export type LotRow = {
   proveedor: string | null;
   departamento: string | null;
   municipio: string | null;
+  /** Bodega física según la columna «BODEGA» (0115); nula si no la trae. */
+  bodega_hoja: Bodega | null;
   entry_date: string | null;
   remision: string | null;
   odc: string | null;
@@ -297,6 +300,21 @@ function campo(
  * RPC import_inventory_sheet. Las filas sin código (separadores, TOTALES) se
  * saltan.
  */
+/**
+ * La columna «BODEGA»: sola en la fila de subgrupos o como hoja bajo un grupo
+ * combinado («ENTRADAS A BODEGA|BODEGA»). Exacta, para no confundirla con
+ * «CANTIDAD DISPONIBLE EN BODEGA». -1 si no está.
+ */
+function columnaBodega(mapa: ReturnType<typeof construirMapa>): number {
+  const nombres = ["bodega", "bodega actual", "ubicacion", "ubicacion fisica"];
+  let mejor = -1;
+  for (const [clave, i] of mapa.indice) {
+    const hoja = clave.includes("|") ? clave.slice(clave.lastIndexOf("|") + 1) : clave;
+    if (nombres.includes(hoja) && (mejor < 0 || i < mejor)) mejor = i;
+  }
+  return mejor;
+}
+
 export function parseInventorySheet(csv: string): ParsedSheet {
   const matrix = parseCsv(csv);
   const filaSub = ubicarEncabezado(matrix, MARCAS_ENCABEZADO);
@@ -326,6 +344,9 @@ export function parseInventorySheet(csv: string): ParsedSheet {
     codigoNuevo: columnaOpcional(mapa, "CODIGO CONCATENADO NUEVO"),
     departamento: columnaOpcional(mapa, "CODIGO DEPARTAMENTO"),
     municipio: columnaOpcional(mapa, "CODIGO MUNICIPIO"),
+    // Dónde está el grano hoy (acta 2026-11-17). Opcional: hasta que la bodega
+    // agregue la columna, todos los lotes caen a la regla por origen.
+    bodega: columnaBodega(mapa),
     proveedor: columnaOpcional(mapa, "PROVEEDOR"),
     valorBase: columnaOpcional(mapa, "Valor de Compra|Valor Base"),
     bonificacion: columnaOpcional(mapa, "Valor de Compra|Bonificación"),
@@ -401,6 +422,7 @@ export function parseInventorySheet(csv: string): ParsedSheet {
       proveedor: texto(row, C.proveedor),
       departamento: texto(row, C.departamento),
       municipio: texto(row, C.municipio),
+      bodega_hoja: leerBodega(texto(row, C.bodega)),
       entry_date: parseEsDate(cell(row, C.fecha)),
       remision,
       odc: texto(row, C.odc),

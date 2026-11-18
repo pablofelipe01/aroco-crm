@@ -1647,6 +1647,7 @@ export type Database = {
           bodega: string | null;
           bodega_por: string | null;
           bodega_en: string | null;
+          bodega_hoja: string | null;
           clase: string;
           codigo_nuevo: string | null;
           proveedor: string | null;
@@ -1715,6 +1716,7 @@ export type Database = {
           bodega?: string | null;
           bodega_por?: string | null;
           bodega_en?: string | null;
+          bodega_hoja?: string | null;
           clase?: string;
           codigo_nuevo?: string | null;
           proveedor?: string | null;
@@ -1783,6 +1785,7 @@ export type Database = {
           bodega?: string | null;
           bodega_por?: string | null;
           bodega_en?: string | null;
+          bodega_hoja?: string | null;
           clase?: string;
           codigo_nuevo?: string | null;
           proveedor?: string | null;

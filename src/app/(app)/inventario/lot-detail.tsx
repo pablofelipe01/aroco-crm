@@ -196,7 +196,7 @@ export function LotDetail({
           <Meta
             label="Bodega"
             value={`${esBodega(lot.bodega) ? NOMBRE_BODEGA[lot.bodega] : "—"}${
-              lot.bodega_por ? "" : " (automática)"
+              lot.bodega_por ? "" : lot.bodega_hoja ? " (según hoja)" : " (por confirmar)"
             }`}
           />
           {lot.proveedor && <Meta label="Proveedor" value={lot.proveedor} />}

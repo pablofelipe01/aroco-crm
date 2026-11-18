@@ -21,7 +21,7 @@ import {
   NOMBRE_TIPO,
   TIPOS,
   disponiblePorTipo,
-  bodegaPorOrigen,
+  bodegaAutomatica,
   esBodega,
   resumenPorBodega,
   type Bodega,
@@ -84,14 +84,14 @@ export function InventarioClient({
     () => (cambios.base === initialLots ? cambios.m : {}),
     [cambios, initialLots],
   );
-  // La bodega sale sola del origen (0114) salvo que alguien la haya elegido a
-  // mano; «auto» es volver a la regla.
+  // Sin elección manual, la bodega es la de la columna «BODEGA» de la hoja y,
+  // si no la trae, el estimado por origen (0115); «auto» es volver a eso.
   const bodegaDe = React.useCallback(
     (l: InventoryLot): Bodega | null => {
       const p = pendiente[l.id];
-      if (p === "auto") return bodegaPorOrigen(l.departamento, l.code);
+      if (p === "auto") return bodegaAutomatica(l).bodega;
       if (p) return p;
-      return esBodega(l.bodega) ? l.bodega : bodegaPorOrigen(l.departamento, l.code);
+      return esBodega(l.bodega) ? l.bodega : bodegaAutomatica(l).bodega;
     },
     [pendiente],
   );
@@ -443,7 +443,8 @@ export function InventarioClient({
                         className="h-8 w-40 text-xs"
                       >
                         <option value="auto">
-                          {NOMBRE_BODEGA[bodegaPorOrigen(l.departamento, l.code)]} · automática
+                          {NOMBRE_BODEGA[bodegaAutomatica(l).bodega]} ·{" "}
+                          {bodegaAutomatica(l).origen === "hoja" ? "según hoja" : "por confirmar"}
                         </option>
                         {BODEGAS.map((b) => (
                           <option key={b} value={b}>
@@ -454,7 +455,12 @@ export function InventarioClient({
                     ) : (
                       <span className="text-xs text-fg-muted">
                         {l.bodega ? NOMBRE_BODEGA[l.bodega] : "—"}
-                        {!esManual(l) && <span className="text-fg-subtle"> · auto</span>}
+                        {!esManual(l) && (
+                          <span className="text-fg-subtle">
+                            {" "}
+                            · {bodegaAutomatica(l).origen === "hoja" ? "según hoja" : "por confirmar"}
+                          </span>
+                        )}
                       </span>
                     )}
                   </td>
@@ -660,7 +666,7 @@ function ResumenBodegas({
         Primera = Premium, Estándar, Fairtrade y Rainforest · Segunda = Corriente, Corriente C y
         Pasilla
         {!hayBaba && " · Baba (cacao fresco) entra con los ingresos registrados en el CRM"}
-        {" · La bodega sale del origen: Cauca → Cauca; Cundinamarca y Tolima → Nilo; lo demás → Bogotá. Se puede cambiar a mano en la columna «Bodega»"}
+        {" · La bodega es dónde está el grano: la de la columna «BODEGA» del archivo o la elegida a mano. Sin ninguna de las dos se estima por el origen y el lote sale «por confirmar»"}
       </p>
     </Card>
   );

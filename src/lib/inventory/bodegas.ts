@@ -12,10 +12,12 @@
  *   Orgánico = Orgánico
  *   Baba     = cacao en baba (fresco); el archivo no lo trae, entra por el CRM
  *
- * La bodega tampoco está en el archivo. Desde 0114 se asigna sola por el
- * departamento de origen (`bodegaPorOrigen`, igual que la función SQL
- * inventario_bodega_por_origen); quien tenga permiso puede cambiarla a mano y
- * esa elección se respeta.
+ * La bodega física (dónde está el grano HOY, no de dónde vino) se decide así
+ * desde 0115 (acta 2026-11-17: 888 kg del Cauca en Bogotá salían bajo Cauca):
+ *   1. la elegida a mano en el CRM (bodega_por), siempre;
+ *   2. la columna «BODEGA» del archivo (`bodega_hoja`);
+ *   3. si no hay ninguna, la regla por origen de 0114 (`bodegaPorOrigen`),
+ *      que es solo un estimado y la vista marca «por confirmar».
  */
 
 export const BODEGAS = ["cauca", "bogota", "nilo"] as const;
@@ -46,6 +48,40 @@ export function bodegaPorOrigen(departamento: string | null | undefined, code?: 
   if (seg.startsWith("CAU")) return "cauca";
   if (seg.startsWith("CUN") || seg.startsWith("TOL")) return "nilo";
   return "bogota";
+}
+
+/**
+ * Lee la celda «BODEGA» del archivo: «Cauca», «BOGOTÁ», «El Nilo»… Lo que no
+ * se reconozca queda nulo (y el lote cae a la regla por origen) en vez de
+ * adivinar.
+ */
+export function leerBodega(v: string | null | undefined): Bodega | null {
+  const t = (v ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim()
+    .replace(/^(bodega\s+)?(el\s+)?/, "");
+  if (t.startsWith("cauca")) return "cauca";
+  if (t.startsWith("bogota")) return "bogota";
+  if (t.startsWith("nilo")) return "nilo";
+  return null;
+}
+
+export type OrigenBodega = "manual" | "hoja" | "estimada";
+
+/**
+ * La bodega que toma un lote sin elección manual: la de la hoja si la trae, y
+ * si no, el estimado por origen. Igual que el trigger inventario_tr_bodega.
+ */
+export function bodegaAutomatica(l: {
+  bodega_hoja?: string | null;
+  departamento: string | null;
+  code: string | null;
+}): { bodega: Bodega; origen: Exclude<OrigenBodega, "manual"> } {
+  return esBodega(l.bodega_hoja)
+    ? { bodega: l.bodega_hoja, origen: "hoja" }
+    : { bodega: bodegaPorOrigen(l.departamento, l.code), origen: "estimada" };
 }
 
 export const TIPOS = ["organico", "primera", "segunda", "baba"] as const;
