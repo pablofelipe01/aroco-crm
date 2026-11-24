@@ -21,6 +21,12 @@ import { useToast } from "@/components/ui/toast";
 import type { CatalogoCaptura } from "@/lib/finca/captura";
 import { anularRegistro, marcarRevisado } from "./actions";
 import { CorregirRegistro } from "./corregir-registro";
+import {
+  RiegoCombustible,
+  type CompraTabla,
+  type UsoTabla,
+} from "./riego-combustible";
+import type { EquipoVista as EquipoCombustible } from "@/lib/finca/combustible";
 import { StatCard } from "@/components/ui/stat-card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ScrollFijo } from "@/components/ui/scroll-fijo";
@@ -67,7 +73,13 @@ const MESES = [
 const nombreMes = (m: string) =>
   `${MESES[Number(m.slice(5, 7)) - 1]} ${m.slice(0, 4)}`;
 
-type Pestana = "resumen" | "registros" | "poscosecha" | "revisar" | "catalogos";
+type Pestana =
+  | "resumen"
+  | "registros"
+  | "poscosecha"
+  | "riego"
+  | "revisar"
+  | "catalogos";
 
 const num = (v: number | null, d = 0) => (v == null ? "—" : formatNumber(v, d));
 const esDesgrane = (r: RegistroVista) => r.labor.startsWith("Desgrane");
@@ -91,7 +103,13 @@ export function LaboresFincaClient({
   labores,
   empleados,
   valvulas,
+  combustible,
 }: {
+  combustible: {
+    compras: CompraTabla[];
+    usos: UsoTabla[];
+    equipos: EquipoCombustible[];
+  };
   registros: RegistroVista[];
   anulados: RegistroVista[];
   baches: BacheVista[];
@@ -178,6 +196,7 @@ export function LaboresFincaClient({
     { clave: "resumen", label: "Resumen" },
     { clave: "registros", label: "Registros", cuenta: registros.length },
     { clave: "poscosecha", label: "Poscosecha", cuenta: baches.length },
+    { clave: "riego", label: "Riego y combustible" },
     {
       clave: "revisar",
       label: "Por revisar",
@@ -225,7 +244,14 @@ export function LaboresFincaClient({
         ))}
       </div>
 
-      {!registros.length && !baches.length ? (
+      {pestana === "riego" ? (
+        <RiegoCombustible
+          compras={combustible.compras}
+          usos={combustible.usos}
+          equipos={combustible.equipos}
+          valvulasOrden={valvulas.map((v) => v.codigo)}
+        />
+      ) : !registros.length && !baches.length ? (
         <EmptyState
           icon={<Sprout className="h-6 w-6" />}
           title="Aún no hay labores cargadas"

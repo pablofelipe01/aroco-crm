@@ -260,6 +260,175 @@ export type Database = {
         }
         Relationships: []
       }
+      // 0120 — riego, equipos y combustible.
+      finca_equipos: {
+        Row: {
+          id: string
+          codigo: string
+          nombre: string
+          combustible: "acpm" | "gasolina"
+          consumo_gal_h: number | null
+          activo_fijo: string | null
+          activo: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          codigo: string
+          nombre: string
+          combustible: "acpm" | "gasolina"
+          consumo_gal_h?: number | null
+          activo_fijo?: string | null
+          activo?: boolean
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          codigo?: string
+          nombre?: string
+          combustible?: "acpm" | "gasolina"
+          consumo_gal_h?: number | null
+          activo_fijo?: string | null
+          activo?: boolean
+          created_at?: string
+        }
+        Relationships: []
+      }
+      finca_combustible_compras: {
+        Row: {
+          id: string
+          fecha: string
+          combustible: "acpm" | "gasolina"
+          recibo: string | null
+          galones: number | null
+          precio_galon: number | null
+          valor: number | null
+          proveedor: string | null
+          destino: string | null
+          observaciones: string | null
+          origen: string
+          ref_hoja: string | null
+          dudoso: boolean
+          motivo_duda: string | null
+          original: Json | null
+          created_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          fecha: string
+          combustible: "acpm" | "gasolina"
+          recibo?: string | null
+          galones?: number | null
+          precio_galon?: number | null
+          valor?: number | null
+          proveedor?: string | null
+          destino?: string | null
+          observaciones?: string | null
+          origen?: string
+          ref_hoja?: string | null
+          dudoso?: boolean
+          motivo_duda?: string | null
+          original?: Json | null
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          fecha?: string
+          combustible?: "acpm" | "gasolina"
+          recibo?: string | null
+          galones?: number | null
+          precio_galon?: number | null
+          valor?: number | null
+          proveedor?: string | null
+          destino?: string | null
+          observaciones?: string | null
+          origen?: string
+          ref_hoja?: string | null
+          dudoso?: boolean
+          motivo_duda?: string | null
+          original?: Json | null
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      finca_equipo_usos: {
+        Row: {
+          id: string
+          fecha: string
+          equipo_id: string
+          actividad: string | null
+          valvulas: string[]
+          sitio: string | null
+          hora_inicio: string | null
+          hora_fin: string | null
+          horas: number | null
+          carga_galones: number | null
+          empleado_id: string | null
+          observaciones: string | null
+          origen: string
+          ref_hoja: string | null
+          dudoso: boolean
+          motivo_duda: string | null
+          original: Json | null
+          registrado_por: string | null
+          registrado_en: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          fecha: string
+          equipo_id: string
+          actividad?: string | null
+          valvulas?: string[]
+          sitio?: string | null
+          hora_inicio?: string | null
+          hora_fin?: string | null
+          horas?: number | null
+          carga_galones?: number | null
+          empleado_id?: string | null
+          observaciones?: string | null
+          origen?: string
+          ref_hoja?: string | null
+          dudoso?: boolean
+          motivo_duda?: string | null
+          original?: Json | null
+          registrado_por?: string | null
+          registrado_en?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          fecha?: string
+          equipo_id?: string
+          actividad?: string | null
+          valvulas?: string[]
+          sitio?: string | null
+          hora_inicio?: string | null
+          hora_fin?: string | null
+          horas?: number | null
+          carga_galones?: number | null
+          empleado_id?: string | null
+          observaciones?: string | null
+          origen?: string
+          ref_hoja?: string | null
+          dudoso?: boolean
+          motivo_duda?: string | null
+          original?: Json | null
+          registrado_por?: string | null
+          registrado_en?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       finca_baches: {
         Row: {
           numero: number

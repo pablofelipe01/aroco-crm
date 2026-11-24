@@ -5,6 +5,7 @@ import { todas } from "@/lib/supabase/todas";
 import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
 import { LaboresFincaClient } from "./labores-finca-client";
+import type { CompraTabla, UsoTabla } from "./riego-combustible";
 
 export const dynamic = "force-dynamic";
 
@@ -143,6 +144,34 @@ export default async function LaboresFincaPage() {
           .order("numero", { ascending: false })
           .range(d, h),
       ),
+      // 0120 — riego, equipos y combustible.
+      todas((d, h) =>
+        supabase
+          .from("finca_equipos")
+          .select("id, codigo, nombre, combustible, consumo_gal_h")
+          .order("codigo")
+          .range(d, h),
+      ),
+      todas((d, h) =>
+        supabase
+          .from("finca_combustible_compras")
+          .select(
+            "id, fecha, combustible, recibo, galones, precio_galon, valor, proveedor, destino, observaciones, dudoso, motivo_duda, ref_hoja",
+          )
+          .order("fecha", { ascending: false })
+          .order("id")
+          .range(d, h),
+      ),
+      todas((d, h) =>
+        supabase
+          .from("finca_equipo_usos")
+          .select(
+            "id, fecha, equipo_id, actividad, valvulas, sitio, horas, carga_galones, observaciones, dudoso, motivo_duda, ref_hoja",
+          )
+          .order("fecha", { ascending: false })
+          .order("id")
+          .range(d, h),
+      ),
     ]);
   } catch (e) {
     return (
@@ -156,7 +185,37 @@ export default async function LaboresFincaPage() {
       </div>
     );
   }
-  const [empleados, labores, valvulas, registros, baches] = datos;
+  const [empleados, labores, valvulas, registros, baches, equipos, compras, usos] = datos;
+  const codigoEquipo = new Map(equipos.map((e) => [e.id, e.codigo]));
+  const comprasVista: CompraTabla[] = compras.map((c) => ({
+    id: c.id,
+    fecha: c.fecha,
+    combustible: c.combustible,
+    recibo: c.recibo,
+    galones: n(c.galones),
+    precio: n(c.precio_galon),
+    valor: n(c.valor),
+    proveedor: c.proveedor,
+    destino: c.destino,
+    observaciones: c.observaciones,
+    dudoso: c.dudoso,
+    motivoDuda: c.motivo_duda,
+    refHoja: c.ref_hoja,
+  }));
+  const usosVista: UsoTabla[] = usos.map((u) => ({
+    id: u.id,
+    fecha: u.fecha,
+    equipo: codigoEquipo.get(u.equipo_id) ?? "—",
+    actividad: u.actividad,
+    valvulas: u.valvulas ?? [],
+    sitio: u.sitio,
+    horas: n(u.horas),
+    carga: n(u.carga_galones),
+    observaciones: u.observaciones,
+    dudoso: u.dudoso,
+    motivoDuda: u.motivo_duda,
+    refHoja: u.ref_hoja,
+  }));
 
   const nombreEmpleado = new Map(empleados.map((e) => [e.id, e.nombre]));
   const laborPorId = new Map(labores.map((l) => [l.id, l]));
@@ -248,6 +307,16 @@ export default async function LaboresFincaPage() {
         registros: porEmpleado.get(e.id)?.registros ?? 0,
         ultimo: porEmpleado.get(e.id)?.ultimo ?? null,
       }))}
+      combustible={{
+        compras: comprasVista,
+        usos: usosVista,
+        equipos: equipos.map((e) => ({
+          codigo: e.codigo,
+          nombre: e.nombre,
+          combustible: e.combustible,
+          consumoGalH: n(e.consumo_gal_h),
+        })),
+      }}
       valvulas={valvulas.map((v) => ({
         codigo: v.codigo,
         registros: porValvula.get(v.codigo) ?? 0,
