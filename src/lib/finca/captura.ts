@@ -149,17 +149,35 @@ export type Errores = Partial<Record<keyof Borrador, string>>;
 /**
  * Valida el borrador. `hoy` es la fecha del TELÉFONO en Colombia: el catálogo
  * pudo bajarse hace días y su `hoy` ya no sirve.
+ *
+ * `opciones` es para la corrección desde el CRM (0119): ahí se corrige
+ * historia sin la ventana de 45 días, y «sin trabajador» o «sin horas» se
+ * aceptan solo si la fila ya venía así de la hoja.
  */
-export function validar(b: Borrador, cat: CatalogoCaptura, hoy: string): Errores {
+export interface OpcionesValidar {
+  desde?: string;
+  permitirSinEmpleado?: boolean;
+  permitirSinHoras?: boolean;
+}
+
+export function validar(
+  b: Borrador,
+  cat: CatalogoCaptura,
+  hoy: string,
+  opciones: OpcionesValidar = {},
+): Errores {
   const e: Errores = {};
+  const desde = opciones.desde ?? restarDias(hoy, DIAS_ATRAS_MAX);
 
   if (!/^\d{4}-\d{2}-\d{2}$/.test(b.fecha)) e.fecha = "Falta la fecha";
   else if (b.fecha > hoy) e.fecha = "La fecha no puede ser futura";
-  else if (b.fecha < restarDias(hoy, DIAS_ATRAS_MAX))
-    e.fecha = `Solo hasta ${DIAS_ATRAS_MAX} días atrás`;
+  else if (b.fecha < desde)
+    e.fecha = opciones.desde ? `No antes de ${desde}` : `Solo hasta ${DIAS_ATRAS_MAX} días atrás`;
 
   const ids = new Set(cat.empleados.map((x) => x.id));
-  if (b.empleados.length === 0) e.empleados = "¿Quién hizo la labor?";
+  if (b.empleados.length === 0) {
+    if (!opciones.permitirSinEmpleado) e.empleados = "¿Quién hizo la labor?";
+  }
   else if (b.empleados.some((x) => !ids.has(x))) e.empleados = "Trabajador que no está en la lista";
   else if (!cat.porOtros && b.empleados.some((x) => x !== cat.yo))
     e.empleados = "Solo puede registrar sus propias labores";
@@ -181,7 +199,9 @@ export function validar(b: Borrador, cat: CatalogoCaptura, hoy: string): Errores
     }
   } else {
     const h = leerNumero(b.horas);
-    if (h == null) e.horas = "Anote las horas o el inicio y el fin";
+    if (h == null) {
+      if (!opciones.permitirSinHoras) e.horas = "Anote las horas o el inicio y el fin";
+    }
     else if (Number.isNaN(h) || h <= 0) e.horas = "Horas inválidas";
     else if (h > HORAS_MAX) e.horas = `Más de ${HORAS_MAX} horas`;
   }
@@ -225,14 +245,51 @@ export function armarRegistros(
   ahora: Date,
   idPara: (empleadoId: string) => string,
 ): RegistroCampo[] {
+  const d = datosDe(b, cat);
+  if (d.horas == null) throw new Error("Horas inválidas");
+  const horas = d.horas;
+
+  const unicos = [...new Set(b.empleados)];
+  return unicos.map((empleado_id) => ({
+    ...d,
+    id: idPara(empleado_id),
+    empleado_id,
+    horas,
+    registrado_en: ahora.toISOString(),
+  }));
+}
+
+/** Los datos de UNA fila según el borrador (sin trabajador ni id). */
+export interface DatosRegistro {
+  fecha: string;
+  labor_id: string;
+  valvulas: string[];
+  sitio: string | null;
+  hora_inicio: string | null;
+  hora_fin: string | null;
+  horas: number | null;
+  cantidad: number | null;
+  unidad: string | null;
+  sanas: number | null;
+  pasador_monilia: number | null;
+  negras: number | null;
+  observaciones: string | null;
+}
+
+/**
+ * Del borrador a las columnas. Solo guarda las cifras que la labor usa: si se
+ * corrige una fila de Cosecha a Riego, las mazorcas no quedan colgando.
+ * Debe venir validado.
+ */
+export function datosDe(b: Borrador, cat: CatalogoCaptura): DatosRegistro {
   const labor = cat.labores.find((l) => l.id === b.laborId);
   if (!labor) throw new Error("Labor desconocida");
   const m = medidaDe(labor);
 
   const ini = b.horaInicio.trim() || null;
   const fin = b.horaFin.trim() || null;
-  const horas = ini && fin ? horasEntre(ini, fin) : leerNumero(b.horas);
-  if (horas == null || Number.isNaN(horas)) throw new Error("Horas inválidas");
+  const h = ini && fin ? horasEntre(ini, fin) : leerNumero(b.horas);
+  if (h != null && Number.isNaN(h)) throw new Error("Horas inválidas");
 
   const n = (s: string) => {
     const x = leerNumero(s);
@@ -257,23 +314,55 @@ export function armarRegistros(
     cantidad = partes.length ? partes.reduce((a, x) => a + x, 0) : null;
   }
 
-  const unicos = [...new Set(b.empleados)];
-  return unicos.map((empleado_id) => ({
-    id: idPara(empleado_id),
+  return {
     fecha: b.fecha,
-    empleado_id,
     labor_id: labor.id,
     valvulas: [...b.valvulas],
     sitio: b.sitio.trim() || null,
     hora_inicio: ini,
     hora_fin: fin,
-    horas,
+    horas: h,
     cantidad,
     unidad: labor.unidad,
     sanas,
     pasador_monilia: pasador,
     negras,
     observaciones: b.observaciones.trim() || null,
-    registrado_en: ahora.toISOString(),
-  }));
+  };
+}
+
+/** Lo que ya está guardado, de vuelta a borrador (para corregirlo). */
+export function borradorDesde(r: {
+  fecha: string;
+  empleado_id: string | null;
+  labor_id: string;
+  valvulas: string[];
+  sitio: string | null;
+  hora_inicio: string | null;
+  hora_fin: string | null;
+  horas: number | null;
+  cantidad: number | null;
+  sanas: number | null;
+  pasador_monilia: number | null;
+  negras: number | null;
+  observaciones: string | null;
+}): Borrador {
+  const s = (n: number | null) => (n == null ? "" : String(n).replace(".", ","));
+  const ini = r.hora_inicio?.slice(0, 5) ?? "";
+  const fin = r.hora_fin?.slice(0, 5) ?? "";
+  return {
+    fecha: r.fecha,
+    empleados: r.empleado_id ? [r.empleado_id] : [],
+    laborId: r.labor_id,
+    valvulas: [...r.valvulas],
+    sitio: r.sitio ?? "",
+    horaInicio: ini && fin ? ini : "",
+    horaFin: ini && fin ? fin : "",
+    horas: ini && fin ? "" : s(r.horas),
+    cantidad: s(r.cantidad),
+    sanas: s(r.sanas),
+    pasador: s(r.pasador_monilia),
+    negras: s(r.negras),
+    observaciones: r.observaciones ?? "",
+  };
 }

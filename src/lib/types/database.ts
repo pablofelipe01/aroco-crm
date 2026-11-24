@@ -139,6 +139,11 @@ export type Database = {
           original: Json | null
           registrado_por: string | null
           registrado_en: string | null
+          editado_por: string | null
+          editado_en: string | null
+          anulado_por: string | null
+          anulado_en: string | null
+          motivo_anulacion: string | null
           created_at: string
           updated_at: string
         }
@@ -165,6 +170,11 @@ export type Database = {
           original?: Json | null
           registrado_por?: string | null
           registrado_en?: string | null
+          editado_por?: string | null
+          editado_en?: string | null
+          anulado_por?: string | null
+          anulado_en?: string | null
+          motivo_anulacion?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -191,6 +201,11 @@ export type Database = {
           original?: Json | null
           registrado_por?: string | null
           registrado_en?: string | null
+          editado_por?: string | null
+          editado_en?: string | null
+          anulado_por?: string | null
+          anulado_en?: string | null
+          motivo_anulacion?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -217,6 +232,33 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      // 0119 — historial de correcciones. Solo lectura (se escribe por RPC).
+      finca_registros_cambios: {
+        Row: {
+          id: number
+          registro_id: string
+          accion: "corregir" | "anular" | "restaurar" | "revisar"
+          antes: Json | null
+          despues: Json | null
+          motivo: string | null
+          por: string | null
+          en: string
+        }
+        Insert: {
+          id?: never
+          registro_id: string
+          accion: "corregir" | "anular" | "restaurar" | "revisar"
+          antes?: Json | null
+          despues?: Json | null
+          motivo?: string | null
+          por?: string | null
+          en?: string
+        }
+        Update: {
+          motivo?: string | null
+        }
+        Relationships: []
       }
       finca_baches: {
         Row: {
@@ -4308,6 +4350,19 @@ export type Database = {
       finca_subir_registros: {
         Args: { p_registros: Json };
         Returns: Json;
+      };
+      // 0119 — correcciones desde /labores-finca (solo Dirección).
+      finca_corregir_registro: {
+        Args: { p_id: string; p: Json };
+        Returns: undefined;
+      };
+      finca_anular_registro: {
+        Args: { p_id: string; p_anular: boolean; p_motivo?: string | null };
+        Returns: undefined;
+      };
+      finca_marcar_revisado: {
+        Args: { p_id: string };
+        Returns: undefined;
       };
       inventario_pasar_a_crm: {
         Args: Record<PropertyKey, never>;

@@ -2,7 +2,9 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   armarRegistros,
+  borradorDesde,
   borradorVacio,
+  datosDe,
   fechaColombia,
   horasEntre,
   leerNumero,
@@ -159,4 +161,64 @@ test("armarRegistros: labor por cantidad y labor solo por horas", () => {
   assert.equal(riego.cantidad, null);
   assert.equal(riego.unidad, null);
   assert.equal(riego.horas, 4);
+});
+
+// ── Corrección desde el CRM (0119) ──────────────────────────────────────────
+
+const guardado = {
+  fecha: "2026-03-10",
+  empleado_id: "e-wo",
+  labor_id: "l-cos",
+  valvulas: ["8"],
+  sitio: null,
+  hora_inicio: "06:00:00",
+  hora_fin: "13:30:00",
+  horas: 7.5,
+  cantidad: 300,
+  sanas: 280,
+  pasador_monilia: null,
+  negras: 20,
+  observaciones: null,
+};
+
+test("borradorDesde: lo guardado vuelve tal cual al formulario", () => {
+  const br = borradorDesde(guardado);
+  assert.equal(br.horaInicio, "06:00");
+  assert.equal(br.horaFin, "13:30");
+  assert.equal(br.horas, "", "con inicio y fin no se repiten las horas");
+  assert.deepEqual(br.empleados, ["e-wo"]);
+  const d = datosDe(br, cat);
+  assert.equal(d.horas, 7.5);
+  assert.equal(d.cantidad, 300);
+  assert.equal(d.sanas, 280);
+  assert.equal(d.negras, 20);
+  assert.equal(d.hora_inicio, "06:00");
+});
+
+test("borradorDesde: decimales con coma y fila sin horario", () => {
+  const br = borradorDesde({ ...guardado, labor_id: "l-des", hora_inicio: null, hora_fin: null, horas: 7.25, sanas: 120.5 });
+  assert.equal(br.horas, "7,25");
+  assert.equal(br.sanas, "120,5");
+});
+
+test("datosDe: al cambiar de Cosecha a Riego no quedan mazorcas colgando", () => {
+  const d = datosDe({ ...borradorDesde(guardado), laborId: "l-rie" }, cat);
+  assert.equal(d.sanas, null);
+  assert.equal(d.negras, null);
+  assert.equal(d.cantidad, null);
+  assert.equal(d.unidad, null);
+});
+
+test("validar con opciones de corrección: historia vieja y filas de mayo sin trabajador", () => {
+  const viejo = borradorDesde({ ...guardado, fecha: "2026-01-05" });
+  assert.ok(validar(viejo, cat, HOY).fecha, "sin opciones, 45 días");
+  assert.equal(validar(viejo, cat, HOY, { desde: "2025-01-01" }).fecha, undefined);
+
+  const mayo = borradorDesde({ ...guardado, empleado_id: null, hora_inicio: null, hora_fin: null, horas: null, labor_id: "l-des" });
+  const op = { desde: "2025-01-01", permitirSinEmpleado: true, permitirSinHoras: true };
+  assert.ok(sinErrores(validar(mayo, cat, HOY, op)));
+  const e = validar(mayo, cat, HOY, { desde: "2025-01-01" });
+  assert.ok(e.empleados);
+  assert.ok(e.horas);
+  assert.equal(datosDe(mayo, cat).horas, null);
 });

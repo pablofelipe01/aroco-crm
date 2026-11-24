@@ -22,6 +22,8 @@ export type RegistroVista = {
   id: string;
   fecha: string;
   empleado: string | null;
+  empleadoId: string | null;
+  laborId: string;
   labor: string;
   categoria: Categoria;
   valvulas: string[];
@@ -32,11 +34,17 @@ export type RegistroVista = {
   cantidad: number | null;
   unidad: string | null;
   sanas: number | null;
+  pasador: number | null;
   negras: number | null;
   observaciones: string | null;
   dudoso: boolean;
   motivoDuda: string | null;
   refHoja: string | null;
+  origen: "hoja" | "app";
+  /** Tocado a mano en el CRM (0119): la recarga de la hoja ya no lo pisa. */
+  editado: boolean;
+  /** Anulado: no cuenta en ninguna suma. */
+  anulado: { en: string; motivo: string | null } | null;
 };
 
 export type BacheVista = {
@@ -122,7 +130,7 @@ export default async function LaboresFincaPage() {
         supabase
           .from("finca_registros")
           .select(
-            "id, fecha, empleado_id, labor_id, valvulas, sitio, hora_inicio, hora_fin, horas, cantidad, unidad, sanas, negras, observaciones, dudoso, motivo_duda, ref_hoja",
+            "id, fecha, empleado_id, labor_id, valvulas, sitio, hora_inicio, hora_fin, horas, cantidad, unidad, sanas, pasador_monilia, negras, observaciones, dudoso, motivo_duda, ref_hoja, origen, editado_en, anulado_en, motivo_anulacion",
           )
           .order("fecha", { ascending: false })
           .order("id")
@@ -161,6 +169,8 @@ export default async function LaboresFincaPage() {
       empleado: r.empleado_id
         ? (nombreEmpleado.get(r.empleado_id) ?? null)
         : null,
+      empleadoId: r.empleado_id,
+      laborId: r.labor_id,
       labor: l?.nombre ?? "—",
       categoria: (l?.categoria ?? "mantenimiento") as Categoria,
       valvulas: r.valvulas ?? [],
@@ -171,11 +181,17 @@ export default async function LaboresFincaPage() {
       cantidad: n(r.cantidad),
       unidad: r.unidad,
       sanas: n(r.sanas),
+      pasador: n(r.pasador_monilia),
       negras: n(r.negras),
       observaciones: r.observaciones,
       dudoso: r.dudoso,
       motivoDuda: r.motivo_duda,
       refHoja: r.ref_hoja,
+      origen: r.origen === "app" ? "app" : "hoja",
+      editado: r.editado_en != null,
+      anulado: r.anulado_en
+        ? { en: r.anulado_en, motivo: r.motivo_anulacion }
+        : null,
     };
   });
 
@@ -186,6 +202,7 @@ export default async function LaboresFincaPage() {
   >();
   const porValvula = new Map<string, number>();
   for (const r of registros) {
+    if (r.anulado_en) continue;
     usosLabor.set(r.labor_id, (usosLabor.get(r.labor_id) ?? 0) + 1);
     if (r.empleado_id) {
       const e = porEmpleado.get(r.empleado_id) ?? {
@@ -202,7 +219,8 @@ export default async function LaboresFincaPage() {
 
   return (
     <LaboresFincaClient
-      registros={regs}
+      registros={regs.filter((r) => !r.anulado)}
+      anulados={regs.filter((r) => r.anulado)}
       baches={baches.map((b) => ({
         numero: b.numero,
         valvulas: b.valvulas_texto,

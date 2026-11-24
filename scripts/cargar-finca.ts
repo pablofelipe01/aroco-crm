@@ -9,6 +9,11 @@
  * filas de la hoja que ya no existen se borran; lo capturado desde la app
  * (`origen = 'app'`) no se toca nunca.
  *
+ * LO CORREGIDO EN EL CRM MANDA SOBRE LA HOJA (0119). Una fila de la hoja que
+ * Dirección corrigió, anuló o marcó como revisada lleva `editado_en`: la carga
+ * no la reescribe ni la borra, aunque la hoja diga otra cosa o ya no la tenga
+ * (esto último se avisa en consola).
+ *
  * La lectura y la limpieza están en `src/lib/finca/hoja.ts` (con sus tests);
  * aquí solo se lee el archivo y se escribe.
  */
@@ -199,22 +204,38 @@ async function main() {
     });
   }
 
-  await enTandas(filas, (t) =>
-    db.from("finca_registros").upsert(t, { onConflict: "ref_hoja" }),
-  );
-
-  // Lo que estaba en la hoja y ya no está.
-  const vigentes = new Set(filas.map((f) => f.ref_hoja));
   const { data: previas, error: e3 } = await db
     .from("finca_registros")
-    .select("id, ref_hoja")
+    .select("id, ref_hoja, editado_en")
     .eq("origen", "hoja")
     .order("id")
     .range(0, 9999);
   if (e3) throw new Error(e3.message);
-  const sobran = (previas ?? [])
-    .filter((p) => !vigentes.has(p.ref_hoja as string))
-    .map((p) => p.id as string);
+  if ((previas ?? []).length >= 10000)
+    throw new Error("Más de 10.000 filas de hoja: paginar esta consulta antes de seguir.");
+
+  // Tocadas a mano en el CRM: no se reescriben ni se borran.
+  const protegidas = new Set(
+    (previas ?? []).filter((p) => p.editado_en).map((p) => p.ref_hoja as string),
+  );
+  const aEscribir = filas.filter((f) => !protegidas.has(f.ref_hoja));
+  if (protegidas.size) {
+    console.log(
+      `\n${protegidas.size} filas corregidas en el CRM se dejan como están (la hoja no las pisa).`,
+    );
+  }
+
+  await enTandas(aEscribir, (t) =>
+    db.from("finca_registros").upsert(t, { onConflict: "ref_hoja" }),
+  );
+
+  // Lo que estaba en la hoja y ya no está (salvo lo corregido en el CRM).
+  const vigentes = new Set(filas.map((f) => f.ref_hoja));
+  const desaparecidas = (previas ?? []).filter((p) => !vigentes.has(p.ref_hoja as string));
+  for (const p of desaparecidas.filter((p) => p.editado_en)) {
+    console.log(`  ojo: ${p.ref_hoja} ya no está en la hoja pero fue corregida en el CRM; se deja.`);
+  }
+  const sobran = desaparecidas.filter((p) => !p.editado_en).map((p) => p.id as string);
   if (sobran.length) {
     await enTandas(sobran, (t) =>
       db.from("finca_registros").delete().in("id", t),
@@ -246,7 +267,7 @@ async function main() {
   );
 
   console.log(
-    `\nEscrito: ${filas.length} registros, ${baches.length} baches. Borrados de la hoja: ${sobran.length}.`,
+    `\nEscrito: ${aEscribir.length} registros, ${baches.length} baches. Borrados de la hoja: ${sobran.length}.`,
   );
 }
 

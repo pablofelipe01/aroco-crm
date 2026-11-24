@@ -4,7 +4,11 @@ import * as React from "react";
 import {
   AlertTriangle,
   CalendarDays,
+  Check,
   Clock,
+  Pencil,
+  RotateCcw,
+  Smartphone,
   Sprout,
   Wheat,
 } from "lucide-react";
@@ -12,6 +16,11 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Field, Select } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { useToast } from "@/components/ui/toast";
+import type { CatalogoCaptura } from "@/lib/finca/captura";
+import { anularRegistro, marcarRevisado } from "./actions";
+import { CorregirRegistro } from "./corregir-registro";
 import { StatCard } from "@/components/ui/stat-card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ScrollFijo } from "@/components/ui/scroll-fijo";
@@ -77,18 +86,39 @@ interface Mes {
 
 export function LaboresFincaClient({
   registros,
+  anulados,
   baches,
   labores,
   empleados,
   valvulas,
 }: {
   registros: RegistroVista[];
+  anulados: RegistroVista[];
   baches: BacheVista[];
   labores: LaborVista[];
   empleados: EmpleadoVista[];
   valvulas: ValvulaVista[];
 }) {
   const [pestana, setPestana] = React.useState<Pestana>("resumen");
+  const [editando, setEditando] = React.useState<RegistroVista | null>(null);
+  // El formulario de corrección usa el mismo catálogo y las mismas
+  // validaciones que el celular (src/lib/finca/captura.ts).
+  const catalogo = React.useMemo<CatalogoCaptura>(
+    () => ({
+      yo: null,
+      porOtros: true,
+      empleados: empleados.map((e) => ({ id: e.id, nombre: e.nombre })),
+      labores: labores.map((l) => ({
+        id: l.id,
+        nombre: l.nombre,
+        categoria: l.categoria,
+        unidad: l.unidad,
+      })),
+      valvulas: valvulas.map((v) => v.codigo),
+      hoy: "",
+    }),
+    [empleados, labores, valvulas],
+  );
   const dudososReg = registros.filter((r) => r.dudoso);
   const dudososBache = baches.filter((b) => b.dudoso);
 
@@ -164,7 +194,7 @@ export function LaboresFincaClient({
         title="Labores Finca"
         description={
           registros.length
-            ? `Historia del reporte diario de la finca, ${formatDate(fechas[0])} a ${formatDate(fechas.at(-1))}. La captura desde el celular viene en la siguiente fase.`
+            ? `Reporte diario de la finca y lo registrado desde el celular, ${formatDate(fechas[0])} a ${formatDate(fechas.at(-1))}.`
             : "Registro diario de labores y poscosecha de la finca."
         }
       />
@@ -210,13 +240,19 @@ export function LaboresFincaClient({
       ) : pestana === "registros" ? (
         <Registros
           registros={registros}
+          anulados={anulados}
           empleados={empleados}
           labores={labores}
+          onCorregir={setEditando}
         />
       ) : pestana === "poscosecha" ? (
         <Poscosecha baches={baches} />
       ) : pestana === "revisar" ? (
-        <PorRevisar registros={dudososReg} baches={dudososBache} />
+        <PorRevisar
+          registros={dudososReg}
+          baches={dudososBache}
+          onCorregir={setEditando}
+        />
       ) : (
         <Catalogos
           labores={labores}
@@ -224,6 +260,12 @@ export function LaboresFincaClient({
           valvulas={valvulas}
         />
       )}
+
+      <CorregirRegistro
+        registro={editando}
+        catalogo={catalogo}
+        onClose={() => setEditando(null)}
+      />
     </div>
   );
 }
@@ -355,13 +397,18 @@ function Resumen({
 
 function Registros({
   registros,
+  anulados,
   empleados,
   labores,
+  onCorregir,
 }: {
   registros: RegistroVista[];
+  anulados: RegistroVista[];
   empleados: EmpleadoVista[];
   labores: LaborVista[];
+  onCorregir: (r: RegistroVista) => void;
 }) {
+  const [verAnulados, setVerAnulados] = React.useState(false);
   const meses = React.useMemo(
     () =>
       [...new Set(registros.map((r) => r.fecha.slice(0, 7)))].sort().reverse(),
@@ -371,7 +418,8 @@ function Registros({
   const [empleado, setEmpleado] = React.useState("");
   const [labor, setLabor] = React.useState("");
 
-  const filtrados = registros.filter(
+  const base = verAnulados ? anulados : registros;
+  const filtrados = base.filter(
     (r) =>
       (!mes || r.fecha.startsWith(mes)) &&
       (!empleado || r.empleado === empleado) &&
@@ -431,7 +479,25 @@ function Registros({
         jornales trabajados
         {filtrados.length > MAX_FILAS &&
           ` · se muestran los ${MAX_FILAS} más recientes; filtra para ver el resto`}
+        {(anulados.length > 0 || verAnulados) && (
+          <>
+            {" · "}
+            <button
+              type="button"
+              onClick={() => setVerAnulados((x) => !x)}
+              className="text-accent underline-offset-2 hover:underline"
+            >
+              {verAnulados ? "Volver a los vigentes" : `Ver anulados (${anulados.length})`}
+            </button>
+          </>
+        )}
       </p>
+      {verAnulados && (
+        <p className="text-fg-muted text-xs">
+          Anulados: no cuentan en ninguna suma. Restaurar los devuelve tal como
+          estaban.
+        </p>
+      )}
 
       {!filtrados.length ? (
         <EmptyState title="Ningún registro con esos filtros" />
@@ -447,7 +513,12 @@ function Registros({
                 <th className="px-3 py-2 font-medium">Horario</th>
                 <th className="px-3 py-2 text-right font-medium">Horas</th>
                 <th className="px-3 py-2 text-right font-medium">Cantidad</th>
-                <th className="px-3 py-2 font-medium">Observaciones</th>
+                <th className="px-3 py-2 font-medium">
+                  {verAnulados ? "Motivo de anulación" : "Observaciones"}
+                </th>
+                <th className="px-3 py-2">
+                  <span className="sr-only">Acciones</span>
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -466,6 +537,22 @@ function Registros({
                   </td>
                   <td className="px-3 py-1.5">
                     {r.labor}
+                    {r.origen === "app" && (
+                      <span title="Registrado desde el celular">
+                        <Smartphone
+                          className="text-fg-subtle ml-1 inline h-3.5 w-3.5"
+                          aria-label="Desde el celular"
+                        />
+                      </span>
+                    )}
+                    {r.editado && (
+                      <span title="Corregido en el CRM">
+                        <Pencil
+                          className="text-fg-subtle ml-1 inline h-3 w-3"
+                          aria-label="Corregido en el CRM"
+                        />
+                      </span>
+                    )}
                     {r.dudoso && (
                       <span title={r.motivoDuda ?? undefined}>
                         <AlertTriangle
@@ -494,7 +581,23 @@ function Registros({
                         : "—"}
                   </td>
                   <td className="text-fg-muted max-w-[20rem] px-3 py-1.5 text-xs">
-                    {r.observaciones ?? ""}
+                    {verAnulados
+                      ? (r.anulado?.motivo ?? "")
+                      : (r.observaciones ?? "")}
+                  </td>
+                  <td className="px-2 py-1 text-right whitespace-nowrap">
+                    {verAnulados ? (
+                      <Restaurar id={r.id} />
+                    ) : (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => onCorregir(r)}
+                        aria-label={`Corregir registro de ${r.empleado ?? "sin trabajador"} del ${r.fecha}`}
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -592,9 +695,11 @@ function Poscosecha({ baches }: { baches: BacheVista[] }) {
 function PorRevisar({
   registros,
   baches,
+  onCorregir,
 }: {
   registros: RegistroVista[];
   baches: BacheVista[];
+  onCorregir: (r: RegistroVista) => void;
 }) {
   if (!registros.length && !baches.length) {
     return (
@@ -609,7 +714,8 @@ function PorRevisar({
       <p className="text-fg-muted text-sm">
         Lo que la carga no pudo leer con seguridad. Ya entró con la mejor
         lectura posible; hay que confirmarlo con la finca. «Fila» es el número
-        de fila en el Excel.
+        de fila en el Excel. Si la lectura está bien, «Está bien» la saca de
+        la lista; si no, corríjala.
       </p>
       {registros.length > 0 && (
         <Card>
@@ -624,7 +730,10 @@ function PorRevisar({
                   <th className="pr-3 pb-2 font-medium">Fecha leída</th>
                   <th className="pr-3 pb-2 font-medium">Trabajador</th>
                   <th className="pr-3 pb-2 font-medium">Labor</th>
-                  <th className="pb-2 font-medium">Motivo</th>
+                  <th className="pr-3 pb-2 font-medium">Motivo</th>
+                  <th className="pb-2">
+                    <span className="sr-only">Acciones</span>
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -645,8 +754,19 @@ function PorRevisar({
                         {r.empleado ?? "—"}
                       </td>
                       <td className="py-1.5 pr-3">{r.labor}</td>
-                      <td className="text-warn py-1.5 text-xs">
+                      <td className="text-warn py-1.5 pr-3 text-xs">
                         {r.motivoDuda}
+                      </td>
+                      <td className="py-1 text-right whitespace-nowrap">
+                        <EstaBien id={r.id} />
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => onCorregir(r)}
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                          Corregir
+                        </Button>
                       </td>
                     </tr>
                   ))}
@@ -778,5 +898,50 @@ function Catalogos({
         </CardBody>
       </Card>
     </div>
+  );
+}
+
+// ── Acciones de una fila ────────────────────────────────────────────────────
+
+function EstaBien({ id }: { id: string }) {
+  const { toast } = useToast();
+  const [cargando, setCargando] = React.useState(false);
+  return (
+    <Button
+      size="sm"
+      variant="ghost"
+      loading={cargando}
+      onClick={async () => {
+        setCargando(true);
+        const r = await marcarRevisado(id);
+        setCargando(false);
+        if (!r.ok) toast({ tone: "error", title: "No se marcó", description: r.error });
+      }}
+    >
+      <Check className="h-3.5 w-3.5" />
+      Está bien
+    </Button>
+  );
+}
+
+function Restaurar({ id }: { id: string }) {
+  const { toast } = useToast();
+  const [cargando, setCargando] = React.useState(false);
+  return (
+    <Button
+      size="sm"
+      variant="ghost"
+      loading={cargando}
+      onClick={async () => {
+        setCargando(true);
+        const r = await anularRegistro(id, false, "");
+        setCargando(false);
+        if (!r.ok) toast({ tone: "error", title: "No se restauró", description: r.error });
+        else toast({ tone: "success", title: "Restaurado" });
+      }}
+    >
+      <RotateCcw className="h-3.5 w-3.5" />
+      Restaurar
+    </Button>
   );
 }
