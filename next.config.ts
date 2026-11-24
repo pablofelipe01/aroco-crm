@@ -21,6 +21,19 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       {
+        // El service worker de /campo se revisa en cada visita: si el
+        // navegador lo guarda en caché, un arreglo tarda días en llegar.
+        source: "/sw-campo.js",
+        headers: [
+          { key: "Content-Type", value: "application/javascript; charset=utf-8" },
+          { key: "Cache-Control", value: "no-cache, no-store, must-revalidate" },
+        ],
+      },
+      {
+        source: "/campo.webmanifest",
+        headers: [{ key: "Content-Type", value: "application/manifest+json" }],
+      },
+      {
         source: "/firmar/:path*",
         headers: [
           { key: "Referrer-Policy", value: "no-referrer" },

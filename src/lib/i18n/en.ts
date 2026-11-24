@@ -19,6 +19,7 @@ export const en: Diccionario = {
     inventario: "Inventory",
     trazabilidad: "Traceability",
     laboresFinca: "Farm Work",
+    campo: "Field log",
     proveedoresInsumos: "Supply vendors",
     compras: "Admin Purchasing",
     despachos: "Shipments",

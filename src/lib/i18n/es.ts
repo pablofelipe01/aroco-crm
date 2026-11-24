@@ -19,6 +19,7 @@ export const es = {
     inventario: "Inventario",
     trazabilidad: "Trazabilidad",
     laboresFinca: "Labores Finca",
+    campo: "Registro en campo",
     proveedoresInsumos: "Proveedores Insumos",
     compras: "Compras Adm",
     despachos: "Despachos",

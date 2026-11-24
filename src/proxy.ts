@@ -12,7 +12,10 @@ export const config = {
      * Match all request paths except:
      * - _next/static, _next/image, favicon
      * - common static asset extensions
+     * - el service worker y el manifest de /campo: el navegador los pide sin
+     *   cookie de sesión (el manifest) o para actualizarlos en segundo plano,
+     *   y una redirección al login rompe la instalación de la app.
      */
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|sw-campo\\.js|campo\\.webmanifest|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
   ],
 };

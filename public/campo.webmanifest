@@ -1,0 +1,17 @@
+{
+  "name": "AROCO · Labores Finca",
+  "short_name": "Labores Finca",
+  "description": "Registro diario de labores de la finca, con o sin señal.",
+  "id": "/campo",
+  "start_url": "/campo",
+  "scope": "/campo",
+  "display": "standalone",
+  "orientation": "portrait",
+  "lang": "es-CO",
+  "background_color": "#241002",
+  "theme_color": "#241002",
+  "icons": [
+    { "src": "/brand/campo-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/brand/campo-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

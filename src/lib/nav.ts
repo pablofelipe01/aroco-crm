@@ -18,6 +18,7 @@ import {
   Settings,
   FileSignature,
   Sprout,
+  Smartphone,
   type LucideIcon,
 } from "lucide-react";
 
@@ -110,6 +111,15 @@ export const NAV_ITEMS: NavItem[] = [
     label: "Labores Finca",
     icon: Sprout,
     departments: ["Dirección"],
+  },
+  {
+    // La app del celular para registrar labores sin señal (0118). Finca
+    // registra; Dirección también puede, y ahí se prueba.
+    href: "/campo",
+    llave: "campo",
+    label: "Registro en campo",
+    icon: Smartphone,
+    departments: ["Dirección", "Finca"],
   },
   {
     href: "/proveedores",

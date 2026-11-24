@@ -4300,6 +4300,15 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
+      // 0118 — captura de labores desde /campo.
+      finca_catalogo_captura: {
+        Args: Record<PropertyKey, never>;
+        Returns: Json;
+      };
+      finca_subir_registros: {
+        Args: { p_registros: Json };
+        Returns: Json;
+      };
       inventario_pasar_a_crm: {
         Args: Record<PropertyKey, never>;
         Returns: Json;
