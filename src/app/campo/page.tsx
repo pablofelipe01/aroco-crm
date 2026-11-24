@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { ShieldAlert } from "lucide-react";
 import { getSessionContext } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import type { CatalogoCaptura } from "@/lib/finca/captura";
+import type { CatalogoCampo } from "@/lib/finca/captura-equipos";
 import { CampoClient } from "./campo-client";
 
 export const dynamic = "force-dynamic";
@@ -42,7 +42,7 @@ export default async function CampoPage() {
 
   return (
     <CampoClient
-      catalogo={data as unknown as CatalogoCaptura}
+      catalogo={data as unknown as CatalogoCampo}
       usuario={session.userId}
       nombre={session.profile?.full_name ?? session.email}
     />

@@ -12,6 +12,9 @@ import {
   Trash2,
   Download,
   ArrowLeft,
+  ClipboardList,
+  Droplets,
+  Fuel,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -38,9 +41,14 @@ import {
   leer,
   quitar,
   subir,
+  tipoDe,
   type ItemCola,
   type ItemEnviado,
+  type TipoCola,
 } from "@/lib/finca/cola";
+import type { CatalogoCampo, CompraCampo, UsoCampo } from "@/lib/finca/captura-equipos";
+import { Chip, Numero } from "./piezas";
+import { FormCompra, FormUso } from "./formularios";
 
 const CATEGORIAS: Record<Categoria, string> = {
   cosecha: "Cosecha",
@@ -71,10 +79,18 @@ export function CampoClient({
   usuario,
   nombre,
 }: {
-  catalogo: CatalogoCaptura;
+  catalogo: CatalogoCampo;
   usuario: string;
   nombre: string;
 }) {
+  // Labores, riego y equipos, o compras de combustible (estas solo Dirección
+  // y Finca: es plata).
+  const [modo, setModo] = React.useState<TipoCola>("labor");
+  // Uso o compra de la cola que se está corrigiendo (las labores usan
+  // `corrigiendo`, que puede ser una cuadrilla entera).
+  const [editando, setEditando] = React.useState<
+    { tipo: "uso"; item: UsoCampo; grupo: string } | { tipo: "compra"; item: CompraCampo; grupo: string } | null
+  >(null);
   const { toast } = useToast();
   const supabase = React.useMemo(() => createClient(), []);
   const hoy = () => fechaColombia(new Date());
@@ -96,6 +112,10 @@ export function CampoClient({
   const laborDe = React.useMemo(
     () => new Map(catalogo.labores.map((l) => [l.id, l])),
     [catalogo.labores],
+  );
+  const equipoDe = React.useMemo(
+    () => new Map((catalogo.equipos ?? []).map((q) => [q.id, q.nombre])),
+    [catalogo.equipos],
   );
   const labor = laborDe.get(b.laborId);
   const medida = labor ? medidaDe(labor) : null;
@@ -212,13 +232,15 @@ export function CampoClient({
       toast({ tone: "error", title: "Revise los campos marcados" });
       return;
     }
-    const previos = corrigiendo ? cola.filter((x) => x.grupo === corrigiendo) : [];
+    const previos = corrigiendo
+      ? cola.filter((x): x is Extract<ItemCola, { empleado_id: string }> & { labor_id: string } => x.grupo === corrigiendo && tipoDe(x) === "labor")
+      : [];
     const idPrevio = new Map(previos.map((x) => [x.empleado_id, x.id]));
     const filas = armarRegistros(b, catalogo, new Date(), (emp) => idPrevio.get(emp) ?? crypto.randomUUID());
     const grupo = corrigiendo ?? crypto.randomUUID();
     const quedan = new Set(filas.map((f) => f.id));
     await quitar(previos.filter((x) => !quedan.has(x.id)).map((x) => x.id));
-    await agregar(filas.map((f) => ({ ...f, usuario, estado: "pendiente", grupo })));
+    await agregar(filas.map((f) => ({ ...f, tipo: "labor" as const, usuario, estado: "pendiente" as const, grupo })));
 
     toast({
       tone: "success",
@@ -238,10 +260,46 @@ export function CampoClient({
     void intentarSubir();
   }
 
+  /** Guarda un uso o una compra (nuevo o corregido) en la cola y sube. */
+  async function guardarOtro(tipo: "uso" | "compra", dato: UsoCampo | CompraCampo) {
+    const grupo = editando?.grupo ?? crypto.randomUUID();
+    await agregar([{ ...dato, tipo, usuario, estado: "pendiente", grupo } as ItemCola]);
+    toast({
+      tone: "success",
+      title: editando ? "Corregido" : "Guardado en el teléfono",
+      description: navigator.onLine ? "Subiendo…" : "Se sube solo al volver a la oficina.",
+    });
+    setEditando(null);
+    await refrescar();
+    void intentarSubir();
+  }
+
   function corregir(grupo: string) {
-    const items = cola.filter((x) => x.grupo === grupo);
+    const todos = cola.filter((x) => x.grupo === grupo);
+    const primero = todos[0];
+    if (!primero) return;
+    const tipo = tipoDe(primero);
+    if (tipo !== "labor") {
+      const { usuario: _u, estado: _e, motivo: _m, grupo: _g, tipo: _t, ...dato } = primero as ItemCola & { tipo: string };
+      void _u;
+      void _e;
+      void _m;
+      void _g;
+      void _t;
+      setEditando(
+        tipo === "uso"
+          ? { tipo, item: dato as unknown as UsoCampo, grupo }
+          : { tipo, item: dato as unknown as CompraCampo, grupo },
+      );
+      setCorrigiendo(null);
+      setModo(tipo);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+    setEditando(null);
+    setModo("labor");
+    const items = todos as unknown as RegistroCampo[];
     const f = items[0];
-    if (!f) return;
     const s = (n: number | null) => (n == null ? "" : String(n).replace(".", ","));
     setB({
       fecha: f.fecha,
@@ -266,6 +324,7 @@ export function CampoClient({
   async function borrar(grupo: string) {
     await quitar(cola.filter((x) => x.grupo === grupo).map((x) => x.id));
     if (corrigiendo === grupo) setCorrigiendo(null);
+    if (editando?.grupo === grupo) setEditando(null);
     await refrescar();
   }
 
@@ -341,6 +400,54 @@ export function CampoClient({
       <main className="mx-auto max-w-xl space-y-6 px-4 pt-4">
         <Instalar />
 
+        <div role="tablist" aria-label="Qué registrar" className="grid grid-cols-3 gap-1 rounded-[var(--radius-lg)] border border-border bg-surface p-1">
+          {(
+            [
+              { k: "labor", label: "Labores", icon: ClipboardList },
+              { k: "uso", label: "Riego y equipos", icon: Droplets },
+              ...(catalogo.porOtros ? [{ k: "compra", label: "Combustible", icon: Fuel }] : []),
+            ] as { k: TipoCola; label: string; icon: typeof Fuel }[]
+          ).map(({ k, label, icon: Icono }) => (
+            <button
+              key={k}
+              type="button"
+              role="tab"
+              aria-selected={modo === k}
+              onClick={() => {
+                setModo(k);
+                setEditando(null);
+              }}
+              className={cn(
+                "flex min-h-11 flex-col items-center justify-center gap-0.5 rounded-[var(--radius-md)] px-2 text-xs font-medium transition-colors",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                modo === k ? "bg-accent text-accent-fg" : "text-fg-muted hover:bg-bg-subtle hover:text-fg",
+              )}
+            >
+              <Icono className="h-4 w-4" aria-hidden />
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {modo === "uso" && (
+          <FormUso
+            key={editando?.grupo ?? "nuevo-uso"}
+            catalogo={catalogo}
+            editar={editando?.tipo === "uso" ? editando.item : null}
+            onGuardar={(u) => guardarOtro("uso", u)}
+            onCancelar={() => setEditando(null)}
+          />
+        )}
+        {modo === "compra" && catalogo.porOtros && (
+          <FormCompra
+            key={editando?.grupo ?? "nueva-compra"}
+            editar={editando?.tipo === "compra" ? editando.item : null}
+            onGuardar={(c) => guardarOtro("compra", c)}
+            onCancelar={() => setEditando(null)}
+          />
+        )}
+
+        {modo === "labor" && (
         <form
           onSubmit={guardar}
           noValidate
@@ -536,6 +643,7 @@ export function CampoClient({
             {corrigiendo ? "Guardar corrección" : "Guardar"}
           </Button>
         </form>
+        )}
 
         <Lista
           titulo="Por subir"
@@ -543,6 +651,7 @@ export function CampoClient({
           items={mios}
           nombreDe={nombreDe}
           laborDe={laborDe}
+          equipoDe={equipoDe}
           acciones={(grupo) =>
             estado.tipo === "subiendo" ? null : (
             <div className="flex gap-1">
@@ -567,66 +676,10 @@ export function CampoClient({
           items={enviados}
           nombreDe={nombreDe}
           laborDe={laborDe}
+          equipoDe={equipoDe}
         />
       </main>
     </div>
-  );
-}
-
-function Chip({
-  activo,
-  onClick,
-  disabled,
-  mono,
-  children,
-}: {
-  activo: boolean;
-  onClick: () => void;
-  disabled?: boolean;
-  mono?: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      aria-pressed={activo}
-      onClick={onClick}
-      disabled={disabled}
-      className={cn(
-        "min-h-11 rounded-full border px-4 text-sm transition-colors duration-150",
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-        mono && "tnum font-mono",
-        activo
-          ? "border-accent bg-accent text-accent-fg"
-          : "border-border bg-surface text-fg hover:border-border-strong",
-        disabled && "cursor-default",
-      )}
-    >
-      {children}
-    </button>
-  );
-}
-
-function Numero({
-  label,
-  valor,
-  error,
-  onChange,
-}: {
-  label: string;
-  valor: string;
-  error?: string;
-  onChange: (v: string) => void;
-}) {
-  return (
-    <Field label={label} error={error}>
-      <Input
-        inputMode="decimal"
-        value={valor}
-        onChange={(e) => onChange(e.target.value)}
-        className="tnum h-12 text-base"
-      />
-    </Field>
   );
 }
 
@@ -648,7 +701,7 @@ function BorrarBoton({ onConfirmar }: { onConfirmar: () => void }) {
   );
 }
 
-type Fila = RegistroCampo & { grupo: string; estado?: ItemCola["estado"]; motivo?: string };
+type Fila = ItemCola | ItemEnviado;
 
 function Lista({
   titulo,
@@ -656,6 +709,7 @@ function Lista({
   items,
   nombreDe,
   laborDe,
+  equipoDe,
   acciones,
 }: {
   titulo: string;
@@ -663,6 +717,7 @@ function Lista({
   items: Fila[];
   nombreDe: Map<string, string>;
   laborDe: Map<string, CatalogoCaptura["labores"][number]>;
+  equipoDe: Map<string, string>;
   acciones?: (grupo: string) => React.ReactNode;
 }) {
   const grupos = React.useMemo(() => {
@@ -685,9 +740,8 @@ function Lista({
       ) : (
         <ul className="space-y-2">
           {grupos.map(([grupo, fs]) => {
-            const f = fs[0];
-            const l = laborDe.get(f.labor_id);
-            const rechazo = fs.find((x) => x.estado === "rechazado");
+            const d = describir(fs, nombreDe, laborDe, equipoDe);
+            const rechazo = fs.find((x) => "estado" in x && x.estado === "rechazado") as ItemCola | undefined;
             return (
               <li
                 key={grupo}
@@ -698,16 +752,9 @@ function Lista({
               >
                 <div className="flex items-start gap-2">
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-fg">{l?.nombre ?? "Labor"}</p>
-                    <p className="tnum text-xs text-fg-muted">
-                      {f.fecha} · {String(f.horas).replace(".", ",")} h
-                      {f.valvulas.length ? ` · V ${f.valvulas.join(", ")}` : ""}
-                      {f.sitio ? ` · ${f.sitio}` : ""}
-                      {cifra(f, l)}
-                    </p>
-                    <p className="truncate text-xs text-fg-subtle">
-                      {fs.map((x) => nombreDe.get(x.empleado_id) ?? "¿?").join(", ")}
-                    </p>
+                    <p className="text-sm font-medium text-fg">{d.titulo}</p>
+                    <p className="tnum text-xs text-fg-muted">{d.detalle}</p>
+                    {d.personas && <p className="truncate text-xs text-fg-subtle">{d.personas}</p>}
                     {rechazo && (
                       <p className="mt-1 flex items-center gap-1 text-xs text-danger">
                         <AlertTriangle className="h-3.5 w-3.5" />
@@ -734,6 +781,57 @@ function cifra(f: RegistroCampo, l: CatalogoCaptura["labores"][number] | undefin
   if (m === "desgrane") return ` · A ${n(f.sanas)} kg / C ${n(f.negras)} kg`;
   if (m === "cantidad" && f.cantidad != null) return ` · ${n(f.cantidad)} ${l.unidad}`;
   return "";
+}
+
+const coma = (x: number | null) => (x == null ? "" : String(x).replace(".", ","));
+
+/** Título y detalle de un grupo de la cola, según su tipo. */
+function describir(
+  fs: Fila[],
+  nombreDe: Map<string, string>,
+  laborDe: Map<string, CatalogoCaptura["labores"][number]>,
+  equipoDe: Map<string, string>,
+): { titulo: string; detalle: string; personas: string | null } {
+  const f = fs[0];
+  const tipo = tipoDe(f);
+  if (tipo === "compra") {
+    const c = f as unknown as CompraCampo;
+    return {
+      titulo: `Compra de ${c.combustible === "acpm" ? "ACPM" : "gasolina"}`,
+      detalle: [
+        c.fecha,
+        c.galones != null ? `${coma(c.galones)} gal` : null,
+        c.valor != null ? `$${Math.round(c.valor).toLocaleString("es-CO")}` : null,
+        c.recibo ? `recibo ${c.recibo}` : null,
+      ]
+        .filter(Boolean)
+        .join(" · "),
+      personas: c.destino,
+    };
+  }
+  if (tipo === "uso") {
+    const u = f as unknown as UsoCampo;
+    return {
+      titulo: equipoDe.get(u.equipo_id) ?? "Equipo",
+      detalle: [
+        u.fecha,
+        u.horas != null ? `${coma(u.horas)} h` : null,
+        u.valvulas.length ? `V ${u.valvulas.join(", ")}` : null,
+        u.sitio,
+        u.carga_galones != null ? `tanqueó ${coma(u.carga_galones)} gal` : null,
+      ]
+        .filter(Boolean)
+        .join(" · "),
+      personas: u.empleado_id ? (nombreDe.get(u.empleado_id) ?? null) : null,
+    };
+  }
+  const r = f as unknown as RegistroCampo;
+  const l = laborDe.get(r.labor_id);
+  return {
+    titulo: l?.nombre ?? "Labor",
+    detalle: `${r.fecha} · ${coma(r.horas)} h${r.valvulas.length ? ` · V ${r.valvulas.join(", ")}` : ""}${r.sitio ? ` · ${r.sitio}` : ""}${cifra(r, l)}`,
+    personas: (fs as unknown as RegistroCampo[]).map((x) => nombreDe.get(x.empleado_id) ?? "¿?").join(", "),
+  };
 }
 
 /**

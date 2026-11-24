@@ -13,25 +13,42 @@
  *   con su motivo, hasta que el trabajador lo corrija o lo borre.
  * - Cada registro lleva la cuenta que lo anotó y solo esa cuenta lo sube: en
  *   un celular compartido, nadie sube lo de otro con su sesión.
+ * - Tres tipos en la misma cola (0121): labores, usos de equipo (riego) y
+ *   compras de combustible. Lo guardado antes de 0121 no trae `tipo` y es
+ *   una labor: `tipoDe` lo resuelve, así no se pierde nada de un teléfono
+ *   que tenía cosas pendientes al actualizarse la app.
  */
 
 import type { RegistroCampo } from "./captura";
+import type { CompraCampo, UsoCampo } from "./captura-equipos";
 
 export type EstadoCola = "pendiente" | "rechazado";
+export type TipoCola = "labor" | "uso" | "compra";
 
-export interface ItemCola extends RegistroCampo {
+type Datos =
+  | (RegistroCampo & { tipo?: "labor" })
+  | (UsoCampo & { tipo: "uso" })
+  | (CompraCampo & { tipo: "compra" });
+
+interface Meta {
   usuario: string;
-  estado: EstadoCola;
-  motivo?: string;
-  /** Registros que salieron del mismo formulario (una cuadrilla). */
+  /** Lo que salió del mismo formulario (una cuadrilla). */
   grupo: string;
 }
 
-export interface ItemEnviado extends RegistroCampo {
-  usuario: string;
-  grupo: string;
-  subido_en: string;
+export type ItemCola = Datos & Meta & { estado: EstadoCola; motivo?: string };
+export type ItemEnviado = Datos & Meta & { subido_en: string };
+
+export function tipoDe(x: { tipo?: TipoCola }): TipoCola {
+  return x.tipo ?? "labor";
 }
+
+/** Función de la base y nombre del parámetro, por tipo. */
+const RPC = {
+  labor: { fn: "finca_subir_registros", arg: "p_registros" },
+  uso: { fn: "finca_subir_usos", arg: "p_usos" },
+  compra: { fn: "finca_subir_compras", arg: "p_compras" },
+} as const;
 
 const DB = "aroco-campo";
 const VERSION = 1;
@@ -102,7 +119,7 @@ export async function leer(): Promise<{ cola: ItemCola[]; enviados: ItemEnviado[
       todos<ItemCola>(t.objectStore(COLA)),
       todos<ItemEnviado>(t.objectStore(ENVIADOS)),
     ]);
-    const orden = (a: RegistroCampo, b: RegistroCampo) =>
+    const orden = (a: { registrado_en: string }, b: { registrado_en: string }) =>
       b.registrado_en.localeCompare(a.registrado_en);
     return { cola: cola.sort(orden), enviados: enviados.sort(orden) };
   } finally {
@@ -133,7 +150,7 @@ async function anotarResultado(
         const { estado: _e, motivo: _m, ...resto } = it;
         void _e;
         void _m;
-        env.put({ ...resto, subido_en: ahora } satisfies ItemEnviado);
+        env.put({ ...resto, subido_en: ahora } as ItemEnviado);
         cola.delete(it.id);
       } else if (rechazados.has(it.id)) {
         cola.put({ ...it, estado: "rechazado", motivo: rechazados.get(it.id) });
@@ -159,8 +176,8 @@ export type ResultadoSubida =
   | { tipo: "error"; mensaje: string };
 
 type Rpc = (
-  fn: "finca_subir_registros",
-  args: { p_registros: RegistroCampo[] },
+  fn: (typeof RPC)[TipoCola]["fn"],
+  args: Record<string, unknown>,
 ) => PromiseLike<{
   data: unknown;
   error: { message: string; code?: string; status?: number } | null;
@@ -168,7 +185,11 @@ type Rpc = (
 
 const LOTE = 200;
 
-/** Sube lo pendiente de `usuario`. Lo rechazado no se reintenta solo. */
+/**
+ * Sube lo pendiente de `usuario`, tipo por tipo. Lo rechazado no se reintenta
+ * solo. Sin red se corta ahí; un error de un tipo (p. ej. una cuenta sin
+ * permiso de compras) no frena a los otros.
+ */
 export async function subir(rpc: Rpc, usuario: string): Promise<ResultadoSubida> {
   const { cola } = await leer();
   const mios = cola.filter((x) => x.usuario === usuario && x.estado === "pendiente");
@@ -176,38 +197,41 @@ export async function subir(rpc: Rpc, usuario: string): Promise<ResultadoSubida>
 
   let subidos = 0;
   let rech = 0;
-  for (let i = 0; i < mios.length; i += LOTE) {
-    const lote = mios.slice(i, i + LOTE).map(
-      ({ usuario: _u, estado: _e, motivo: _m, grupo: _g, ...r }) => {
-        void _u;
-        void _e;
-        void _m;
-        void _g;
+  let error: ResultadoSubida | null = null;
+  for (const tipo of ["labor", "uso", "compra"] as const) {
+    const delTipo = mios.filter((x) => tipoDe(x) === tipo);
+    for (let i = 0; i < delTipo.length; i += LOTE) {
+      const lote = delTipo.slice(i, i + LOTE).map((x) => {
+        const r: Record<string, unknown> = { ...x };
+        for (const k of ["usuario", "estado", "motivo", "grupo", "tipo"]) delete r[k];
         return r;
-      },
-    );
-    let res: Awaited<ReturnType<Rpc>>;
-    try {
-      res = await rpc("finca_subir_registros", { p_registros: lote });
-    } catch {
-      return subidos ? { tipo: "ok", subidos, rechazados: rech } : { tipo: "sin-red" };
+      });
+      let res: Awaited<ReturnType<Rpc>>;
+      try {
+        res = await rpc(RPC[tipo].fn, { [RPC[tipo].arg]: lote });
+      } catch {
+        return subidos ? { tipo: "ok", subidos, rechazados: rech } : { tipo: "sin-red" };
+      }
+      if (res.error) {
+        const m = res.error.message ?? "";
+        if (/fetch|network|Load failed/i.test(m))
+          return subidos ? { tipo: "ok", subidos, rechazados: rech } : { tipo: "sin-red" };
+        if (res.error.code === "PGRST301" || res.error.status === 401 || /JWT/i.test(m))
+          return { tipo: "sin-sesion" };
+        error = { tipo: "error", mensaje: m };
+        break; // este tipo no sigue; los demás sí
+      }
+      const data = res.data as {
+        aceptados: string[];
+        rechazados: { id: string; motivo: string }[];
+      };
+      const ok = new Set(data.aceptados);
+      const no = new Map(data.rechazados.map((x) => [x.id, x.motivo]));
+      await anotarResultado(ok, no, new Date().toISOString());
+      subidos += ok.size;
+      rech += no.size;
     }
-    if (res.error) {
-      const m = res.error.message ?? "";
-      if (/fetch|network|Load failed/i.test(m)) return { tipo: "sin-red" };
-      if (res.error.code === "PGRST301" || res.error.status === 401 || /JWT/i.test(m))
-        return { tipo: "sin-sesion" };
-      return { tipo: "error", mensaje: m };
-    }
-    const data = res.data as {
-      aceptados: string[];
-      rechazados: { id: string; motivo: string }[];
-    };
-    const ok = new Set(data.aceptados);
-    const no = new Map(data.rechazados.map((x) => [x.id, x.motivo]));
-    await anotarResultado(ok, no, new Date().toISOString());
-    subidos += ok.size;
-    rech += no.size;
   }
+  if (error && !subidos) return error;
   return { tipo: "ok", subidos, rechazados: rech };
 }

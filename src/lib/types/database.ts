@@ -4520,6 +4520,15 @@ export type Database = {
         Args: { p_registros: Json };
         Returns: Json;
       };
+      // 0121 — riego, equipos y compras desde /campo.
+      finca_subir_usos: {
+        Args: { p_usos: Json };
+        Returns: Json;
+      };
+      finca_subir_compras: {
+        Args: { p_compras: Json };
+        Returns: Json;
+      };
       // 0119 — correcciones desde /labores-finca (solo Dirección).
       finca_corregir_registro: {
         Args: { p_id: string; p: Json };
