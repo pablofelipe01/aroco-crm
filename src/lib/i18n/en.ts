@@ -18,6 +18,7 @@ export const en: Diccionario = {
     cotizaciones: "Cocoa Purchasing",
     inventario: "Inventory",
     trazabilidad: "Traceability",
+    laboresFinca: "Farm Work",
     proveedoresInsumos: "Supply vendors",
     compras: "Admin Purchasing",
     despachos: "Shipments",

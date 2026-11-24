@@ -17,6 +17,7 @@ import {
   Route,
   Settings,
   FileSignature,
+  Sprout,
   type LucideIcon,
 } from "lucide-react";
 
@@ -101,6 +102,15 @@ export const NAV_ITEMS: NavItem[] = [
   // Tolimax): 60,8 kg en dos filas.
   // La ruta, la tabla y el sync diario siguen vivos — para reponerlo basta con
   // devolver esta entrada al menú.
+  {
+    // Labores y poscosecha de la finca (0117). Solo Dirección por ahora, por
+    // pedido del cliente: trae costos. La RLS repite el candado.
+    href: "/labores-finca",
+    llave: "laboresFinca",
+    label: "Labores Finca",
+    icon: Sprout,
+    departments: ["Dirección"],
+  },
   {
     href: "/proveedores",
     llave: "proveedoresInsumos",

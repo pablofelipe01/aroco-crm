@@ -20,6 +20,281 @@ export type Database = {
   };
   public: {
     Tables: {
+      finca_empleados: {
+        Row: {
+          id: string
+          nombre: string
+          clave: string
+          profile_id: string | null
+          jornal_cop: number | null
+          activo: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          nombre: string
+          clave: string
+          profile_id?: string | null
+          jornal_cop?: number | null
+          activo?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          nombre?: string
+          clave?: string
+          profile_id?: string | null
+          jornal_cop?: number | null
+          activo?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "finca_empleados_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      finca_valvulas: {
+        Row: {
+          codigo: string
+          orden: number
+          hectareas: number | null
+          arboles: number | null
+          activo: boolean
+          created_at: string
+        }
+        Insert: {
+          codigo: string
+          orden: number
+          hectareas?: number | null
+          arboles?: number | null
+          activo?: boolean
+          created_at?: string
+        }
+        Update: {
+          codigo?: string
+          orden?: number
+          hectareas?: number | null
+          arboles?: number | null
+          activo?: boolean
+          created_at?: string
+        }
+        Relationships: []
+      }
+      finca_labores: {
+        Row: {
+          id: string
+          nombre: string
+          categoria: Database["public"]["Enums"]["finca_categoria"]
+          unidad: string | null
+          activo: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          nombre: string
+          categoria: Database["public"]["Enums"]["finca_categoria"]
+          unidad?: string | null
+          activo?: boolean
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          nombre?: string
+          categoria?: Database["public"]["Enums"]["finca_categoria"]
+          unidad?: string | null
+          activo?: boolean
+          created_at?: string
+        }
+        Relationships: []
+      }
+      finca_registros: {
+        Row: {
+          id: string
+          fecha: string
+          empleado_id: string | null
+          labor_id: string
+          valvulas: string[]
+          sitio: string | null
+          hora_inicio: string | null
+          hora_fin: string | null
+          horas: number | null
+          cantidad: number | null
+          unidad: string | null
+          sanas: number | null
+          pasador_monilia: number | null
+          negras: number | null
+          observaciones: string | null
+          origen: string
+          ref_hoja: string | null
+          dudoso: boolean
+          motivo_duda: string | null
+          original: Json | null
+          registrado_por: string | null
+          registrado_en: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          fecha: string
+          empleado_id?: string | null
+          labor_id: string
+          valvulas?: string[]
+          sitio?: string | null
+          hora_inicio?: string | null
+          hora_fin?: string | null
+          horas?: number | null
+          cantidad?: number | null
+          unidad?: string | null
+          sanas?: number | null
+          pasador_monilia?: number | null
+          negras?: number | null
+          observaciones?: string | null
+          origen?: string
+          ref_hoja?: string | null
+          dudoso?: boolean
+          motivo_duda?: string | null
+          original?: Json | null
+          registrado_por?: string | null
+          registrado_en?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          fecha?: string
+          empleado_id?: string | null
+          labor_id?: string
+          valvulas?: string[]
+          sitio?: string | null
+          hora_inicio?: string | null
+          hora_fin?: string | null
+          horas?: number | null
+          cantidad?: number | null
+          unidad?: string | null
+          sanas?: number | null
+          pasador_monilia?: number | null
+          negras?: number | null
+          observaciones?: string | null
+          origen?: string
+          ref_hoja?: string | null
+          dudoso?: boolean
+          motivo_duda?: string | null
+          original?: Json | null
+          registrado_por?: string | null
+          registrado_en?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "finca_registros_empleado_id_fkey"
+            columns: ["empleado_id"]
+            isOneToOne: false
+            referencedRelation: "finca_empleados"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "finca_registros_labor_id_fkey"
+            columns: ["labor_id"]
+            isOneToOne: false
+            referencedRelation: "finca_labores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "finca_registros_registrado_por_fkey"
+            columns: ["registrado_por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      finca_baches: {
+        Row: {
+          numero: number
+          valvulas_texto: string | null
+          variedad: string | null
+          calidad: string | null
+          fecha_inicio: string | null
+          peso_baba: number | null
+          fecha_salida_secado: string | null
+          peso_fermentado: number | null
+          peso_final: number | null
+          fecha_fin: string | null
+          fecha_despacho: string | null
+          peso_salida: number | null
+          observaciones: string | null
+          origen: string
+          dudoso: boolean
+          motivo_duda: string | null
+          original: Json | null
+          created_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          numero: number
+          valvulas_texto?: string | null
+          variedad?: string | null
+          calidad?: string | null
+          fecha_inicio?: string | null
+          peso_baba?: number | null
+          fecha_salida_secado?: string | null
+          peso_fermentado?: number | null
+          peso_final?: number | null
+          fecha_fin?: string | null
+          fecha_despacho?: string | null
+          peso_salida?: number | null
+          observaciones?: string | null
+          origen?: string
+          dudoso?: boolean
+          motivo_duda?: string | null
+          original?: Json | null
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          numero?: number
+          valvulas_texto?: string | null
+          variedad?: string | null
+          calidad?: string | null
+          fecha_inicio?: string | null
+          peso_baba?: number | null
+          fecha_salida_secado?: string | null
+          peso_fermentado?: number | null
+          peso_final?: number | null
+          fecha_fin?: string | null
+          fecha_despacho?: string | null
+          peso_salida?: number | null
+          observaciones?: string | null
+          origen?: string
+          dudoso?: boolean
+          motivo_duda?: string | null
+          original?: Json | null
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "finca_baches_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       firmas_eventos: {
         Row: {
           actor: string | null
@@ -4093,6 +4368,15 @@ export type Database = {
       is_admin: { Args: Record<string, never>; Returns: boolean };
     };
     Enums: {
+      finca_categoria:
+        | "cosecha"
+        | "poscosecha"
+        | "cultivo"
+        | "riego"
+        | "sanidad"
+        | "mantenimiento"
+        | "administracion"
+        | "ausencia";
       lugar_tipo: "bodega" | "municipio" | "vereda";
       compra_categoria:
         | "Oficina"

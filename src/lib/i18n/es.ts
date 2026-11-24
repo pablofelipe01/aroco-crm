@@ -18,6 +18,7 @@ export const es = {
     cotizaciones: "Compras Cacao",
     inventario: "Inventario",
     trazabilidad: "Trazabilidad",
+    laboresFinca: "Labores Finca",
     proveedoresInsumos: "Proveedores Insumos",
     compras: "Compras Adm",
     despachos: "Despachos",
