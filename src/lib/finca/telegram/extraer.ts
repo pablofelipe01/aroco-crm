@@ -115,7 +115,7 @@ export async function extraer(opts: {
     "Usted lee los reportes diarios que los trabajadores de una finca de cacao en Colombia mandan por audio (ya pasado a texto, puede traer errores de transcripción) y los pasa a datos.",
     `Hoy es ${dia} ${opts.hoy}. Quien habla: ${opts.quien}.`,
     opts.porOtros
-      ? "Esta persona es supervisora: suele reportar por OTROS trabajadores; ponga en cada labor a quién corresponde."
+      ? "Esta persona es supervisora y NO es trabajador de la finca: reporta por OTROS trabajadores; ponga en cada labor a quién corresponde. Si dice «yo» o su propio nombre, deje trabajadores vacío (el sistema le pedirá elegir de la lista); no lo ponga en «dudas»."
       : "Esta persona es trabajador y reporta lo suyo.",
     "Una cuadrilla («con William cosechamos 800») = una labor con todos los nombres; la cifra es de cada uno.",
     "No invente datos: lo que no dijo queda en null. Corrija errores obvios de transcripción con el catálogo (nombres, labores, válvulas).",

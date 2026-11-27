@@ -177,6 +177,11 @@ export function proponer(
   const preguntas: string[] = [...ext.dudas.filter((d) => d.trim())];
   const catQuien: CatalogoCampo = { ...cat, yo: quien.yo, porOtros: quien.porOtros };
   const nombreDe = (id: string) => cat.empleados.find((e) => e.id === id)?.nombre ?? id;
+  // Al supervisor hay que decirle de quiénes puede escoger: si contesta «yo»
+  // y no tiene ficha de trabajador, la misma pregunta sin la lista lo deja en
+  // un círculo (pasó en la primera prueba, 2026-11-27).
+  const lista = cat.empleados.map((e) => e.nombre).join(", ");
+  const conLista = (q: string) => (quien.porOtros ? `${q} Diga el nombre de uno de estos trabajadores: ${lista}.` : q);
 
   const labores: LaborPropuesta[] = [];
   for (const l of ext.labores) {
@@ -199,7 +204,7 @@ export function proponer(
       if (empleados.length === 0 && quien.yo) empleados = [quien.yo];
     }
     for (const n of desconocidos)
-      preguntas.push(`No encuentro a «${n}» en la lista de trabajadores. ¿Quién es?`);
+      preguntas.push(conLista(`No encuentro a «${n}» en la lista de trabajadores.`));
 
     const v = valvulasDe(l.valvulas, cat);
     for (const m of v.malas) preguntas.push(`La válvula «${m}» no está en la lista. ¿Cuál fue?`);
@@ -234,7 +239,8 @@ export function proponer(
       const p = PREGUNTA_LABOR[k];
       if (k === "empleados" && desconocidos.length) continue;
       if (k === "valvulas" && v.malas.length) continue;
-      const q = p ? p.replace("{labor}", nombreLabor) : `${nombreLabor}: ${errores[k]}`;
+      let q = p ? p.replace("{labor}", nombreLabor) : `${nombreLabor}: ${errores[k]}`;
+      if (k === "empleados") q = conLista(q);
       if (!preguntas.includes(q)) preguntas.push(q);
     }
 
@@ -260,7 +266,7 @@ export function proponer(
       const e = buscar(cat.empleados, u.trabajador, (x) => x.nombre);
       if (e) empleadoId = e.id;
       else if (u.trabajador)
-        preguntas.push(`No encuentro a «${u.trabajador}» en la lista de trabajadores. ¿Quién es?`);
+        preguntas.push(conLista(`No encuentro a «${u.trabajador}» en la lista de trabajadores.`));
     }
     const v = valvulasDe(u.valvulas, cat);
     for (const m of v.malas) preguntas.push(`La válvula «${m}» no está en la lista. ¿Cuál fue?`);
@@ -285,7 +291,7 @@ export function proponer(
       preguntas.push(`¿Cuántas horas trabajó ${nombreEquipo}, o a qué hora prendió y apagó?`);
     if (errores.carga) preguntas.push(`¿Cuántos galones le echó a ${nombreEquipo}?`);
     if (errores.fecha) preguntas.push("¿De qué día es el reporte?");
-    if (errores.empleadoId && !u.trabajador) preguntas.push(`¿Quién usó ${nombreEquipo}?`);
+    if (errores.empleadoId && !u.trabajador) preguntas.push(conLista(`¿Quién usó ${nombreEquipo}?`));
     usos.push({
       equipo: nombreEquipo,
       trabajador: empleadoId ? nombreDe(empleadoId) : null,

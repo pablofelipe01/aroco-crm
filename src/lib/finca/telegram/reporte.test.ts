@@ -170,6 +170,8 @@ test("supervisor: cuadrilla = una fila por persona, con nombres cortos", () => {
 test("supervisor sin decir quién: pregunta quién", () => {
   const p = proponer(ext({ labores: [labor({ labor: "Poda", horas: 4 })] }), cat, supervisor, HOY, id);
   assert.ok(p.preguntas.some((q) => /Quién hizo/.test(q)));
+  // Con la lista: si no, quien no es trabajador contesta «yo» y da vueltas.
+  assert.ok(p.preguntas.some((q) => q.includes("William Osorio, Heriberto Pinzón")));
 });
 
 test("supervisor nombra a alguien que no está: pregunta por él", () => {
