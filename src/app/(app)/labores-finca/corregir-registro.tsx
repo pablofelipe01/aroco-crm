@@ -83,7 +83,7 @@ export function CorregirRegistro({
       title="Corregir registro"
       subtitle={
         registro
-          ? `${registro.origen === "app" ? "Del celular" : `Hoja, fila ${registro.refHoja?.replace(/^\w+:/, "") ?? "—"}`} · ${formatDate(registro.fecha)}`
+          ? `${registro.origen === "app" ? "Del celular" : registro.origen === "telegram" ? "Por Telegram" : `Hoja, fila ${registro.refHoja?.replace(/^\w+:/, "") ?? "—"}`} · ${formatDate(registro.fecha)}`
           : undefined
       }
       width="lg"

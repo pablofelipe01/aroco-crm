@@ -98,6 +98,28 @@ export const serverEnv = {
   get INVENTORY_MCP_CF_CLIENT_SECRET() {
     return process.env.INVENTORY_MCP_CF_CLIENT_SECRET ?? "";
   },
+  /**
+   * Bot de Telegram de Labores Finca (0122). Sin token el bot está apagado:
+   * el webhook contesta 503 y los crons no escriben a nadie.
+   */
+  get TELEGRAM_BOT_TOKEN() {
+    return process.env.TELEGRAM_BOT_TOKEN ?? "";
+  },
+  /** Lo manda Telegram en cada llamada al webhook (X-Telegram-Bot-Api-Secret-Token). */
+  get TELEGRAM_WEBHOOK_SECRET() {
+    return process.env.TELEGRAM_WEBHOOK_SECRET ?? "";
+  },
+  /** El @usuario del bot sin «@», para mostrar el enlace t.me/… en el CRM. */
+  get TELEGRAM_BOT_USERNAME() {
+    return (process.env.TELEGRAM_BOT_USERNAME ?? "").replace(/^@/, "");
+  },
+  /** Voz a texto de los audios del bot (OpenAI). */
+  get OPENAI_API_KEY() {
+    return process.env.OPENAI_API_KEY ?? "";
+  },
+  get OPENAI_TRANSCRIBE_MODEL() {
+    return process.env.OPENAI_TRANSCRIBE_MODEL || "gpt-4o-transcribe";
+  },
   /** Gmail OAuth (lectura del buzón de Renata para el cron de Actas). */
   get GMAIL_CLIENT_ID() {
     return process.env.GMAIL_CLIENT_ID ?? "";

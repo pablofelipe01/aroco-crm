@@ -139,6 +139,7 @@ export type Database = {
           original: Json | null
           registrado_por: string | null
           registrado_en: string | null
+          telegram_mensaje_id: string | null
           editado_por: string | null
           editado_en: string | null
           anulado_por: string | null
@@ -170,6 +171,7 @@ export type Database = {
           original?: Json | null
           registrado_por?: string | null
           registrado_en?: string | null
+          telegram_mensaje_id?: string | null
           editado_por?: string | null
           editado_en?: string | null
           anulado_por?: string | null
@@ -201,6 +203,7 @@ export type Database = {
           original?: Json | null
           registrado_por?: string | null
           registrado_en?: string | null
+          telegram_mensaje_id?: string | null
           editado_por?: string | null
           editado_en?: string | null
           anulado_por?: string | null
@@ -378,6 +381,7 @@ export type Database = {
           original: Json | null
           registrado_por: string | null
           registrado_en: string | null
+          telegram_mensaje_id: string | null
           created_at: string
           updated_at: string
         }
@@ -401,6 +405,7 @@ export type Database = {
           original?: Json | null
           registrado_por?: string | null
           registrado_en?: string | null
+          telegram_mensaje_id?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -424,8 +429,153 @@ export type Database = {
           original?: Json | null
           registrado_por?: string | null
           registrado_en?: string | null
+          telegram_mensaje_id?: string | null
           created_at?: string
           updated_at?: string
+        }
+        Relationships: []
+      }
+      finca_telegram_usuarios: {
+        Row: {
+          id: string
+          nombre: string
+          telefono: string
+          empleado_id: string | null
+          rol: string
+          recibe_avisos: boolean
+          chat_id: number | null
+          telegram_user_id: number | null
+          vinculado_en: string | null
+          activo: boolean
+          created_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          nombre: string
+          telefono: string
+          empleado_id?: string | null
+          rol?: string
+          recibe_avisos?: boolean
+          chat_id?: number | null
+          telegram_user_id?: number | null
+          vinculado_en?: string | null
+          activo?: boolean
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          nombre?: string
+          telefono?: string
+          empleado_id?: string | null
+          rol?: string
+          recibe_avisos?: boolean
+          chat_id?: number | null
+          telegram_user_id?: number | null
+          vinculado_en?: string | null
+          activo?: boolean
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      finca_telegram_mensajes: {
+        Row: {
+          id: string
+          update_id: number | null
+          chat_id: number
+          usuario_id: string | null
+          tipo: string
+          file_id: string | null
+          audio_path: string | null
+          duracion_s: number | null
+          texto: string | null
+          extraccion: Json | null
+          propuesta: Json | null
+          estado: string
+          error: string | null
+          fecha_labor: string | null
+          anterior_id: string | null
+          registros: string[]
+          usos: string[]
+          confirmado_en: string | null
+          bot_message_id: number | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          update_id?: number | null
+          chat_id: number
+          usuario_id?: string | null
+          tipo: string
+          file_id?: string | null
+          audio_path?: string | null
+          duracion_s?: number | null
+          texto?: string | null
+          extraccion?: Json | null
+          propuesta?: Json | null
+          estado?: string
+          error?: string | null
+          fecha_labor?: string | null
+          anterior_id?: string | null
+          registros?: string[]
+          usos?: string[]
+          confirmado_en?: string | null
+          bot_message_id?: number | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          update_id?: number | null
+          chat_id?: number
+          usuario_id?: string | null
+          tipo?: string
+          file_id?: string | null
+          audio_path?: string | null
+          duracion_s?: number | null
+          texto?: string | null
+          extraccion?: Json | null
+          propuesta?: Json | null
+          estado?: string
+          error?: string | null
+          fecha_labor?: string | null
+          anterior_id?: string | null
+          registros?: string[]
+          usos?: string[]
+          confirmado_en?: string | null
+          bot_message_id?: number | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      finca_telegram_envios: {
+        Row: {
+          id: string
+          fecha: string
+          tipo: string
+          usuario_id: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          fecha: string
+          tipo: string
+          usuario_id: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          fecha?: string
+          tipo?: string
+          usuario_id?: string
+          created_at?: string
         }
         Relationships: []
       }

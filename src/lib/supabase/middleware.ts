@@ -26,6 +26,9 @@ const PUBLIC_PREFIXES = [
   "/proveedor",
   "/api/cron",
   "/api/posicion",
+  // Bot de Labores Finca (0122): el webhook lo llama Telegram con su secreto
+  // (X-Telegram-Bot-Api-Secret-Token); /configurar pide el CRON_SECRET.
+  "/api/telegram",
 ];
 
 function isPublic(pathname: string) {

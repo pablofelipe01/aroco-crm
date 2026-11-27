@@ -48,6 +48,14 @@
     {
       "path": "/api/cron/sync-operaciones",
       "schedule": "15 12 * * *"
+    },
+    {
+      "path": "/api/cron/finca-telegram?tipo=recordatorio",
+      "schedule": "0 11 * * 1-6"
+    },
+    {
+      "path": "/api/cron/finca-telegram?tipo=aviso",
+      "schedule": "0 22 * * 1-6"
     }
   ]
 }

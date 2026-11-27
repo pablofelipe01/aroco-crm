@@ -6,6 +6,7 @@ import {
   CalendarDays,
   Check,
   Clock,
+  MessageCircle,
   Pencil,
   RotateCcw,
   Smartphone,
@@ -28,6 +29,11 @@ import {
 } from "./riego-combustible";
 import type { EquipoVista as EquipoCombustible } from "@/lib/finca/combustible";
 import { StatCard } from "@/components/ui/stat-card";
+import {
+  TelegramBot,
+  type MensajeTelegramVista,
+  type UsuarioTelegramVista,
+} from "./telegram-bot";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ScrollFijo } from "@/components/ui/scroll-fijo";
 import { cn, formatDate, formatNumber, formatPct } from "@/lib/utils";
@@ -79,6 +85,7 @@ type Pestana =
   | "poscosecha"
   | "riego"
   | "revisar"
+  | "telegram"
   | "catalogos";
 
 const num = (v: number | null, d = 0) => (v == null ? "—" : formatNumber(v, d));
@@ -104,7 +111,15 @@ export function LaboresFincaClient({
   empleados,
   valvulas,
   combustible,
+  telegram,
 }: {
+  telegram: {
+    activo: boolean;
+    usuarioBot: string | null;
+    usuarios: UsuarioTelegramVista[];
+    mensajes: MensajeTelegramVista[];
+    error: string | null;
+  };
   combustible: {
     compras: CompraTabla[];
     usos: UsoTabla[];
@@ -202,6 +217,11 @@ export function LaboresFincaClient({
       label: "Por revisar",
       cuenta: dudososReg.length + dudososBache.length,
     },
+    {
+      clave: "telegram",
+      label: "Telegram",
+      cuenta: telegram.mensajes.filter((m) => m.estado === "por_confirmar" || m.estado === "error").length || undefined,
+    },
     { clave: "catalogos", label: "Catálogos" },
   ];
 
@@ -244,7 +264,23 @@ export function LaboresFincaClient({
         ))}
       </div>
 
-      {pestana === "riego" ? (
+      {pestana === "telegram" ? (
+        telegram.error ? (
+          <EmptyState
+            icon={<MessageCircle className="h-6 w-6" />}
+            title="No se pudo cargar el bot"
+            description={telegram.error}
+          />
+        ) : (
+          <TelegramBot
+            activo={telegram.activo}
+            usuarioBot={telegram.usuarioBot}
+            empleados={empleados.map((e) => ({ id: e.id, nombre: e.nombre }))}
+            usuarios={telegram.usuarios}
+            mensajes={telegram.mensajes}
+          />
+        )
+      ) : pestana === "riego" ? (
         <RiegoCombustible
           compras={combustible.compras}
           usos={combustible.usos}
@@ -563,6 +599,14 @@ function Registros({
                   </td>
                   <td className="px-3 py-1.5">
                     {r.labor}
+                    {r.origen === "telegram" && (
+                      <span title="Mandado por Telegram">
+                        <MessageCircle
+                          className="text-fg-subtle ml-1 inline h-3.5 w-3.5"
+                          aria-label="Por Telegram"
+                        />
+                      </span>
+                    )}
                     {r.origen === "app" && (
                       <span title="Registrado desde el celular">
                         <Smartphone

@@ -6,6 +6,10 @@ import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
 import { LaboresFincaClient } from "./labores-finca-client";
 import type { CompraTabla, UsoTabla } from "./riego-combustible";
+import type { MensajeTelegramVista, UsuarioTelegramVista } from "./telegram-bot";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { serverEnv } from "@/lib/env";
+import type { Propuesta } from "@/lib/finca/telegram/reporte";
 
 export const dynamic = "force-dynamic";
 
@@ -41,7 +45,7 @@ export type RegistroVista = {
   dudoso: boolean;
   motivoDuda: string | null;
   refHoja: string | null;
-  origen: "hoja" | "app";
+  origen: "hoja" | "app" | "telegram";
   /** Tocado a mano en el CRM (0119): la recarga de la hoja ya no lo pisa. */
   editado: boolean;
   /** Anulado: no cuenta en ninguna suma. */
@@ -186,6 +190,7 @@ export default async function LaboresFincaPage() {
     );
   }
   const [empleados, labores, valvulas, registros, baches, equipos, compras, usos] = datos;
+  const telegram = await cargarTelegram(supabase);
   const codigoEquipo = new Map(equipos.map((e) => [e.id, e.codigo]));
   const comprasVista: CompraTabla[] = compras.map((c) => ({
     id: c.id,
@@ -246,7 +251,7 @@ export default async function LaboresFincaPage() {
       dudoso: r.dudoso,
       motivoDuda: r.motivo_duda,
       refHoja: r.ref_hoja,
-      origen: r.origen === "app" ? "app" : "hoja",
+      origen: r.origen === "app" || r.origen === "telegram" ? r.origen : "hoja",
       editado: r.editado_en != null,
       anulado: r.anulado_en
         ? { en: r.anulado_en, motivo: r.motivo_anulacion }
@@ -321,6 +326,81 @@ export default async function LaboresFincaPage() {
         codigo: v.codigo,
         registros: porValvula.get(v.codigo) ?? 0,
       }))}
+      telegram={telegram}
     />
   );
+}
+
+/**
+ * Pestaña «Telegram» (0122): quién usa el bot y los últimos mensajes. Si algo
+ * falla aquí, la página sigue: el bot no debe tumbar el resto de Labores Finca.
+ */
+async function cargarTelegram(supabase: Awaited<ReturnType<typeof createClient>>) {
+  const vacio = {
+    activo: Boolean(serverEnv.TELEGRAM_BOT_TOKEN),
+    usuarioBot: serverEnv.TELEGRAM_BOT_USERNAME || null,
+    usuarios: [] as UsuarioTelegramVista[],
+    mensajes: [] as MensajeTelegramVista[],
+    error: null as string | null,
+  };
+  const [us, ms] = await Promise.all([
+    supabase
+      .from("finca_telegram_usuarios")
+      .select("id, nombre, telefono, empleado_id, rol, recibe_avisos, vinculado_en")
+      .eq("activo", true)
+      .order("nombre"),
+    supabase
+      .from("finca_telegram_mensajes")
+      .select(
+        "id, created_at, usuario_id, tipo, texto, estado, error, fecha_labor, propuesta, registros, usos, audio_path, duracion_s",
+      )
+      .order("created_at", { ascending: false })
+      .limit(100),
+  ]);
+  if (us.error || ms.error) return { ...vacio, error: (us.error ?? ms.error)!.message };
+
+  const nombres = new Map((us.data ?? []).map((u) => [u.id, u.nombre]));
+  // Los audios están en un bucket privado: URL firmada por una hora.
+  const rutas = (ms.data ?? []).map((m) => m.audio_path).filter((x): x is string => Boolean(x));
+  const firmadas = new Map<string, string>();
+  if (rutas.length) {
+    const { data } = await createAdminClient().storage.from("finca-audios").createSignedUrls(rutas, 3600);
+    for (const f of data ?? []) if (f.path && f.signedUrl) firmadas.set(f.path, f.signedUrl);
+  }
+
+  return {
+    ...vacio,
+    usuarios: (us.data ?? []).map((u) => ({
+      id: u.id,
+      nombre: u.nombre,
+      telefono: u.telefono,
+      empleadoId: u.empleado_id,
+      rol: u.rol === "supervisor" ? ("supervisor" as const) : ("trabajador" as const),
+      recibeAvisos: u.recibe_avisos,
+      vinculadoEn: u.vinculado_en,
+    })),
+    mensajes: (ms.data ?? []).map((m) => {
+      const p = m.propuesta as unknown as Propuesta | null;
+      return {
+        id: m.id,
+        en: m.created_at,
+        quien: m.usuario_id ? (nombres.get(m.usuario_id) ?? null) : null,
+        tipo: m.tipo === "voz" ? ("voz" as const) : ("texto" as const),
+        texto: m.texto,
+        estado: m.estado,
+        error: m.error,
+        fechaLabor: m.fecha_labor,
+        labores: [
+          ...(p?.labores ?? []).map((l) =>
+            l.trabajadores.length ? `${l.labor} (${l.trabajadores.join(", ")})` : l.labor,
+          ),
+          ...(p?.usos ?? []).map((u) => u.equipo),
+        ],
+        preguntas: p?.preguntas ?? [],
+        guardados: (m.registros?.length ?? 0) + (m.usos?.length ?? 0),
+        audioUrl: m.audio_path ? (firmadas.get(m.audio_path) ?? null) : null,
+        duracion: m.duracion_s,
+      };
+    }),
+  };
 }

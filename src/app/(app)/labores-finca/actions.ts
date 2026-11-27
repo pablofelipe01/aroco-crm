@@ -13,6 +13,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import type { DatosRegistro } from "@/lib/finca/captura";
 import type { Json } from "@/lib/types/database";
+import { normalizarTelefono } from "@/lib/finca/telegram/reporte";
 
 export type Resultado = { ok: true } | { ok: false; error: string };
 
@@ -93,4 +94,62 @@ export async function historialRegistro(
       en: c.en,
     })),
   };
+}
+
+// ── Bot de Telegram (0122) ──────────────────────────────────────────────────
+//
+// Quién puede hablarle al bot. La RLS (is_direccion) es el candado; el bot
+// reconoce a la persona cuando comparte este mismo número.
+
+export type UsuarioTelegramForm = {
+  id: string | null;
+  nombre: string;
+  telefono: string;
+  empleadoId: string | null;
+  rol: "trabajador" | "supervisor";
+  recibeAvisos: boolean;
+};
+
+export async function guardarUsuarioTelegram(u: UsuarioTelegramForm): Promise<Resultado> {
+  const telefono = normalizarTelefono(u.telefono);
+  if (!/^\d{10,15}$/.test(telefono)) {
+    return { ok: false, error: "Número inválido. Ej.: 317 430 4429" };
+  }
+  if (u.rol === "trabajador" && !u.empleadoId) {
+    return { ok: false, error: "Falta el trabajador" };
+  }
+  const supabase = await createClient();
+  const fila = {
+    nombre: u.nombre.trim(),
+    telefono,
+    empleado_id: u.empleadoId,
+    rol: u.rol,
+    recibe_avisos: u.recibeAvisos,
+  };
+  if (u.id) {
+    const { data: antes } = await supabase
+      .from("finca_telegram_usuarios")
+      .select("telefono")
+      .eq("id", u.id)
+      .maybeSingle();
+    // Otro número = otra persona: el vínculo con el Telegram viejo se suelta.
+    const suelta = antes && antes.telefono !== telefono
+      ? { chat_id: null, telegram_user_id: null, vinculado_en: null }
+      : {};
+    const { error } = await supabase
+      .from("finca_telegram_usuarios")
+      .update({ ...fila, ...suelta })
+      .eq("id", u.id);
+    if (error?.code === "23505") return { ok: false, error: "Ese número ya lo tiene otra persona" };
+    return listo(error);
+  }
+  const { error } = await supabase.from("finca_telegram_usuarios").insert(fila);
+  if (error?.code === "23505") return { ok: false, error: "Ese número o ese trabajador ya está en la lista" };
+  return listo(error);
+}
+
+export async function quitarUsuarioTelegram(id: string): Promise<Resultado> {
+  const supabase = await createClient();
+  const { error } = await supabase.from("finca_telegram_usuarios").delete().eq("id", id);
+  return listo(error);
 }
